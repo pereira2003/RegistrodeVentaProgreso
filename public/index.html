@@ -309,7 +309,8 @@ button{cursor:pointer;border:none;background:none}
   </div>
 
   <div style="margin-top:10px" class="fila">
-    <button class="btn ambar" id="btnCam">Escanear QR</button>
+    <button class="btn ambar" id="btnCam">Escanear crédito</button>
+    <button class="btn plano" id="btnCamEntrega">Escanear entrega</button>
   </div>
 
   <div class="rotulo">Buscar sin escanear</div>
@@ -508,6 +509,7 @@ const DB = {
     }
     this.productos = caja.leer('gp_productos', null) || SEMILLA.slice();
     this.ventas    = caja.leer('gp_ventas', []);
+    this.entregas  = caja.leer('gp_entregas', []);
     caja.guardar('gp_productos', this.productos);
     sello('Modo prueba','local');
     pintarTodo();
@@ -600,29 +602,40 @@ $('#velo').addEventListener('click',cerrarHoja);
 /* ============================================================
    ESCÁNER
    ============================================================ */
-let flujo=null, leyendo=false, ultimo=0;
+let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito';
 const recientes = [];
+const entregaActual = { vendor: CFG.vendedores[0] || '', items: [] };
 
-$('#btnCam').addEventListener('click', async ()=>{
+$('#btnCam').addEventListener('click', async ()=>{ iniciarEscaneo('credito'); });
+$('#btnCamEntrega').addEventListener('click', async ()=>{ iniciarEscaneo('entrega'); });
+
+async function iniciarEscaneo(modo){
+  modoEscaneo = modo;
+  if(modo==='entrega' && !entregaActual.vendor && CFG.vendedores.length) entregaActual.vendor = CFG.vendedores[0];
   if(flujo){ apagarCamara(); return; }
   try{
     flujo = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
     const v=$('#video'); v.srcObject=flujo; await v.play();
     $('#visor').classList.add('encendida');
     $('#apagado').hidden=true; $('#reticula').hidden=false;
-    $('#btnCam').textContent='Detener escaneo'; $('#btnCam').classList.remove('ambar'); $('#btnCam').classList.add('plano');
+    const btn = modo === 'entrega' ? $('#btnCamEntrega') : $('#btnCam');
+    const otro = modo === 'entrega' ? $('#btnCam') : $('#btnCamEntrega');
+    btn.textContent='Detener escaneo'; btn.classList.remove('ambar'); btn.classList.add('plano');
+    otro.textContent = otro.id === 'btnCam' ? 'Escanear crédito' : 'Escanear entrega';
+    otro.classList.add('ambar'); otro.classList.remove('plano');
     leyendo=true; requestAnimationFrame(cicloLectura);
   }catch(e){
     $('#apagado').innerHTML = '<b>No se pudo abrir la cámara</b>La página necesita HTTPS y permiso de cámara. Mientras tanto, escribe el código del producto abajo.';
     $('#visor').classList.remove('encendida');
     $('#apagado').hidden=false;
   }
-});
+}
 function apagarCamara(){
   leyendo=false; if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
   $('#visor').classList.remove('encendida');
   $('#video').srcObject=null; $('#reticula').hidden=true; $('#apagado').hidden=false;
-  $('#btnCam').textContent='Escanear QR'; $('#btnCam').classList.add('ambar'); $('#btnCam').classList.remove('plano');
+  $('#btnCam').textContent='Escanear crédito'; $('#btnCam').classList.add('ambar'); $('#btnCam').classList.remove('plano');
+  $('#btnCamEntrega').textContent='Escanear entrega'; $('#btnCamEntrega').classList.add('ambar'); $('#btnCamEntrega').classList.remove('plano');
 }
 function cicloLectura(){
   if(!leyendo) return;
@@ -635,8 +648,13 @@ function cicloLectura(){
     const cod=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
     if(cod && cod.data){
       if(navigator.vibrate) navigator.vibrate(60);
-      apagarCamara();                       // se desactiva sola al leer el código
-      abrirProducto(cod.data.trim());
+      const sku = cod.data.trim();
+      apagarCamara();
+      if(modoEscaneo === 'entrega'){
+        procesarEscaneoEntrega(sku);
+      }else{
+        abrirProducto(sku);
+      }
       return;
     }
   }
@@ -651,6 +669,87 @@ function abrirProducto(sku){
   if(!recientes.find(r=>r.sku===p.sku)) recientes.unshift(p);
   recientes.splice(6); pintarRecientes();
   fichaProducto(p);
+}
+
+function mostrarHojaEntrega(){
+  const vendedor = entregaActual.vendor || CFG.vendedores[0] || '';
+  const items = entregaActual.items || [];
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Entrega de producto</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="tarjeta pad">
+      <div class="campo" style="margin-bottom:0">
+        <label>Vendedor</label>
+        <select id="entregaVendor" onchange="entregaActual.vendor=this.value; mostrarHojaEntrega()">
+          ${CFG.vendedores.map(v=>`<option value="${esc(v)}" ${v===vendedor?'selected':''}>${esc(v)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="rotulo">Productos que lleva</div>
+    ${items.length ? `<div>${items.map(item=>`
+      <div class="item" style="padding:10px 12px">
+        <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
+        <div class="val">${money(item.precio||0)}<small>${item.cantidad||1} pieza</small></div>
+      </div>`).join('')}</div>` : `<div class="vacio"><b>Sin productos</b>Escanea uno para agregarlo a la entrega.</div>`}
+    <button class="btn ambar" style="margin-top:14px" onclick="guardarEntrega()">Guardar</button>
+    <button class="btn plano" style="margin-top:8px" onclick="guardarEntrega(); cerrarHoja(); iniciarEscaneo('entrega')">Escaneo otro producto y guardar</button>
+  `);
+}
+
+function guardarEntrega(){
+  const vendedor = entregaActual.vendor || CFG.vendedores[0] || 'Sin vendedor';
+  if(!entregaActual.items.length){ brindis('Escanea al menos un producto antes de guardar'); return; }
+  DB.entregas = (DB.entregas||[]).filter(x=>x.vendor!==vendedor);
+  DB.entregas.push({
+    vendor: vendedor,
+    items: entregaActual.items.map(item=>({ ...item })),
+    fecha: hoy(),
+    creado: new Date().toISOString()
+  });
+  caja.guardar('gp_entregas', DB.entregas);
+  brindis(`Entrega guardada para ${vendedor}`);
+  entregaActual.items = [];
+}
+
+function procesarEscaneoEntrega(sku){
+  const p = DB.buscar(sku);
+  if(!p){ brindis('No hay ningún producto con el código '+sku); return; }
+  if(!entregaActual.vendor && CFG.vendedores.length) entregaActual.vendor = CFG.vendedores[0];
+  const vendedor = entregaActual.vendor || CFG.vendedores[0] || 'Sin vendedor';
+
+  const listaGuardada = (DB.entregas||[]).find(x=>x.vendor===vendedor)?.items || [];
+  const indiceGuardado = listaGuardada.findIndex(item=>item.sku===p.sku);
+  if(indiceGuardado >= 0){
+    const item = listaGuardada.splice(indiceGuardado,1)[0];
+    DB.entregas = (DB.entregas||[]).filter(x=>x.vendor!==vendedor);
+    if(listaGuardada.length) DB.entregas.push({ vendor:vendedor, items:listaGuardada, fecha:hoy(), creado:new Date().toISOString() });
+    caja.guardar('gp_entregas', DB.entregas);
+    guardarVentaEntrega(vendedor, p, item.cantidad || 1);
+    brindis(`${p.nombre} quedó vendido para ${vendedor}`);
+    mostrarHojaEntrega();
+    return;
+  }
+
+  const idx = entregaActual.items.findIndex(item=>item.sku===p.sku);
+  if(idx >= 0){
+    entregaActual.items.splice(idx,1);
+    brindis(`${p.nombre} quitado de la entrega`);
+  }else{
+    entregaActual.items.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 });
+    brindis(`${p.nombre} agregado a la entrega`);
+  }
+  mostrarHojaEntrega();
+}
+
+function guardarVentaEntrega(vendedor, p, cantidad = 1){
+  const total = +(p.contado || 0) * cantidad;
+  const venta = {
+    id: uid(), sku:p.sku, producto:p.nombre, marca:p.marca||'', tipo:'entrega',
+    cantidad, precioUnitario:+(p.contado || 0).toFixed(2),
+    cliente: vendedor, documento:'', telefono:'', direccion:'', ubicacion:null,
+    vendedor, sucursal:sucursalActual(), fecha:hoy(), creado:new Date().toISOString(), abonos:[],
+    total: +total.toFixed(2), prima: +total.toFixed(2), totalCancelar:0, saldo:0, estado:'pagada', cuotas:[]
+  };
+  DB.guardarVenta(venta);
 }
 
 function fichaProducto(p){
