@@ -130,9 +130,13 @@ button{cursor:pointer;border:none;background:none}
 .campo input,.campo select,.campo textarea{
   width:100%;min-width:0;padding:11px 12px;border:1.5px solid var(--suave);border-radius:var(--r);background:#fff;
 }
+.campo input[type="date"]{display:block;width:100%;max-width:100%;min-width:0}
 .campo input:focus,.campo select:focus{border-color:var(--borde);outline:none}
 .dosc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .dosc>*{min-width:0}
+@media (max-width:520px){
+  .dosc{grid-template-columns:1fr}
+}
 .chips{display:flex;gap:7px;flex-wrap:wrap}
 .chip{
   flex:1;min-width:62px;padding:10px 6px;border:1.5px solid var(--borde);border-radius:var(--r);
