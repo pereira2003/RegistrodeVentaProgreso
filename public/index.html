@@ -310,7 +310,7 @@ button{cursor:pointer;border:none;background:none}
 
   <div style="margin-top:10px" class="fila">
     <button class="btn ambar" id="btnCam">Escanear crédito</button>
-    <button class="btn plano" id="btnCamEntrega">Escanear entrega</button>
+    <button class="btn plano" id="btnCamEntrega">Escanear entrega y devolución</button>
   </div>
 
   <div class="rotulo">Buscar sin escanear</div>
@@ -621,7 +621,7 @@ async function iniciarEscaneo(modo){
     const btn = modo === 'entrega' ? $('#btnCamEntrega') : $('#btnCam');
     const otro = modo === 'entrega' ? $('#btnCam') : $('#btnCamEntrega');
     btn.textContent='Detener escaneo'; btn.classList.remove('ambar'); btn.classList.add('plano');
-    otro.textContent = otro.id === 'btnCam' ? 'Escanear crédito' : 'Escanear entrega';
+    otro.textContent = otro.id === 'btnCam' ? 'Escanear crédito' : 'Escanear entrega y devolución';
     otro.classList.add('ambar'); otro.classList.remove('plano');
     leyendo=true; requestAnimationFrame(cicloLectura);
   }catch(e){
@@ -635,7 +635,7 @@ function apagarCamara(){
   $('#visor').classList.remove('encendida');
   $('#video').srcObject=null; $('#reticula').hidden=true; $('#apagado').hidden=false;
   $('#btnCam').textContent='Escanear crédito'; $('#btnCam').classList.add('ambar'); $('#btnCam').classList.remove('plano');
-  $('#btnCamEntrega').textContent='Escanear entrega'; $('#btnCamEntrega').classList.add('ambar'); $('#btnCamEntrega').classList.remove('plano');
+  $('#btnCamEntrega').textContent='Escanear entrega y devolución'; $('#btnCamEntrega').classList.add('ambar'); $('#btnCamEntrega').classList.remove('plano');
 }
 function cicloLectura(){
   if(!leyendo) return;
