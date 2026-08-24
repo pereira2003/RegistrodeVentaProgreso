@@ -130,7 +130,7 @@ button{cursor:pointer;border:none;background:none}
 .campo input,.campo select,.campo textarea{
   width:100%;min-width:0;padding:11px 12px;border:1.5px solid var(--suave);border-radius:var(--r);background:#fff;
 }
-.campo input[type="date"]{display:block;width:100%;max-width:100%;min-width:0}
+.campo input[type="date"]{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none}
 .campo input:focus,.campo select:focus{border-color:var(--borde);outline:none}
 .dosc{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .dosc>*{min-width:0}
@@ -202,6 +202,7 @@ button{cursor:pointer;border:none;background:none}
 .hoja{
   position:fixed;left:0;right:0;bottom:0;z-index:61;background:var(--fondo);
   border-top:1px solid var(--suave);max-height:92vh;overflow-y:auto;display:none;
+  overflow-x:hidden;
   padding:0 14px calc(22px + env(safe-area-inset-bottom));
   animation:sube .2s cubic-bezier(.2,.8,.3,1);
 }
