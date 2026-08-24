@@ -323,6 +323,13 @@ button{cursor:pointer;border:none;background:none}
   <div id="recientes"></div>
 </section>
 
+<!-- ================= ENTREGAS Y DEVOLUCIONES ================= -->
+<section class="vista" data-vista="entregas">
+  <div class="rotulo">Entregas y devoluciones</div>
+  <div class="cifras" id="resumenEntregas"></div>
+  <div id="listaEntregas"></div>
+</section>
+
 <!-- ================= PRODUCTOS ================= -->
 <section class="vista" data-vista="productos">
   <input id="filtroProd" placeholder="Buscar por nombre, marca o código"
@@ -406,6 +413,9 @@ button{cursor:pointer;border:none;background:none}
   <button data-ir="escanear" class="on">
     <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 011-1h3M20 8V5a1 1 0 00-1-1h-3M4 16v3a1 1 0 001 1h3M20 16v3a1 1 0 01-1 1h-3M3 12h18"/></svg>
     Escanear</button>
+  <button data-ir="entregas">
+    <svg viewBox="0 0 24 24"><path d="M3 4h8l4 4h6v12H3zm8 0v4h8"/></svg>
+    Entregas</button>
   <button data-ir="productos">
     <svg viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0v10l-8 4m8-14l-8 4m0 10L4 17V7m8 10V11M4 7l8 4"/></svg>
     Productos</button>
@@ -455,6 +465,7 @@ const CFG = {
   // Cuando escribas las tuyas, aparece un campo para elegirla al registrar la venta.
   sucursales: [],
   vendedores: ['Abrahan','Katherine','José','Marielos'],
+  zonas: ['Zona Norte','Zona Sur','Zona Centro','Zona Este'],
   // Prima: porcentaje del total que el cliente paga al momento de la compra.
   // 0.10 = 10 %. El resto se reparte en partes iguales entre los meses del plazo.
   primaPct: 0.10,
@@ -511,6 +522,7 @@ const DB = {
     this.ventas    = caja.leer('gp_ventas', []);
     this.entregas  = caja.leer('gp_entregas', []);
     caja.guardar('gp_productos', this.productos);
+    caja.guardar('gp_entregas', this.entregas);
     sello('Modo prueba','local');
     pintarTodo();
   },
@@ -604,7 +616,7 @@ $('#velo').addEventListener('click',cerrarHoja);
    ============================================================ */
 let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito';
 const recientes = [];
-const entregaActual = { vendor: CFG.vendedores[0] || '', items: [] };
+const entregaActual = { vendor: CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
 
 $('#btnCam').addEventListener('click', async ()=>{ iniciarEscaneo('credito'); });
 $('#btnCamEntrega').addEventListener('click', async ()=>{ iniciarEscaneo('entrega'); });
@@ -676,15 +688,25 @@ function abrirProducto(sku){
 
 function mostrarHojaEntrega(){
   const vendedor = entregaActual.vendor || CFG.vendedores[0] || '';
+  const zona = entregaActual.zona || CFG.zonas[0] || '';
   const items = entregaActual.items || [];
+  const devueltos = entregaActual.devueltos || [];
   abrirHoja(`
-    <div class="hoja-tope"><h2>Entrega de producto</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="hoja-tope"><h2>Entrega y devolución</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="tarjeta pad">
-      <div class="campo" style="margin-bottom:0">
-        <label>Vendedor</label>
-        <select id="entregaVendor" onchange="entregaActual.vendor=this.value; mostrarHojaEntrega()">
-          ${CFG.vendedores.map(v=>`<option value="${esc(v)}" ${v===vendedor?'selected':''}>${esc(v)}</option>`).join('')}
-        </select>
+      <div class="dosc" style="margin-bottom:0">
+        <div class="campo" style="margin-bottom:0">
+          <label>Vendedor</label>
+          <select id="entregaVendor" onchange="entregaActual.vendor=this.value; mostrarHojaEntrega()">
+            ${CFG.vendedores.map(v=>`<option value="${esc(v)}" ${v===vendedor?'selected':''}>${esc(v)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="campo" style="margin-bottom:0">
+          <label>Zona</label>
+          <select id="entregaZona" onchange="entregaActual.zona=this.value; mostrarHojaEntrega()">
+            ${CFG.zonas.map(z=>`<option value="${esc(z)}" ${z===zona?'selected':''}>${esc(z)}</option>`).join('')}
+          </select>
+        </div>
       </div>
     </div>
     <div class="rotulo">Productos que lleva</div>
@@ -693,6 +715,12 @@ function mostrarHojaEntrega(){
         <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
         <div class="val">${money(item.precio||0)}<small>${item.cantidad||1} pieza</small></div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin productos</b>Escanea uno para agregarlo a la entrega.</div>`}
+    <div class="rotulo">Productos que regresan</div>
+    ${devueltos.length ? `<div>${devueltos.map(item=>`
+      <div class="item" style="padding:10px 12px; border-color:rgba(216,194,164,.7)">
+        <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
+        <div class="val">${money(item.precio||0)}<small>${item.cantidad||1} devuelto</small></div>
+      </div>`).join('')}</div>` : `<div class="vacio"><b>Sin devoluciones</b>Si escaneas el mismo producto otra vez, queda aquí.</div>`}
     <button class="btn ambar" style="margin-top:14px" onclick="guardarEntrega()">Guardar</button>
     <button class="btn plano" style="margin-top:8px" onclick="cerrarHoja(); iniciarEscaneo('entrega')">Escaneo otro producto</button>
   `);
@@ -700,40 +728,57 @@ function mostrarHojaEntrega(){
 
 function guardarEntrega(){
   const vendedor = entregaActual.vendor || CFG.vendedores[0] || 'Sin vendedor';
-  if(!entregaActual.items.length){ brindis('Escanea al menos un producto antes de guardar'); return; }
-  DB.entregas = (DB.entregas||[]).filter(x=>x.vendor!==vendedor);
+  const zona = entregaActual.zona || CFG.zonas[0] || 'Sin zona';
+  if(!entregaActual.items.length && !entregaActual.devueltos.length){ brindis('Escanea al menos un producto antes de guardar'); return; }
+  DB.entregas = (DB.entregas||[]).filter(x=>!(x.vendor===vendedor && x.zona===zona));
   DB.entregas.push({
     vendor: vendedor,
-    items: entregaActual.items.map(item=>({ ...item })),
+    zona: zona,
+    entregados: entregaActual.items.map(item=>({ ...item, cantidad: item.cantidad || 1 })),
+    devueltos: entregaActual.devueltos.map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     fecha: hoy(),
     creado: new Date().toISOString()
   });
   caja.guardar('gp_entregas', DB.entregas);
   brindis(`Entrega guardada para ${vendedor}`);
   entregaActual.items = [];
+  entregaActual.devueltos = [];
+  cerrarHoja();
+  pintarEntregas();
 }
 
 function procesarEscaneoEntrega(sku){
   const p = DB.buscar(sku);
   if(!p){ brindis('No hay ningún producto con el código '+sku); return; }
   if(!entregaActual.vendor && CFG.vendedores.length) entregaActual.vendor = CFG.vendedores[0];
+  if(!entregaActual.zona && CFG.zonas.length) entregaActual.zona = CFG.zonas[0];
   const vendedor = entregaActual.vendor || CFG.vendedores[0] || 'Sin vendedor';
 
   const idxActual = entregaActual.items.findIndex(item=>item.sku===p.sku);
   if(idxActual >= 0){
-    entregaActual.items.splice(idxActual,1);
+    const item = entregaActual.items.splice(idxActual,1)[0];
+    const dev = entregaActual.devueltos.find(x=>x.sku===p.sku);
+    if(dev){ dev.cantidad = (dev.cantidad||1)+1; } else { entregaActual.devueltos.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.precio||0, cantidad:1 }); }
     brindis(`${p.nombre} quitado de la entrega`);
     mostrarHojaEntrega();
     return;
   }
 
-  const listaGuardada = (DB.entregas||[]).find(x=>x.vendor===vendedor)?.items || [];
+  const idxDev = entregaActual.devueltos.findIndex(item=>item.sku===p.sku);
+  if(idxDev >= 0){
+    entregaActual.devueltos.splice(idxDev,1);
+    brindis(`${p.nombre} regresó a la lista de entregados`);
+    entregaActual.items.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 });
+    mostrarHojaEntrega();
+    return;
+  }
+
+  const listaGuardada = (DB.entregas||[]).find(x=>x.vendor===vendedor && x.zona===entregaActual.zona)?.entregados || [];
   const indiceGuardado = listaGuardada.findIndex(item=>item.sku===p.sku);
   if(indiceGuardado >= 0){
-    const nuevaLista = listaGuardada.filter(item=>item.sku!==p.sku);
-    DB.entregas = (DB.entregas||[]).filter(x=>x.vendor!==vendedor);
-    if(nuevaLista.length){ DB.entregas.push({ vendor:vendedor, items:nuevaLista, fecha:hoy(), creado:new Date().toISOString() }); }
-    caja.guardar('gp_entregas', DB.entregas);
+    const item = listaGuardada[indiceGuardado];
+    const dev = entregaActual.devueltos.find(x=>x.sku===p.sku);
+    if(dev){ dev.cantidad = (dev.cantidad||1)+1; } else { entregaActual.devueltos.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 }); }
     brindis(`${p.nombre} quitado; no se registró como venta`);
     mostrarHojaEntrega();
     return;
@@ -1488,7 +1533,33 @@ $('#btnCsv').addEventListener('click',()=>{
 /* ============================================================
    ARRANQUE
    ============================================================ */
-function pintarTodo(){ pintarProductos(); pintarVentas(); pintarCartera(); pintarRecientes(); }
+function pintarEntregas(){
+  const entregas = DB.entregas || [];
+  const totalEntregados = entregas.reduce((s,e)=>s + (e.entregados||[]).reduce((t,i)=>t+(i.cantidad||1),0),0);
+  const totalDevueltos = entregas.reduce((s,e)=>s + (e.devueltos||[]).reduce((t,i)=>t+(i.cantidad||1),0),0);
+  const vendedores = new Set(entregas.map(e=>e.vendor));
+
+  $('#resumenEntregas').innerHTML = `
+    <div class="cifra"><em>Registros</em><b>${entregas.length}</b></div>
+    <div class="cifra bien"><em>Productos entregados</em><b>${totalEntregados}</b></div>
+    <div class="cifra"><em>Productos devueltos</em><b>${totalDevueltos}</b></div>
+    <div class="cifra"><em>Vendedores</em><b>${vendedores.size}</b></div>`;
+
+  $('#listaEntregas').innerHTML = entregas.length ? entregas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||'')).map(e=>{
+    const entregados = (e.entregados||[]).map(i=>`${esc(i.nombre)} × ${i.cantidad||1}`).join(', ');
+    const devueltos = (e.devueltos||[]).map(i=>`${esc(i.nombre)} × ${i.cantidad||1}`).join(', ');
+    return `<div class="item" style="display:block">
+      <div class="cont"><h4>${esc(e.vendor)}</h4>
+        <div class="meta">${fecha(e.fecha)} · ${esc(e.zona||'Sin zona')}</div>
+        <div class="meta" style="margin-top:8px"><strong>Entrega:</strong> ${entregados || '—'}</div>
+        <div class="meta"><strong>Devolución:</strong> ${devueltos || '—'}</div>
+      </div>
+      <div class="val">${(e.entregados||[]).reduce((t,i)=>t+(i.cantidad||1),0)}<small>entregados</small></div>
+    </div>`;
+  }).join('') : `<div class="vacio"><b>No hay entregas</b>Los registros aparecerán aquí con vendedor, zona y cantidades.</div>`;
+}
+
+function pintarTodo(){ pintarProductos(); pintarVentas(); pintarCartera(); pintarEntregas(); pintarRecientes(); }
 
 // La sucursal solo se pide si la configuraste en CFG.sucursales
 function sucursalActual(){
