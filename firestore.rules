@@ -1,0 +1,55 @@
+rules_version = '2';
+
+// Reglas de seguridad de Firestore.
+// Publícalas con:  firebase deploy --only firestore:rules
+//
+// Modelo: cada empleado tiene un documento en /usuarios/{uid} con { rol: "vendedor" | "admin" }.
+// Crea esos documentos a mano desde la consola de Firebase la primera vez.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function rol() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol;
+    }
+
+    function esAdmin() {
+      return autenticado() && rol() == 'admin';
+    }
+
+    // Perfiles: cada quien lee el suyo; solo el admin los modifica.
+    match /usuarios/{uid} {
+      allow read: if autenticado() && (request.auth.uid == uid || esAdmin());
+      allow write: if esAdmin();
+    }
+
+    // Catálogo: todo empleado autenticado lo lee.
+    // El vendedor solo puede tocar la existencia (al vender); el admin edita todo.
+    match /productos/{sku} {
+      allow read: if autenticado();
+      allow create, delete: if esAdmin();
+      allow update: if esAdmin() ||
+        (autenticado() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']));
+    }
+
+    // Ventas: se crean con el vendedor autenticado y ya no se borran.
+    // Solo se permite actualizar los campos de cobro.
+    match /ventas/{id} {
+      allow read: if autenticado();
+      allow create: if autenticado()
+        && request.resource.data.cliente is string
+        && request.resource.data.cliente.size() > 0
+        && request.resource.data.total is number;
+      allow update: if esAdmin() ||
+        (autenticado() &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['cuotas','saldo','estado','abonos']));
+      allow delete: if false;
+    }
+  }
+}
