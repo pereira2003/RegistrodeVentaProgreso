@@ -736,8 +736,7 @@ function formVenta(sku, tipo){
       <div class="campo"><label>Dirección de entrega</label><input id="vDir" placeholder="Barrio, calle, referencia"></div>
       <div class="campo" style="margin-bottom:0">
         <label>Ubicación de la venta</label>
-        <button class="btn plano chico" style="width:100%" id="btnGeo" onclick="capturarUbicacion()">Capturar ubicación GPS</button>
-        <div id="geoTxt" style="font-family:var(--dato);font-size:11px;color:var(--tinta-3);margin-top:6px">Sin capturar</div>
+        <div id="geoTxt" style="font-family:var(--dato);font-size:11px;color:var(--tinta-3);margin-top:6px">Detectando ubicación...</div>
       </div>
     </div>
 
@@ -759,6 +758,7 @@ function formVenta(sku, tipo){
     <button class="btn plano" style="margin-top:8px" onclick="cerrarHoja()">Cancelar</button>
   `);
   calcular();
+  capturarUbicacion();
 }
 
 let _tipo = 'contado';
@@ -832,13 +832,14 @@ function calcular(){
 }
 
 function capturarUbicacion(){
-  if(!navigator.geolocation){ $('#geoTxt').textContent='Este teléfono no reporta ubicación'; return; }
-  $('#geoTxt').textContent='Buscando señal…';
+  const geoTxt = $('#geoTxt');
+  if(!geoTxt) return;
+  if(!navigator.geolocation){ geoTxt.textContent='Este teléfono no reporta ubicación'; return; }
+  geoTxt.textContent='Buscando señal...';
   navigator.geolocation.getCurrentPosition(
     pos=>{ ubicacion={lat:+pos.coords.latitude.toFixed(6), lng:+pos.coords.longitude.toFixed(6), precision:Math.round(pos.coords.accuracy)};
-      $('#geoTxt').textContent=`${ubicacion.lat}, ${ubicacion.lng} · ±${ubicacion.precision} m`;
-      $('#btnGeo').textContent='Ubicación capturada'; },
-    ()=>{ $('#geoTxt').textContent='Permiso de ubicación denegado'; },
+      geoTxt.textContent=`${ubicacion.lat}, ${ubicacion.lng} · ±${ubicacion.precision} m`; },
+    ()=>{ geoTxt.textContent='Permiso de ubicación denegado'; },
     {enableHighAccuracy:true, timeout:10000}
   );
 }
