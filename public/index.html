@@ -716,40 +716,29 @@ function procesarEscaneoEntrega(sku){
   if(!entregaActual.vendor && CFG.vendedores.length) entregaActual.vendor = CFG.vendedores[0];
   const vendedor = entregaActual.vendor || CFG.vendedores[0] || 'Sin vendedor';
 
-  const listaGuardada = (DB.entregas||[]).find(x=>x.vendor===vendedor)?.items || [];
-  const indiceGuardado = listaGuardada.findIndex(item=>item.sku===p.sku);
-  if(indiceGuardado >= 0){
-    const item = listaGuardada.splice(indiceGuardado,1)[0];
-    DB.entregas = (DB.entregas||[]).filter(x=>x.vendor!==vendedor);
-    if(listaGuardada.length) DB.entregas.push({ vendor:vendedor, items:listaGuardada, fecha:hoy(), creado:new Date().toISOString() });
-    caja.guardar('gp_entregas', DB.entregas);
-    guardarVentaEntrega(vendedor, p, item.cantidad || 1);
-    brindis(`${p.nombre} quedó vendido para ${vendedor}`);
+  const idxActual = entregaActual.items.findIndex(item=>item.sku===p.sku);
+  if(idxActual >= 0){
+    entregaActual.items.splice(idxActual,1);
+    brindis(`${p.nombre} quitado de la entrega`);
     mostrarHojaEntrega();
     return;
   }
 
-  const idx = entregaActual.items.findIndex(item=>item.sku===p.sku);
-  if(idx >= 0){
-    entregaActual.items.splice(idx,1);
-    brindis(`${p.nombre} quitado de la entrega`);
-  }else{
-    entregaActual.items.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 });
-    brindis(`${p.nombre} agregado a la entrega`);
+  const listaGuardada = (DB.entregas||[]).find(x=>x.vendor===vendedor)?.items || [];
+  const indiceGuardado = listaGuardada.findIndex(item=>item.sku===p.sku);
+  if(indiceGuardado >= 0){
+    const nuevaLista = listaGuardada.filter(item=>item.sku!==p.sku);
+    DB.entregas = (DB.entregas||[]).filter(x=>x.vendor!==vendedor);
+    if(nuevaLista.length){ DB.entregas.push({ vendor:vendedor, items:nuevaLista, fecha:hoy(), creado:new Date().toISOString() }); }
+    caja.guardar('gp_entregas', DB.entregas);
+    brindis(`${p.nombre} quitado; no se registró como venta`);
+    mostrarHojaEntrega();
+    return;
   }
-  mostrarHojaEntrega();
-}
 
-function guardarVentaEntrega(vendedor, p, cantidad = 1){
-  const total = +(p.contado || 0) * cantidad;
-  const venta = {
-    id: uid(), sku:p.sku, producto:p.nombre, marca:p.marca||'', tipo:'entrega',
-    cantidad, precioUnitario:+(p.contado || 0).toFixed(2),
-    cliente: vendedor, documento:'', telefono:'', direccion:'', ubicacion:null,
-    vendedor, sucursal:sucursalActual(), fecha:hoy(), creado:new Date().toISOString(), abonos:[],
-    total: +total.toFixed(2), prima: +total.toFixed(2), totalCancelar:0, saldo:0, estado:'pagada', cuotas:[]
-  };
-  DB.guardarVenta(venta);
+  entregaActual.items.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 });
+  brindis(`${p.nombre} agregado a la entrega`);
+  mostrarHojaEntrega();
 }
 
 function fichaProducto(p){
