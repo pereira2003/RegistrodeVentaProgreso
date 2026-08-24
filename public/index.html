@@ -612,6 +612,9 @@ $('#btnCamEntrega').addEventListener('click', async ()=>{ iniciarEscaneo('entreg
 async function iniciarEscaneo(modo){
   modoEscaneo = modo;
   if(modo==='entrega' && !entregaActual.vendor && CFG.vendedores.length) entregaActual.vendor = CFG.vendedores[0];
+  if(modo==='entrega' && entregaActual.items.length){
+    mostrarHojaEntrega();
+  }
   if(flujo){ apagarCamara(); return; }
   try{
     flujo = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
@@ -691,7 +694,7 @@ function mostrarHojaEntrega(){
         <div class="val">${money(item.precio||0)}<small>${item.cantidad||1} pieza</small></div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin productos</b>Escanea uno para agregarlo a la entrega.</div>`}
     <button class="btn ambar" style="margin-top:14px" onclick="guardarEntrega()">Guardar</button>
-    <button class="btn plano" style="margin-top:8px" onclick="guardarEntrega(); cerrarHoja(); iniciarEscaneo('entrega')">Escaneo otro producto y guardar</button>
+    <button class="btn plano" style="margin-top:8px" onclick="cerrarHoja(); iniciarEscaneo('entrega')">Escaneo otro producto</button>
   `);
 }
 
