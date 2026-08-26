@@ -380,9 +380,11 @@ button{cursor:pointer;border:none;background:none}
     <div class="tarjeta pad">
       <div class="campo"><label>Tamaño</label>
         <div class="chips" id="tamEtiq">
-          <button class="chip" data-tam="chica">35 mm<small>45 mm alto</small></button>
-          <button class="chip on" data-tam="mediana">45 mm<small>58 mm alto</small></button>
-          <button class="chip" data-tam="grande">60 mm<small>76 mm alto</small></button>
+          <button class="chip on" data-tam="micro">20 mm<small>28 mm alto</small></button>
+          <button class="chip" data-tam="mini">23 mm<small>31 mm alto</small></button>
+          <button class="chip" data-tam="chica">28 mm<small>36 mm alto</small></button>
+          <button class="chip" data-tam="mediana">33 mm<small>43 mm alto</small></button>
+          <button class="chip" data-tam="grande">40 mm<small>52 mm alto</small></button>
         </div>
       </div>
       <div class="campo"><label>Datos visibles</label>
@@ -1263,11 +1265,13 @@ function pintarCartera(){
    ETIQUETAS QR
    ============================================================ */
 const TAM = {
-  chica:   {w:35, h:45, pad:2.5, tNom:2.0, tSku:2.2, tPre:3.0},
-  mediana: {w:45, h:58, pad:3.0, tNom:2.5, tSku:2.8, tPre:4.0},
-  grande:  {w:60, h:76, pad:4.0, tNom:3.3, tSku:3.6, tPre:5.2}
+  micro:   {w:20, h:28, pad:1.4, tNom:1.2, tSku:1.4, tPre:1.7},
+  mini:    {w:23, h:31, pad:1.6, tNom:1.4, tSku:1.6, tPre:2.0},
+  chica:   {w:28, h:36, pad:1.8, tNom:1.6, tSku:1.8, tPre:2.4},
+  mediana: {w:33, h:43, pad:2.2, tNom:1.8, tSku:2.1, tPre:2.8},
+  grande:  {w:40, h:52, pad:2.8, tNom:2.3, tSku:2.6, tPre:3.4}
 };
-const etq = { sel:new Set(), tam:'mediana', ver:{nombre:true, marca:false, precio:true}, copias:1 };
+const etq = { sel:new Set(), tam:'micro', ver:{nombre:true, marca:false, precio:true}, copias:1 };
 
 // Parte el texto en renglones que quepan en el ancho dado
 function renglones(txt, maxCar, max){
