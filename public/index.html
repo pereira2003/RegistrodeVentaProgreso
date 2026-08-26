@@ -179,10 +179,11 @@ button{cursor:pointer;border:none;background:none}
   margin-top:3px;letter-spacing:.03em}
 .product-swipe{
   position:relative;overflow:hidden;border-radius:18px;margin-bottom:10px;background:transparent;
+  isolation:isolate;z-index:1;
 }
 .product-swipe .swipe-actions{
   position:absolute;top:0;right:0;bottom:0;width:0;display:flex;gap:8px;
-  overflow:hidden;opacity:0;transition:width .22s ease, opacity .22s ease;z-index:0;
+  overflow:hidden;opacity:0;transition:width .22s ease, opacity .22s ease;z-index:3;
   pointer-events:none;align-items:stretch;justify-content:flex-end;padding:8px 0 8px 8px;
 }
 .product-swipe .swipe-actions button{
@@ -195,7 +196,7 @@ button{cursor:pointer;border:none;background:none}
 .product-swipe .swipe-actions .btn-credito{background:linear-gradient(180deg,#d9c09e,#c7ac7a);color:#2a241d;}
 .product-swipe.open .swipe-actions{width:174px;opacity:1;pointer-events:auto}
 .product-swipe .swipe-content{
-  position:relative;z-index:1;transition:transform .22s ease;touch-action:pan-y;
+  position:relative;z-index:2;transition:transform .22s ease;touch-action:pan-y;
   background:var(--papel);border:1px solid var(--suave);border-radius:18px;
   box-shadow:0 10px 22px rgba(24,22,19,.04);overflow:hidden;
 }
