@@ -178,13 +178,17 @@ button{cursor:pointer;border:none;background:none}
 .item .val small{display:block;font-family:var(--dato);font-weight:500;font-size:10px;color:var(--tinta-3);
   margin-top:3px;letter-spacing:.03em}
 .product-swipe{position:relative;overflow:hidden;border-radius:var(--r);margin-bottom:8px}
-.product-swipe .swipe-actions{position:absolute;inset:0 0 0 auto;width:150px;display:flex;z-index:0}
+.product-swipe .swipe-actions{
+  position:absolute;top:0;right:0;bottom:0;width:0;display:flex;overflow:hidden;opacity:0;
+  transition:width .2s ease, opacity .2s ease;z-index:0;pointer-events:none;
+}
 .product-swipe .swipe-actions button{
   flex:1;border:none;color:#fff;font-weight:700;font-family:var(--dato);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
-  cursor:pointer;
+  cursor:pointer;padding:0 6px;
 }
 .product-swipe .swipe-actions .btn-contado{background:var(--verde);}
 .product-swipe .swipe-actions .btn-credito{background:var(--rojo);}
+.product-swipe.open .swipe-actions{width:150px;opacity:1;pointer-events:auto}
 .product-swipe .swipe-content{position:relative;z-index:1;transition:transform .2s ease;touch-action:pan-y;background:transparent}
 .product-swipe .swipe-content.open{transform:translateX(-150px)}
 .marbete{
@@ -835,15 +839,9 @@ function fichaProducto(p){
         </div>
       </div>
     </div>
-    <div style="margin-top:12px" class="fila">
+    <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
       <button class="btn" onclick="formEditarProducto('${p.sku}')">Actualizar</button>
       <button class="btn plano" onclick="confirmarEliminarProducto('${p.sku}')">Eliminar</button>
-    </div>
-    <div style="margin-top:8px" class="fila">
-      <button class="btn" onclick="formVenta('${p.sku}','contado')">Vender de contado</button>
-    </div>
-    <div style="margin-top:8px" class="fila">
-      <button class="btn ambar" onclick="formVenta('${p.sku}','credito')">Vender a crédito</button>
     </div>
   `);
 }
@@ -1219,7 +1217,9 @@ function bindSwipeVenta(card){
   const setOffset = x => {
     const offset = Math.max(Math.min(x, 0), -maxX);
     cont.style.transform = `translateX(${offset}px)`;
-    cont.classList.toggle('open', offset <= -60);
+    const open = offset <= -60;
+    cont.classList.toggle('open', open);
+    card.classList.toggle('open', open);
   };
 
   cont.addEventListener('pointerdown', e => {
@@ -1248,6 +1248,7 @@ function bindSwipeVenta(card){
       setOffset(-maxX);
     }else{
       setOffset(0);
+      card.classList.remove('open');
     }
     dragging = false;
   };
@@ -1257,6 +1258,7 @@ function bindSwipeVenta(card){
   cont.addEventListener('click', e => {
     if(cont.classList.contains('open')){
       setOffset(0);
+      card.classList.remove('open');
       e.preventDefault();
       e.stopPropagation();
       return;
