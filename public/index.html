@@ -184,7 +184,7 @@ button{cursor:pointer;border:none;background:none}
 .product-swipe .swipe-actions{
   position:absolute;top:0;right:0;bottom:0;width:0;display:flex;gap:8px;
   overflow:hidden;opacity:0;transition:width .22s ease, opacity .22s ease;z-index:3;
-  pointer-events:none;align-items:stretch;justify-content:flex-end;padding:8px 0 8px 8px;
+  pointer-events:none;align-items:stretch;justify-content:flex-end;padding:8px 0 8px 10px;
 }
 .product-swipe .swipe-actions button{
   flex:1;min-width:0;border:none;color:#fff;font-weight:800;font-family:var(--dato);
@@ -1222,7 +1222,7 @@ function bindSwipeVenta(card){
   let startY = 0;
   let currentX = 0;
   let dragging = false;
-  const maxX = 150;
+  const maxX = 174;
 
   const setOffset = x => {
     const offset = Math.max(Math.min(x, 0), -maxX);
