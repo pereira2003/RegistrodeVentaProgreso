@@ -177,6 +177,16 @@ button{cursor:pointer;border:none;background:none}
   white-space:nowrap;letter-spacing:-.02em}
 .item .val small{display:block;font-family:var(--dato);font-weight:500;font-size:10px;color:var(--tinta-3);
   margin-top:3px;letter-spacing:.03em}
+.product-swipe{position:relative;overflow:hidden;border-radius:var(--r);margin-bottom:8px}
+.product-swipe .swipe-actions{position:absolute;inset:0 0 0 auto;width:150px;display:flex;z-index:0}
+.product-swipe .swipe-actions button{
+  flex:1;border:none;color:#fff;font-weight:700;font-family:var(--dato);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  cursor:pointer;
+}
+.product-swipe .swipe-actions .btn-contado{background:var(--verde);}
+.product-swipe .swipe-actions .btn-credito{background:var(--rojo);}
+.product-swipe .swipe-content{position:relative;z-index:1;transition:transform .2s ease;touch-action:pan-y;background:transparent}
+.product-swipe .swipe-content.open{transform:translateX(-150px)}
 .marbete{
   display:inline-block;font-family:var(--dato);font-size:9.5px;font-weight:500;letter-spacing:.11em;
   text-transform:uppercase;padding:3px 7px;border-radius:3px;margin-top:7px;
@@ -560,6 +570,26 @@ const DB = {
     }
   },
 
+  async actualizarProducto(p){
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; await f.updateDoc(f.doc(bd,'productos',p.sku), p);
+    }else{
+      const idx = this.productos.findIndex(item => item.sku.toUpperCase() === String(p.sku).trim().toUpperCase());
+      if(idx >= 0){ this.productos[idx] = { ...this.productos[idx], ...p }; }
+      caja.guardar('gp_productos',this.productos); pintarTodo();
+    }
+  },
+
+  async eliminarProducto(sku){
+    const clave = String(sku).trim().toUpperCase();
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; await f.deleteDoc(f.doc(bd,'productos',clave));
+    }else{
+      this.productos = this.productos.filter(p => p.sku.toUpperCase() !== clave);
+      caja.guardar('gp_productos',this.productos); pintarTodo();
+    }
+  },
+
   async guardarVenta(v){
     if(this.modo==='firebase'){
       const {f,bd}=this.fb;
@@ -806,12 +836,29 @@ function fichaProducto(p){
       </div>
     </div>
     <div style="margin-top:12px" class="fila">
+      <button class="btn" onclick="formEditarProducto('${p.sku}')">Actualizar</button>
+      <button class="btn plano" onclick="confirmarEliminarProducto('${p.sku}')">Eliminar</button>
+    </div>
+    <div style="margin-top:8px" class="fila">
       <button class="btn" onclick="formVenta('${p.sku}','contado')">Vender de contado</button>
     </div>
     <div style="margin-top:8px" class="fila">
       <button class="btn ambar" onclick="formVenta('${p.sku}','credito')">Vender a crédito</button>
     </div>
   `);
+}
+
+function confirmarEliminarProducto(sku){
+  const p = DB.buscar(sku); if(!p) return;
+  if(!confirm(`¿Deseas eliminar el producto "${p.nombre}"?`)) return;
+  DB.eliminarProducto(sku);
+  cerrarHoja();
+  brindis('Producto eliminado');
+}
+
+function formEditarProducto(sku){
+  const p = DB.buscar(sku); if(!p) return;
+  abrirFormularioProducto(p);
 }
 
 function pintarRecientes(){
@@ -1103,38 +1150,120 @@ async function aplicarAbono(id){
    PRODUCTOS
    ============================================================ */
 $('#filtroProd').addEventListener('input', pintarProductos);
-$('#btnNuevoProd').addEventListener('click', ()=>abrirHoja(`
-  <div class="hoja-tope"><h2>Nuevo producto</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
-  <div class="tarjeta pad">
-    <div class="campo"><label>Código (SKU)</label><input id="pSku" placeholder="GP-0000"
-      style="font-family:var(--dato);text-transform:uppercase"></div>
-    <div class="campo"><label>Nombre</label><input id="pNombre" placeholder="Refrigeradora No Frost 14 pies"></div>
-    <div class="dosc">
-      <div class="campo"><label>Marca</label><input id="pMarca"></div>
-      <div class="campo"><label>Categoría</label>
-        <select id="pCat"><option>Línea blanca</option><option>Electrónica</option><option>Muebles</option>
-          <option>Cuidado personal</option><option>Otros</option></select></div>
-    </div>
-    <div class="dosc">
-      <div class="campo"><label>Precio contado</label><input id="pContado" type="number" step="0.01" inputmode="decimal"></div>
-      <div class="campo"><label>Precio crédito</label><input id="pCredito" type="number" step="0.01" inputmode="decimal"></div>
-    </div>
-    <div class="campo" style="margin-bottom:0"><label>Existencia</label>
-      <input id="pStock" type="number" inputmode="numeric" value="0"></div>
-  </div>
-  <button class="btn ambar" style="margin-top:14px" onclick="guardarProducto()">Guardar producto</button>
-`));
+$('#btnNuevoProd').addEventListener('click', ()=>abrirFormularioProducto());
 
-async function guardarProducto(){
+function abrirFormularioProducto(p = null){
+  const editando = !!p;
+  abrirHoja(`
+    <div class="hoja-tope"><h2>${editando ? 'Editar producto' : 'Nuevo producto'}</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="tarjeta pad">
+      <div class="campo"><label>Código (SKU)</label><input id="pSku" value="${esc(p ? p.sku : '')}" placeholder="GP-0000"
+        style="font-family:var(--dato);text-transform:uppercase"></div>
+      <div class="campo"><label>Nombre</label><input id="pNombre" value="${esc(p ? p.nombre : '')}" placeholder="Refrigeradora No Frost 14 pies"></div>
+      <div class="dosc">
+        <div class="campo"><label>Marca</label><input id="pMarca" value="${esc(p ? p.marca || '' : '')}"></div>
+        <div class="campo"><label>Categoría</label>
+          <select id="pCat">
+            ${['Línea blanca','Electrónica','Muebles','Cuidado personal','Otros'].map(cat => `<option ${p && p.categoria===cat ? 'selected' : ''}>${esc(cat)}</option>`).join('')}
+          </select></div>
+      </div>
+      <div class="dosc">
+        <div class="campo"><label>Precio contado</label><input id="pContado" type="number" step="0.01" inputmode="decimal" value="${p ? (p.contado ?? 0) : ''}"></div>
+        <div class="campo"><label>Precio crédito</label><input id="pCredito" type="number" step="0.01" inputmode="decimal" value="${p ? (p.credito ?? 0) : ''}"></div>
+      </div>
+      <div class="campo" style="margin-bottom:0"><label>Existencia</label>
+        <input id="pStock" type="number" inputmode="numeric" value="${p ? (p.stock ?? 0) : 0}"></div>
+    </div>
+    <button class="btn ambar" style="margin-top:14px" onclick="guardarProducto('${p ? p.sku : ''}')">${editando ? 'Actualizar producto' : 'Guardar producto'}</button>
+  `);
+}
+
+async function guardarProducto(skuOriginal = ''){
   const sku = $('#pSku').value.trim().toUpperCase();
   const nombre = $('#pNombre').value.trim();
   if(!sku || !nombre){ brindis('El código y el nombre son obligatorios'); return; }
-  if(DB.buscar(sku)){ brindis('Ya existe un producto con ese código'); return; }
-  await DB.agregarProducto({
+
+  const producto = {
     sku, nombre, marca:$('#pMarca').value.trim(), categoria:$('#pCat').value,
     contado:+$('#pContado').value||0, credito:+$('#pCredito').value||0, stock:+$('#pStock').value||0
-  });
+  };
+
+  const existe = DB.buscar(sku);
+  if(skuOriginal){
+    const original = skuOriginal.toUpperCase();
+    if(existe && sku !== original){ brindis('Ya existe un producto con ese código'); return; }
+    const idx = DB.productos.findIndex(p => p.sku.toUpperCase() === original);
+    if(idx >= 0){
+      DB.productos[idx] = { ...DB.productos[idx], ...producto };
+      caja.guardar('gp_productos', DB.productos);
+      cerrarHoja(); brindis('Producto actualizado');
+      pintarTodo();
+      return;
+    }
+  }
+
+  if(existe){ brindis('Ya existe un producto con ese código'); return; }
+  await DB.agregarProducto(producto);
   cerrarHoja(); brindis('Producto agregado');
+}
+
+function bindSwipeVenta(card){
+  const cont = card.querySelector('.swipe-content');
+  if(!cont) return;
+  let startX = 0;
+  let startY = 0;
+  let currentX = 0;
+  let dragging = false;
+  const maxX = 150;
+
+  const setOffset = x => {
+    const offset = Math.max(Math.min(x, 0), -maxX);
+    cont.style.transform = `translateX(${offset}px)`;
+    cont.classList.toggle('open', offset <= -60);
+  };
+
+  cont.addEventListener('pointerdown', e => {
+    startX = e.clientX;
+    startY = e.clientY;
+    currentX = e.clientX;
+    dragging = true;
+    cont.setPointerCapture?.(e.pointerId);
+  });
+
+  cont.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = Math.abs(e.clientY - startY);
+    if(dy > 18) return;
+    if(dx < 0){
+      setOffset(dx);
+      currentX = e.clientX;
+    }
+  });
+
+  const finishSwipe = () => {
+    const dx = currentX - startX;
+    const open = dx <= -60;
+    if(open){
+      setOffset(-maxX);
+    }else{
+      setOffset(0);
+    }
+    dragging = false;
+  };
+
+  cont.addEventListener('pointerup', finishSwipe);
+  cont.addEventListener('pointerleave', finishSwipe);
+  cont.addEventListener('click', e => {
+    if(cont.classList.contains('open')){
+      setOffset(0);
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    const sku = card.dataset.sku;
+    if(sku) fichaProducto(DB.buscar(sku));
+  });
 }
 
 function pintarProductos(){
@@ -1142,14 +1271,22 @@ function pintarProductos(){
   const lista = DB.productos.filter(p=>!q ||
     (p.nombre+p.marca+p.sku+(p.categoria||'')).toLowerCase().includes(q));
   $('#listaProd').innerHTML = lista.length ? lista.map(p=>`
-    <div class="item" onclick="fichaProducto(DB.buscar('${p.sku}'))">
-      <div class="cont"><h4>${esc(p.nombre)}</h4>
-        <div class="meta">${esc(p.sku)} · ${esc(p.marca||'')}</div>
-        <span class="marbete ${p.stock>3?'m-verde':p.stock>0?'m-ambar':'m-rojo'}">
-          ${p.stock>0?p.stock+' en existencia':'Agotado'}</span></div>
-      <div class="val">${money(p.contado)}<small>${money(p.credito)} crédito</small></div>
+    <div class="product-swipe" data-sku="${esc(p.sku)}">
+      <div class="swipe-actions">
+        <button class="btn-contado" type="button" onclick="formVenta('${p.sku}','contado')">Contado</button>
+        <button class="btn-credito" type="button" onclick="formVenta('${p.sku}','credito')">Crédito</button>
+      </div>
+      <div class="swipe-content item" aria-label="Producto ${esc(p.nombre)}">
+        <div class="cont"><h4>${esc(p.nombre)}</h4>
+          <div class="meta">${esc(p.sku)} · ${esc(p.marca||'')}</div>
+          <span class="marbete ${p.stock>3?'m-verde':p.stock>0?'m-ambar':'m-rojo'}">
+            ${p.stock>0?p.stock+' en existencia':'Agotado'}</span></div>
+        <div class="val">${money(p.contado)}<small>${money(p.credito)} crédito</small></div>
+      </div>
     </div>`).join('')
   : `<div class="vacio"><b>Sin resultados</b>Prueba con otro nombre o código.</div>`;
+
+  $('#listaProd').querySelectorAll('.product-swipe').forEach(bindSwipeVenta);
 }
 
 /* ============================================================
