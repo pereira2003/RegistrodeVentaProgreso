@@ -936,8 +936,8 @@ function fichaProducto(p){
       </div>
     </div>
     <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-      <button class="btn" onclick="formEditarProducto('${p.sku}')">Actualizar</button>
-      <button class="btn plano" onclick="confirmarEliminarProducto('${p.sku}')">Eliminar</button>
+      <button class="btn" onclick="formVenta('${p.sku}','contado')">Al contado</button>
+      <button class="btn ambar" onclick="formVenta('${p.sku}','credito')">A crédito</button>
     </div>
   `);
 }
@@ -1378,8 +1378,8 @@ function pintarProductos(){
   $('#listaProd').innerHTML = lista.length ? lista.map(p=>`
     <div class="product-swipe" data-sku="${esc(p.sku)}">
       <div class="swipe-actions">
-        <button class="btn-contado" type="button" onclick="formVenta('${p.sku}','contado')">Contado</button>
-        <button class="btn-credito" type="button" onclick="formVenta('${p.sku}','credito')">Crédito</button>
+        <button class="btn-contado" type="button" onclick="formEditarProducto('${p.sku}')">Actualizar</button>
+        <button class="btn-credito" type="button" onclick="confirmarEliminarProducto('${p.sku}')">Eliminar</button>
       </div>
       <div class="swipe-content item" aria-label="Producto ${esc(p.nombre)}">
         <div class="cont"><h4>${esc(p.nombre)}</h4>
