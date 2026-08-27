@@ -465,6 +465,8 @@ button{cursor:pointer;border:none;background:none}
 <script src="lib/jsQR.js"></script>
 <script src="lib/qrcode.js"></script>
 <script src="lib/jszip.min.js"></script>
+<script src="lib/zxing-library.min.js"></script>
+<script src="lib/zxing-browser.min.js"></script>
 <script>
 (function(){
   const cdn = 'https://cdnjs.cloudflare.com/ajax/libs/';
@@ -627,7 +629,11 @@ const DB = {
     }
   },
 
-  buscar(sku){ return this.productos.find(p=>p.sku.toUpperCase()===String(sku).trim().toUpperCase()); }
+  buscar(codigo){
+    const clave = String(codigo).trim().toUpperCase();
+    return this.productos.find(p=>p.sku.toUpperCase()===clave ||
+      String(p.codigoBarras||'').trim().toUpperCase()===clave);
+  }
 };
 
 function sello(txt,tipo){
@@ -661,7 +667,7 @@ $('#velo').addEventListener('click',cerrarHoja);
    ESCÁNER
    ============================================================ */
 let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito';
-let tipoCodigo='qr', detectorBarras=null;
+let tipoCodigo='qr', detectorBarras=null, lectorBarras=null;
 const recientes = [];
 const entregaActual = { vendor: CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
 
@@ -681,20 +687,19 @@ function seleccionarTipoEscaneo(modo){
 async function iniciarEscaneo(modo, tipo='qr'){
   modoEscaneo = modo;
   tipoCodigo = tipo;
-  if(tipoCodigo === 'barra' && !('BarcodeDetector' in window)){
+  if(tipoCodigo === 'barra' && !('BarcodeDetector' in window) && typeof ZXingBrowser === 'undefined'){
     $('#apagado').innerHTML = '<b>Lectura de barras no disponible</b>Usa Chrome o Edge actualizado en el celular, o escribe el código manualmente.';
     $('#apagado').hidden=false;
     return;
   }
   detectorBarras = null;
   if(tipoCodigo === 'barra'){
-    try{
+    if('BarcodeDetector' in window){
+      try{
       detectorBarras = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf']});
-    }catch(e){
-      $('#apagado').innerHTML = '<b>Formato de barras no disponible</b>Usa Chrome o Edge actualizado en el celular, o escribe el código manualmente.';
-      $('#apagado').hidden=false;
-      return;
+      }catch(e){ detectorBarras = null; }
     }
+    if(!detectorBarras) lectorBarras = new ZXingBrowser.BrowserMultiFormatReader();
   }
   if(modo==='entrega' && !entregaActual.vendor && CFG.vendedores.length) entregaActual.vendor = CFG.vendedores[0];
   if(modo==='entrega' && entregaActual.items.length){
@@ -734,6 +739,10 @@ function cicloLectura(){
     cx.drawImage(v,0,0,c.width,c.height);
     const leer = detectorBarras
       ? detectorBarras.detect(v).then(codigos=>codigos[0]?.rawValue || '')
+      : tipoCodigo === 'barra'
+        ? Promise.resolve().then(()=>{
+            try{ return lectorBarras.decodeFromCanvas(c).getText(); }catch(e){ return ''; }
+          })
       : Promise.resolve((()=>{
           if(typeof jsQR!=='function') return '';
           const img=cx.getImageData(0,0,c.width,c.height);
@@ -1201,8 +1210,10 @@ function abrirFormularioProducto(p = null){
   abrirHoja(`
     <div class="hoja-tope"><h2>${editando ? 'Editar producto' : 'Nuevo producto'}</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="tarjeta pad">
-      <div class="campo"><label>Código (SKU)</label><input id="pSku" value="${esc(p ? p.sku : '')}" placeholder="GP-0000"
+      <div class="campo"><label>Código interno (SKU)</label><input id="pSku" value="${esc(p ? p.sku : '')}" placeholder="GP-0000"
         style="font-family:var(--dato);text-transform:uppercase"></div>
+      <div class="campo"><label>Código de barras del producto</label><input id="pBarras" value="${esc(p ? p.codigoBarras || '' : '')}" placeholder="Ej. 7501234567890"
+        inputmode="numeric" style="font-family:var(--dato);letter-spacing:.08em"></div>
       <div class="campo"><label>Nombre</label><input id="pNombre" value="${esc(p ? p.nombre : '')}" placeholder="Refrigeradora No Frost 14 pies"></div>
       <div class="dosc">
         <div class="campo"><label>Marca</label><input id="pMarca" value="${esc(p ? p.marca || '' : '')}"></div>
@@ -1228,11 +1239,15 @@ async function guardarProducto(skuOriginal = ''){
   if(!sku || !nombre){ brindis('El código y el nombre son obligatorios'); return; }
 
   const producto = {
-    sku, nombre, marca:$('#pMarca').value.trim(), categoria:$('#pCat').value,
+    sku, codigoBarras:$('#pBarras').value.trim(), nombre, marca:$('#pMarca').value.trim(), categoria:$('#pCat').value,
     contado:+$('#pContado').value||0, credito:+$('#pCredito').value||0, stock:+$('#pStock').value||0
   };
 
   const existe = DB.buscar(sku);
+  const barrasOcupadas = DB.productos.find(p=>producto.codigoBarras &&
+    String(p.codigoBarras||'').trim().toUpperCase()===producto.codigoBarras.toUpperCase() &&
+    p.sku.toUpperCase()!==(skuOriginal||'').toUpperCase());
+  if(barrasOcupadas){ brindis('Ya existe un producto con ese código de barras'); return; }
   if(skuOriginal){
     const original = skuOriginal.toUpperCase();
     if(existe && sku !== original){ brindis('Ya existe un producto con ese código'); return; }
@@ -1317,7 +1332,7 @@ function bindSwipeVenta(card){
 function pintarProductos(){
   const q = $('#filtroProd').value.toLowerCase().trim();
   const lista = DB.productos.filter(p=>!q ||
-    (p.nombre+p.marca+p.sku+(p.categoria||'')).toLowerCase().includes(q));
+    (p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q));
   $('#listaProd').innerHTML = lista.length ? lista.map(p=>`
     <div class="product-swipe" data-sku="${esc(p.sku)}">
       <div class="swipe-actions">
@@ -1326,7 +1341,7 @@ function pintarProductos(){
       </div>
       <div class="swipe-content item" aria-label="Producto ${esc(p.nombre)}">
         <div class="cont"><h4>${esc(p.nombre)}</h4>
-          <div class="meta">${esc(p.sku)} · ${esc(p.marca||'')}</div>
+          <div class="meta">${esc(p.sku)}${p.codigoBarras ? ' · Barras: '+esc(p.codigoBarras) : ''} · ${esc(p.marca||'')}</div>
           <span class="marbete ${p.stock>3?'m-verde':p.stock>0?'m-ambar':'m-rojo'}">
             ${p.stock>0?p.stock+' en existencia':'Agotado'}</span></div>
         <div class="val">${money(p.contado)}<small>${money(p.credito)} crédito</small></div>
@@ -1552,7 +1567,7 @@ function seleccionados(){
 
 function pintarSelector(){
   const q = ($('#filtroEtiq')?.value||'').toLowerCase().trim();
-  const lista = DB.productos.filter(p=>!q || (p.nombre+p.marca+p.sku).toLowerCase().includes(q));
+  const lista = DB.productos.filter(p=>!q || (p.nombre+p.marca+p.sku+(p.codigoBarras||'')).toLowerCase().includes(q));
   $('#selLista').innerHTML = lista.length ? lista.map(p=>`
     <label class="sel-fila">
       <input type="checkbox" data-sku="${esc(p.sku)}" ${etq.sel.has(p.sku)?'checked':''}>

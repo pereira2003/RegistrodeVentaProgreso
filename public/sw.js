@@ -1,13 +1,15 @@
 /* Service worker: guarda la app en el teléfono para que abra sin internet.
    Sube el número de versión cada vez que cambies index.html. */
-const VERSION = 'gp-ventas-v4';
+const VERSION = 'gp-ventas-v5';
 const BASICOS = [
   './',
   './index.html',
   './manifest.json',
   './lib/jsQR.js',
   './lib/qrcode.js',
-  './lib/jszip.min.js'
+  './lib/jszip.min.js',
+  './lib/zxing-library.min.js',
+  './lib/zxing-browser.min.js'
 ];
 
 self.addEventListener('install', e => {

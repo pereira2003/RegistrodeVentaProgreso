@@ -74,7 +74,7 @@ Con `rol: "vendedor"` la persona puede registrar ventas y cobros, pero no puede 
 
 **Escanear** — Antes de encender la cámara puedes elegir *Código QR* o *Código de barras*. Al reconocer un código la cámara se apaga sola y se abre la ficha del producto, así no queda consumiendo batería entre venta y venta. Si el código no existe, se abre el formulario para poner nombre, marca, categoría, precios y existencia. También acepta el código escrito a mano, útil si la etiqueta está rayada.
 
-**Productos** — Catálogo con buscador, existencias y alta de productos nuevos.
+**Productos** — Catálogo con buscador, existencias y alta de productos nuevos. Cada producto puede tener un SKU interno y el código de barras que ya trae de fábrica; ambos sirven para buscarlo y registrarlo.
 
 **Ventas** — Resumen del mes, ranking por vendedor, historial completo y descarga en CSV con cantidad, precio unitario, prima y saldo de cada venta.
 
