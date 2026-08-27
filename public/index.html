@@ -1387,6 +1387,7 @@ function abrirFormularioProducto(p = null){
         inputmode="numeric" style="font-family:var(--dato);letter-spacing:.08em"></div>
       <button class="btn plano chico" type="button" onclick="escanearBarrasProducto()">Leer código con cámara</button>
       <div class="campo"><label>Nombre</label><input id="pNombre" value="${esc(p ? p.nombre : '')}" placeholder="Refrigeradora No Frost 14 pies"></div>
+      <div class="campo"><label>Color</label><input id="pColor" value="${esc(p ? p.color || '' : '')}" placeholder="Ej. Negro"></div>
       <div class="dosc">
         <div class="campo"><label>Marca</label><input id="pMarca" value="${esc(p ? p.marca || '' : '')}"></div>
         <div class="campo"><label>Categoría</label>
@@ -1411,7 +1412,7 @@ async function guardarProducto(skuOriginal = ''){
   if(!sku || !nombre){ brindis('El código y el nombre son obligatorios'); return; }
 
   const producto = {
-    sku, codigoBarras:$('#pBarras').value.trim(), nombre, marca:$('#pMarca').value.trim(), categoria:$('#pCat').value,
+    sku, codigoBarras:$('#pBarras').value.trim(), nombre, color:$('#pColor').value.trim(), marca:$('#pMarca').value.trim(), categoria:$('#pCat').value,
     contado:+$('#pContado').value||0, credito:+$('#pCredito').value||0, stock:+$('#pStock').value||0
   };
 
