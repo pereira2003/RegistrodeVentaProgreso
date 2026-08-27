@@ -752,8 +752,19 @@ function escanearBarrasProducto(){
     contado:$('#pContado')?.value || '', credito:$('#pCredito')?.value || '',
     stock:$('#pStock')?.value || 0
   };
-  cerrarHoja();
-  iniciarEscaneo('producto','barra');
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Escanear código de barras</h2><button class="cerrar" onclick="cancelarEscaneoProducto()">✕</button></div>
+    <div class="visor encendida" style="margin:0;border-radius:14px;min-height:260px">
+      <video id="videoProducto" playsinline muted></video>
+      <div class="reticula"><div class="marco"><i></i><i></i><i></i><i></i><div class="barrido"></div></div></div>
+    </div>
+    <div class="aviso" style="margin-top:12px">Apunta la cámara al código de barras del producto.</div>`);
+  setTimeout(()=>iniciarEscaneo('producto','barra'),0);
+}
+
+function cancelarEscaneoProducto(){
+  const datos=productoPendiente||{};
+  apagarCamara(); productoPendiente=null; abrirFormularioProducto(datos);
 }
 
 function seleccionarTipoEscaneo(modo){
@@ -804,14 +815,16 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito'){
   if(flujo){ apagarCamara(); return; }
   try{
     flujo = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
-    const v=$('#video'); v.srcObject=flujo; await v.play();
+    const v=$('#videoProducto')||$('#video'); v.srcObject=flujo; await v.play();
     $('#visor').classList.add('encendida');
     $('#apagado').hidden=true; $('#reticula').hidden=false;
-    const btn = modo === 'entrega' ? $('#btnCamEntrega') : $('#btnCam');
-    const otro = modo === 'entrega' ? $('#btnCam') : $('#btnCamEntrega');
-    btn.textContent='Detener escaneo'; btn.classList.remove('ambar'); btn.classList.add('plano');
-    otro.textContent = otro.id === 'btnCam' ? 'Escanear crédito' : 'Escanear entrega y devolución';
-    otro.classList.add('ambar'); otro.classList.remove('plano');
+    const btn = modo === 'producto' ? null : modo === 'entrega' ? $('#btnCamEntrega') : $('#btnCam');
+    const otro = modo === 'producto' ? null : modo === 'entrega' ? $('#btnCam') : $('#btnCamEntrega');
+    if(btn){
+      btn.textContent='Detener escaneo'; btn.classList.remove('ambar'); btn.classList.add('plano');
+      otro.textContent = otro.id === 'btnCam' ? 'Escanear crédito' : 'Escanear entrega y devolución';
+      otro.classList.add('ambar'); otro.classList.remove('plano');
+    }
     leyendo=true;
     if(tipoCodigo==='barra' && !detectorBarras){
       controlBarras = await lectorBarras.decodeFromVideoElement(v, (resultado, error) => {
@@ -835,7 +848,9 @@ function apagarCamara(){
   if(controlBarras){ controlBarras.stop(); controlBarras=null; }
   if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
   $('#visor').classList.remove('encendida');
-  $('#video').srcObject=null; $('#reticula').hidden=true; $('#apagado').hidden=false;
+  if($('#video')) $('#video').srcObject=null;
+  if($('#videoProducto')) $('#videoProducto').srcObject=null;
+  $('#reticula').hidden=true; $('#apagado').hidden=false;
   $('#btnCam').textContent='Escanear crédito'; $('#btnCam').classList.add('ambar'); $('#btnCam').classList.remove('plano');
   $('#btnCamEntrega').textContent='Escanear entrega y devolución'; $('#btnCamEntrega').classList.add('ambar'); $('#btnCamEntrega').classList.remove('plano');
 }
@@ -865,6 +880,7 @@ function procesarCodigoLeido(valor){
   if(modoEscaneo === 'entrega'){
     procesarEscaneoEntrega(sku);
   }else if(modoEscaneo === 'producto'){
+    cerrarHoja();
     abrirFormularioProducto({...productoPendiente, codigoBarras:sku});
     productoPendiente=null;
   }else{
