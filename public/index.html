@@ -735,7 +735,7 @@ $('#velo').addEventListener('click',cerrarHoja);
    ============================================================ */
 let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo='credito';
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
-let productoPendiente=null;
+let productoPendiente=null, sesionProducto=0;
 const recientes = [];
 const entregaActual = { vendor: CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
 let entregaEditando=null;
@@ -752,19 +752,21 @@ function escanearBarrasProducto(){
     contado:$('#pContado')?.value || '', credito:$('#pCredito')?.value || '',
     stock:$('#pStock')?.value || 0
   };
+  const sesion=++sesionProducto;
   abrirHoja(`
     <div class="hoja-tope"><h2>Escanear código de barras</h2><button class="cerrar" onclick="cancelarEscaneoProducto()">✕</button></div>
     <div class="visor encendida" style="margin:0;border-radius:14px;min-height:260px">
       <video id="videoProducto" playsinline muted></video>
       <div class="reticula"><div class="marco"><i></i><i></i><i></i><i></i><div class="barrido"></div></div></div>
     </div>
-    <div class="aviso" style="margin-top:12px">Apunta la cámara al código de barras del producto.</div>`);
-  setTimeout(()=>iniciarEscaneo('producto','barra'),0);
+    <div class="aviso" style="margin-top:12px">Apunta la cámara al código de barras del producto.</div>
+    <button class="btn plano" style="margin-top:10px" type="button" onclick="cancelarEscaneoProducto()">Detener cámara</button>`);
+  setTimeout(()=>{ if(sesion===sesionProducto) iniciarEscaneo('producto','barra','credito',sesion); },0);
 }
 
 function cancelarEscaneoProducto(){
   const datos=productoPendiente||{};
-  apagarCamara(); productoPendiente=null; abrirFormularioProducto(datos);
+  sesionProducto++; apagarCamara(); productoPendiente=null; abrirFormularioProducto(datos);
 }
 
 function seleccionarTipoEscaneo(modo){
@@ -790,7 +792,7 @@ function seleccionarFormaVenta(modo, tipo){
     </div>`);
 }
 
-async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito'){
+async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
   modoEscaneo = modo;
   tipoCodigo = tipo;
   tipoVentaEscaneo = tipoVenta;
@@ -815,7 +817,9 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito'){
   if(flujo){ apagarCamara(); return; }
   try{
     flujo = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
-    const v=$('#videoProducto')||$('#video'); v.srcObject=flujo; await v.play();
+    if(modo==='producto' && sesion!==sesionProducto){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; return; }
+    const v=$('#videoProducto')||$('#video'); v.srcObject=flujo;
+    if(!(tipoCodigo==='barra' && !detectorBarras)) await v.play();
     $('#visor').classList.add('encendida');
     $('#apagado').hidden=true; $('#reticula').hidden=false;
     const btn = modo === 'producto' ? null : modo === 'entrega' ? $('#btnCamEntrega') : $('#btnCam');
@@ -849,7 +853,7 @@ function apagarCamara(){
   if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
   $('#visor').classList.remove('encendida');
   if($('#video')) $('#video').srcObject=null;
-  if($('#videoProducto')) $('#videoProducto').srcObject=null;
+  if($('#videoProducto')){ $('#videoProducto').pause(); $('#videoProducto').srcObject=null; }
   $('#reticula').hidden=true; $('#apagado').hidden=false;
   $('#btnCam').textContent='Escanear crédito'; $('#btnCam').classList.add('ambar'); $('#btnCam').classList.remove('plano');
   $('#btnCamEntrega').textContent='Escanear entrega y devolución'; $('#btnCamEntrega').classList.add('ambar'); $('#btnCamEntrega').classList.remove('plano');
