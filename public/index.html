@@ -201,6 +201,9 @@ button{cursor:pointer;border:none;background:none}
   box-shadow:0 10px 22px rgba(24,22,19,.04);overflow:hidden;
 }
 .product-swipe .swipe-content.open{transform:translateX(-174px)}
+.cantidad-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:6px}
+.cantidad-control button{width:28px;height:28px;padding:0;border:1px solid var(--linea);border-radius:7px;background:#fff;color:var(--tinta);font-size:18px;line-height:1;cursor:pointer}
+.cantidad-control b{min-width:18px;text-align:center;font-family:var(--dato);font-size:13px}
 .marbete{
   display:inline-block;font-family:var(--dato);font-size:9.5px;font-weight:500;letter-spacing:.11em;
   text-transform:uppercase;padding:3px 7px;border-radius:3px;margin-top:7px;
@@ -909,10 +912,12 @@ function mostrarHojaEntrega(){
     <div class="rotulo">Productos que lleva</div>
     ${items.length ? `<div>${items.map((item,i)=>`
       <div class="product-swipe entrega-item-swipe" data-tipo="entregados" data-indice="${i}">
-        <div class="swipe-actions"><button class="btn-credito" type="button" onclick="borrarItemEntrega('entregados',${i})">Borrar</button></div>
+        <div class="swipe-actions"><button class="btn-credito" type="button" onclick="borrarItemEntrega('items',${i})">Borrar</button></div>
         <div class="swipe-content item" style="padding:10px 12px">
           <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
-          <div class="val">${money(item.precio||0)}<small>${item.cantidad||1} pieza</small></div>
+          <div class="val">${money(item.precio||0)}
+            <div class="cantidad-control"><button type="button" onclick="ajustarCantidadEntrega('items',${i},-1)">-</button><b>${item.cantidad||1}</b><button type="button" onclick="ajustarCantidadEntrega('items',${i},1)">+</button></div>
+          </div>
         </div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin productos</b>Escanea uno para agregarlo a la entrega.</div>`}
     <div class="rotulo">Productos que regresan</div>
@@ -921,7 +926,9 @@ function mostrarHojaEntrega(){
         <div class="swipe-actions"><button class="btn-credito" type="button" onclick="borrarItemEntrega('devueltos',${i})">Borrar</button></div>
         <div class="swipe-content item" style="padding:10px 12px; border-color:rgba(216,194,164,.7)">
           <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
-          <div class="val">${money(item.precio||0)}<small>${item.cantidad||1} devuelto</small></div>
+          <div class="val">${money(item.precio||0)}
+            <div class="cantidad-control"><button type="button" onclick="ajustarCantidadEntrega('devueltos',${i},-1)">-</button><b>${item.cantidad||1}</b><button type="button" onclick="ajustarCantidadEntrega('devueltos',${i},1)">+</button></div>
+          </div>
         </div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin devoluciones</b>Si escaneas el mismo producto otra vez, queda aquí.</div>`}
     <button class="btn ambar" style="margin-top:14px" onclick="guardarEntrega()">Guardar</button>
@@ -944,6 +951,12 @@ function borrarItemEntrega(tipo,indice){
   entregaActual[tipo].splice(indice,1);
   mostrarHojaEntrega();
   brindis('Producto borrado de la entrega');
+}
+
+function ajustarCantidadEntrega(tipo,indice,cambio){
+  const item=entregaActual[tipo][indice]; if(!item) return;
+  item.cantidad=Math.max(1,(item.cantidad||1)+cambio);
+  mostrarHojaEntrega();
 }
 
 function guardarEntrega(){
@@ -988,19 +1001,16 @@ function procesarEscaneoEntrega(sku){
 
   const idxActual = entregaActual.items.findIndex(item=>item.sku===p.sku);
   if(idxActual >= 0){
-    const item = entregaActual.items.splice(idxActual,1)[0];
-    const dev = entregaActual.devueltos.find(x=>x.sku===p.sku);
-    if(dev){ dev.cantidad = (dev.cantidad||1)+1; } else { entregaActual.devueltos.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.precio||0, cantidad:1 }); }
-    brindis(`${p.nombre} quitado de la entrega`);
+    entregaActual.items[idxActual].cantidad=(entregaActual.items[idxActual].cantidad||1)+1;
+    brindis(`${p.nombre}: cantidad ${entregaActual.items[idxActual].cantidad}`);
     mostrarHojaEntrega();
     return;
   }
 
   const idxDev = entregaActual.devueltos.findIndex(item=>item.sku===p.sku);
   if(idxDev >= 0){
-    entregaActual.devueltos.splice(idxDev,1);
-    brindis(`${p.nombre} regresó a la lista de entregados`);
-    entregaActual.items.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 });
+    entregaActual.devueltos[idxDev].cantidad=(entregaActual.devueltos[idxDev].cantidad||1)+1;
+    brindis(`${p.nombre}: devolución ${entregaActual.devueltos[idxDev].cantidad}`);
     mostrarHojaEntrega();
     return;
   }
