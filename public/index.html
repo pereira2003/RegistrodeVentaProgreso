@@ -349,6 +349,14 @@ button{cursor:pointer;border:none;background:none}
 
 <!-- ================= ENTREGAS Y DEVOLUCIONES ================= -->
 <section class="vista" data-vista="entregas">
+  <div class="rotulo">Filtrar entregas</div>
+  <div class="fila" style="align-items:stretch;margin-bottom:8px">
+    <select id="filtroEntregasTipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+      <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
+    </select>
+    <input id="filtroEntregasFecha" type="month" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+  </div>
+  <button class="btn plano chico" id="btnLimpiarEntregas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Entregas y devoluciones</div>
   <div class="cifras" id="resumenEntregas"></div>
   <div id="listaEntregas"></div>
@@ -385,6 +393,14 @@ button{cursor:pointer;border:none;background:none}
 
 <!-- ================= CARTERA ================= -->
 <section class="vista" data-vista="cartera">
+  <div class="rotulo">Filtrar cartera</div>
+  <div class="fila" style="align-items:stretch;margin-bottom:8px">
+    <select id="filtroCarteraTipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+      <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
+    </select>
+    <input id="filtroCarteraFecha" type="month" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+  </div>
+  <button class="btn plano chico" id="btnLimpiarCartera" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Cuentas por cobrar</div>
   <div class="cifras" id="resumenCartera"></div>
   <div class="rotulo">Créditos activos</div>
@@ -639,6 +655,32 @@ const DB = {
       this.ventas = [];
       caja.guardar('gp_ventas', this.ventas);
       pintarTodo();
+    }
+  },
+
+  async eliminarVenta(id){
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; await f.deleteDoc(f.doc(bd,'ventas',id));
+    }else{
+      this.ventas = this.ventas.filter(v=>v.id!==id);
+      caja.guardar('gp_ventas', this.ventas); pintarTodo();
+    }
+  },
+
+  async limpiarEntregas(){
+    this.entregas = [];
+    caja.guardar('gp_entregas', this.entregas);
+    pintarTodo();
+  },
+
+  async limpiarCartera(){
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb;
+      const snap=await f.getDocs(f.collection(bd,'ventas'));
+      await Promise.all(snap.docs.filter(d=>d.data().tipo==='credito').map(d=>f.deleteDoc(d.ref)));
+    }else{
+      this.ventas=this.ventas.filter(v=>v.tipo!=='credito');
+      caja.guardar('gp_ventas',this.ventas); pintarTodo();
     }
   },
 
@@ -1499,8 +1541,17 @@ function detalleVenta(id){
   `);
 }
 
+function coincidePeriodo(fechaVenta, tipo, valor){
+  if(!fechaVenta || !valor) return false;
+  if(tipo==='dia') return fechaVenta===valor;
+  if(tipo==='año') return fechaVenta.slice(0,4)===valor;
+  return fechaVenta.slice(0,7)===valor;
+}
+
 function pintarCartera(){
-  const act = DB.ventas.filter(v=>v.tipo==='credito' && v.saldo>0);
+  const tipoFiltro = $('#filtroCarteraTipo')?.value || 'mes';
+  const fechaFiltro = $('#filtroCarteraFecha')?.value || hoy().slice(0,7);
+  const act = DB.ventas.filter(v=>v.tipo==='credito' && v.saldo>0 && coincidePeriodo(v.fecha,tipoFiltro,fechaFiltro));
   const porCobrar = act.reduce((s,v)=>s+v.saldo,0);
   const vencido = act.reduce((s,v)=>s+v.cuotas.filter(c=>c.estado!=='pagada'&&c.vence<hoy())
     .reduce((t,c)=>t+(c.monto-c.pagado),0),0);
@@ -1520,14 +1571,49 @@ function pintarCartera(){
     const prox = v.cuotas.find(c=>c.estado!=='pagada');
     const mora = prox && prox.vence < hoy();
     const pagadas = v.cuotas.filter(c=>c.estado==='pagada').length;
-    return `<div class="item" onclick="formAbono('${v.id}')">
-      <div class="cont"><h4>${esc(v.cliente)}</h4>
-        <div class="meta">${esc(v.producto)} · ${pagadas}/${v.plazo} cuotas</div>
-        <span class="marbete ${mora?'m-rojo':'m-verde'}">
-          ${mora?'Vencida desde '+fecha(prox.vence):'Próxima '+fecha(prox.vence)}</span></div>
-      <div class="val">${money(v.saldo)}<small>${money(v.cuotaMensual)}/mes</small></div>
+    return `<div class="product-swipe cartera-swipe" data-id="${esc(v.id)}">
+      <div class="swipe-actions">
+        <button class="btn-contado" type="button" onclick="eliminarCredito('${v.id}')">Eliminar</button>
+        <button class="btn-credito" type="button" onclick="cancelarCredito('${v.id}')">Cancelar</button>
+      </div>
+      <div class="swipe-content item">
+        <div class="cont"><h4>${esc(v.cliente)}</h4>
+          <div class="meta">${esc(v.producto)} · ${pagadas}/${v.plazo} cuotas</div>
+          <span class="marbete ${mora?'m-rojo':'m-verde'}">
+            ${mora?'Vencida desde '+fecha(prox.vence):'Próxima '+fecha(prox.vence)}</span></div>
+        <div class="val">${money(v.saldo)}<small>${money(v.cuotaMensual)}/mes</small></div>
+      </div>
     </div>`;}).join('')
   : `<div class="vacio"><b>No hay créditos abiertos</b>Las ventas a plazo aparecerán aquí para su cobro.</div>`;
+  $('#listaCartera').querySelectorAll('.cartera-swipe').forEach(bindSwipeCartera);
+}
+
+function bindSwipeCartera(card){
+  const cont = card.querySelector('.swipe-content');
+  let startX=0, currentX=0, dragging=false;
+  const setOffset = x => {
+    const offset=Math.max(Math.min(x,0),-174);
+    cont.style.transform=`translateX(${offset}px)`;
+    card.classList.toggle('open',offset<=-60); cont.classList.toggle('open',offset<=-60);
+  };
+  cont.addEventListener('pointerdown',e=>{startX=currentX=e.clientX; dragging=true; cont.setPointerCapture?.(e.pointerId);});
+  cont.addEventListener('pointermove',e=>{if(dragging && e.clientX<startX) {currentX=e.clientX; setOffset(currentX-startX);}});
+  const finish=()=>{if(!dragging)return; setOffset(currentX-startX<=-60?-174:0); dragging=false;};
+  cont.addEventListener('pointerup',finish); cont.addEventListener('pointerleave',finish);
+  cont.addEventListener('click',e=>{if(cont.classList.contains('open')){setOffset(0);e.preventDefault();return;} formAbono(card.dataset.id);});
+}
+
+async function eliminarCredito(id){
+  if(!confirm('¿Deseas eliminar este crédito y su registro de venta? Esta acción no se puede deshacer.')) return;
+  await DB.eliminarVenta(id); cerrarHoja(); brindis('Crédito eliminado');
+}
+
+async function cancelarCredito(id){
+  const v=DB.ventas.find(x=>x.id===id); if(!v) return;
+  if(!confirm('¿Marcar este crédito como cancelado por completo?')) return;
+  v.saldo=0; v.estado='pagada';
+  (v.cuotas||[]).forEach(c=>{c.pagado=c.monto;c.estado='pagada';});
+  await DB.actualizarVenta(v); cerrarHoja(); brindis('Crédito cancelado por completo');
 }
 
 /* ============================================================
@@ -1825,11 +1911,41 @@ $('#btnLimpiarVentas').addEventListener('click', async ()=>{
   brindis('Registros de ventas eliminados');
 });
 
+function configurarFiltroFecha(tipoId, fechaId, pintar){
+  const tipo=$('#'+tipoId).value, campo=$('#'+fechaId);
+  if(tipo==='dia'){
+    campo.type='date'; campo.value=campo.value.length===10?campo.value:hoy();
+  }else if(tipo==='año'){
+    campo.type='number'; campo.min='2000'; campo.max='2100'; campo.step='1';
+    campo.value=campo.value.length===4?campo.value:hoy().slice(0,4);
+  }else{
+    campo.type='month'; campo.value=campo.value.length===7?campo.value:hoy().slice(0,7);
+  }
+  pintar();
+}
+$('#filtroEntregasTipo').addEventListener('change',()=>configurarFiltroFecha('filtroEntregasTipo','filtroEntregasFecha',pintarEntregas));
+$('#filtroEntregasFecha').addEventListener('input',pintarEntregas);
+$('#filtroCarteraTipo').addEventListener('change',()=>configurarFiltroFecha('filtroCarteraTipo','filtroCarteraFecha',pintarCartera));
+$('#filtroCarteraFecha').addEventListener('input',pintarCartera);
+$('#btnLimpiarEntregas').addEventListener('click',async()=>{
+  if(!DB.entregas?.length){brindis('No hay registros para limpiar');return;}
+  if(!confirm('¿Deseas eliminar todos los registros de entregas? Esta acción no se puede deshacer.'))return;
+  await DB.limpiarEntregas(); brindis('Registros de entregas eliminados');
+});
+$('#btnLimpiarCartera').addEventListener('click',async()=>{
+  const creditos=DB.ventas.filter(v=>v.tipo==='credito');
+  if(!creditos.length){brindis('No hay registros en cartera');return;}
+  if(!confirm('¿Deseas eliminar todos los créditos de cartera? Esta acción no se puede deshacer.'))return;
+  await DB.limpiarCartera(); brindis('Registros de cartera eliminados');
+});
+
 /* ============================================================
    ARRANQUE
    ============================================================ */
 function pintarEntregas(){
-  const entregas = DB.entregas || [];
+  const tipoFiltro = $('#filtroEntregasTipo')?.value || 'mes';
+  const fechaFiltro = $('#filtroEntregasFecha')?.value || hoy().slice(0,7);
+  const entregas = (DB.entregas || []).filter(e=>coincidePeriodo(e.fecha,tipoFiltro,fechaFiltro));
   const totalEntregados = entregas.reduce((s,e)=>s + (e.entregados||[]).reduce((t,i)=>t+(i.cantidad||1),0),0);
   const totalDevueltos = entregas.reduce((s,e)=>s + (e.devueltos||[]).reduce((t,i)=>t+(i.cantidad||1),0),0);
   const vendedores = new Set(entregas.map(e=>e.vendor));

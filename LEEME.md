@@ -80,6 +80,8 @@ Con `rol: "vendedor"` la persona puede registrar ventas y cobros, pero no puede 
 
 **Cartera** — Créditos activos ordenados por fecha de vencimiento, total por cobrar, monto vencido y clientes en mora. Desde aquí se registran los abonos: el monto se aplica solo a la cuota más antigua pendiente.
 
+**Entregas y devoluciones** — Permite filtrar los registros por mes, día o año y limpiarlos con confirmación. **Cartera** también permite filtrar por período, limpiar todos los créditos y, deslizando un crédito, eliminarlo o marcarlo como cancelado por completo.
+
 **Etiquetas** — Genera el código QR de cada producto y lo entrega listo para pegar.
 
 ---
