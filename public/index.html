@@ -735,6 +735,7 @@ let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let productoPendiente=null;
 const recientes = [];
 const entregaActual = { vendor: CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
+let entregaEditando=null;
 
 $('#btnCam').addEventListener('click', ()=>seleccionarTipoEscaneo('credito'));
 $('#btnCamEntrega').addEventListener('click', ()=>seleccionarTipoEscaneo('entrega'));
@@ -926,21 +927,33 @@ function guardarEntrega(){
   const vendedor = entregaActual.vendor || CFG.vendedores[0] || 'Sin vendedor';
   const zona = entregaActual.zona || CFG.zonas[0] || 'Sin zona';
   if(!entregaActual.items.length && !entregaActual.devueltos.length){ brindis('Escanea al menos un producto antes de guardar'); return; }
-  DB.entregas = (DB.entregas||[]).filter(x=>!(x.vendor===vendedor && x.zona===zona));
+  DB.entregas = (DB.entregas||[]).filter(x=>entregaEditando ? x.creado!==entregaEditando : !(x.vendor===vendedor && x.zona===zona));
   DB.entregas.push({
     vendor: vendedor,
     zona: zona,
     entregados: entregaActual.items.map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     devueltos: entregaActual.devueltos.map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     fecha: hoy(),
-    creado: new Date().toISOString()
+    creado: entregaEditando || new Date().toISOString()
   });
   caja.guardar('gp_entregas', DB.entregas);
   brindis(`Entrega guardada para ${vendedor}`);
   entregaActual.items = [];
   entregaActual.devueltos = [];
+  entregaEditando=null;
   cerrarHoja();
   pintarEntregas();
+}
+
+function editarEntrega(creado){
+  const registro=(DB.entregas||[]).find(x=>x.creado===creado);
+  if(!registro) return;
+  entregaEditando=registro.creado;
+  entregaActual.vendor=registro.vendor||CFG.vendedores[0]||'';
+  entregaActual.zona=registro.zona||CFG.zonas[0]||'';
+  entregaActual.items=(registro.entregados||[]).map(item=>({...item}));
+  entregaActual.devueltos=(registro.devueltos||[]).map(item=>({...item}));
+  mostrarHojaEntrega();
 }
 
 function procesarEscaneoEntrega(sku){
@@ -1960,7 +1973,7 @@ function pintarEntregas(){
     const entregados = (e.entregados||[]).map(i=>`${esc(i.nombre)} × ${i.cantidad||1}`).join(', ');
     const devueltos = (e.devueltos||[]).map(i=>`${esc(i.nombre)} × ${i.cantidad||1}`).join(', ');
     const totalEnt = (e.entregados||[]).reduce((t,i)=>t+(i.cantidad||1),0);
-    return `<div class="item" style="display:block; padding:14px 12px; border-left:4px solid rgba(85,125,115,.8)">
+    return `<div class="item" style="display:block; padding:14px 12px; border-left:4px solid rgba(85,125,115,.8); cursor:pointer" onclick="editarEntrega('${esc(e.creado||'')}')" title="Editar entrega">
       <div class="cont">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px;">
           <div style="flex:1; min-width:0;"></div>
