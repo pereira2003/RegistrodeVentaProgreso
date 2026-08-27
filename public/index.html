@@ -667,7 +667,7 @@ $('#velo').addEventListener('click',cerrarHoja);
    ESCÁNER
    ============================================================ */
 let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito';
-let tipoCodigo='qr', detectorBarras=null, lectorBarras=null;
+let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let productoPendiente=null;
 const recientes = [];
 const entregaActual = { vendor: CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
@@ -730,7 +730,14 @@ async function iniciarEscaneo(modo, tipo='qr'){
     btn.textContent='Detener escaneo'; btn.classList.remove('ambar'); btn.classList.add('plano');
     otro.textContent = otro.id === 'btnCam' ? 'Escanear crédito' : 'Escanear entrega y devolución';
     otro.classList.add('ambar'); otro.classList.remove('plano');
-    leyendo=true; requestAnimationFrame(cicloLectura);
+    leyendo=true;
+    if(tipoCodigo==='barra' && !detectorBarras){
+      controlBarras = await lectorBarras.decodeFromVideoElement(v, (resultado, error) => {
+        if(resultado && leyendo) procesarCodigoLeido(resultado.getText());
+      });
+    }else{
+      requestAnimationFrame(cicloLectura);
+    }
   }catch(e){
     $('#apagado').innerHTML = '<b>No se pudo abrir la cámara</b>La página necesita HTTPS y permiso de cámara. Mientras tanto, escribe el código del producto abajo.';
     $('#visor').classList.remove('encendida');
@@ -742,7 +749,9 @@ async function iniciarEscaneo(modo, tipo='qr'){
   }
 }
 function apagarCamara(){
-  leyendo=false; if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
+  leyendo=false;
+  if(controlBarras){ controlBarras.stop(); controlBarras=null; }
+  if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
   $('#visor').classList.remove('encendida');
   $('#video').srcObject=null; $('#reticula').hidden=true; $('#apagado').hidden=false;
   $('#btnCam').textContent='Escanear crédito'; $('#btnCam').classList.add('ambar'); $('#btnCam').classList.remove('plano');
@@ -757,31 +766,28 @@ function cicloLectura(){
     cx.drawImage(v,0,0,c.width,c.height);
     const leer = detectorBarras
       ? detectorBarras.detect(v).then(codigos=>codigos[0]?.rawValue || '')
-      : tipoCodigo === 'barra'
-        ? Promise.resolve().then(()=>{
-            try{ return lectorBarras.decodeFromCanvas(c).getText(); }catch(e){ return ''; }
-          })
       : Promise.resolve((()=>{
           if(typeof jsQR!=='function') return '';
           const img=cx.getImageData(0,0,c.width,c.height);
           return jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'})?.data || '';
         })());
-    leer.then(valor=>{
-      if(!leyendo || !valor) return;
-      if(navigator.vibrate) navigator.vibrate(60);
-      const sku = valor.trim();
-      apagarCamara();
-      if(modoEscaneo === 'entrega'){
-        procesarEscaneoEntrega(sku);
-      }else if(modoEscaneo === 'producto'){
-        abrirFormularioProducto({...productoPendiente, codigoBarras:sku});
-        productoPendiente=null;
-      }else{
-        abrirProducto(sku);
-      }
-    }).catch(()=>{});
+    leer.then(procesarCodigoLeido).catch(()=>{});
   }
   requestAnimationFrame(cicloLectura);
+}
+function procesarCodigoLeido(valor){
+  if(!leyendo || !valor) return;
+  if(navigator.vibrate) navigator.vibrate(60);
+  const sku = String(valor).trim();
+  apagarCamara();
+  if(modoEscaneo === 'entrega'){
+    procesarEscaneoEntrega(sku);
+  }else if(modoEscaneo === 'producto'){
+    abrirFormularioProducto({...productoPendiente, codigoBarras:sku});
+    productoPendiente=null;
+  }else{
+    abrirProducto(sku);
+  }
 }
 $('#btnBuscar').addEventListener('click',()=>abrirProducto($('#skuManual').value));
 $('#skuManual').addEventListener('keydown',e=>{ if(e.key==='Enter') abrirProducto(e.target.value); });
