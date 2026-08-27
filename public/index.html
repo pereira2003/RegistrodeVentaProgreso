@@ -363,6 +363,7 @@ button{cursor:pointer;border:none;background:none}
   <div class="rotulo">Vendedores</div>
   <button class="btn plano chico" id="btnGestionVendedores" style="width:100%;margin-bottom:14px">Gestionar vendedores</button>
   <div class="rotulo">Entregas y devoluciones</div>
+  <button class="btn plano chico" id="btnPdfEntregas" style="width:100%;margin-bottom:10px">Descargar PDF</button>
   <div class="cifras" id="resumenEntregas"></div>
   <div id="listaEntregas"></div>
 </section>
@@ -372,6 +373,7 @@ button{cursor:pointer;border:none;background:none}
   <input id="filtroProd" placeholder="Buscar por nombre, marca o código"
     style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;margin-bottom:12px">
   <button class="btn plano" id="btnNuevoProd" style="margin-bottom:14px">+ Agregar producto</button>
+  <button class="btn plano chico" id="btnPdfProductos" style="width:100%;margin-bottom:10px">Descargar PDF</button>
   <div id="listaProd"></div>
 </section>
 
@@ -392,6 +394,7 @@ button{cursor:pointer;border:none;background:none}
   <div class="rotulo">Por vendedor</div>
   <div id="porVendedor"></div>
   <div class="rotulo">Todas las ventas</div>
+  <button class="btn plano chico" id="btnPdfVentas" style="width:100%;margin-bottom:10px">Descargar PDF</button>
   <button class="btn plano chico" id="btnCsv" style="width:100%;margin-bottom:10px">Descargar CSV</button>
   <div id="listaVentas"></div>
 </section>
@@ -409,6 +412,7 @@ button{cursor:pointer;border:none;background:none}
   <div class="rotulo">Cuentas por cobrar</div>
   <div class="cifras" id="resumenCartera"></div>
   <div class="rotulo">Créditos activos</div>
+  <button class="btn plano chico" id="btnPdfCartera" style="width:100%;margin-bottom:10px">Descargar PDF</button>
   <div id="listaCartera"></div>
 </section>
 
@@ -2095,6 +2099,54 @@ $('#btnLimpiarCartera').addEventListener('click',async()=>{
   if(!creditos.length){brindis('No hay registros en cartera');return;}
   if(!confirm('¿Deseas eliminar todos los créditos de cartera? Esta acción no se puede deshacer.'))return;
   await DB.limpiarCartera(); brindis('Registros de cartera eliminados');
+});
+
+function descargarTablaPDF(titulo,columnas,filas,nombre){
+  if(!filas.length){brindis('No hay información para descargar');return;}
+  const ventana=window.open('','_blank'); if(!ventana){brindis('Permite las ventanas emergentes para descargar el PDF');return;}
+  const encabezados=columnas.map(c=>`<th>${esc(c)}</th>`).join('');
+  const cuerpo=filas.map(f=>`<tr>${f.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('');
+  ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(nombre)}</title>
+    <style>body{font-family:Arial,sans-serif;color:#222;margin:24px}h1{font-size:20px;margin:0 0 16px}table{border-collapse:collapse;width:100%;font-size:10px}th{background:#e7ddce;text-align:left}th,td{border:1px solid #bbb;padding:6px;vertical-align:top}tr:nth-child(even){background:#f7f5f1}@media print{body{margin:10mm}h1{font-size:16px}table{font-size:8px}}</style></head>
+    <body><h1>${esc(titulo)}</h1><table><thead><tr>${encabezados}</tr></thead><tbody>${cuerpo}</tbody></table>
+    <script>window.onload=function(){window.print();};<\/script></body></html>`);
+  ventana.document.close();
+}
+
+function ventasParaFiltro(){
+  const tipo=$('#filtroVentasTipo').value, valor=$('#filtroVentasFecha').value;
+  return DB.ventas.filter(v=>coincidePeriodo(v.fecha,tipo,valor));
+}
+
+$('#btnPdfProductos').addEventListener('click',()=>{
+  const q=$('#filtroProd').value.toLowerCase().trim();
+  const productos=DB.productos.filter(p=>!q||(p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q));
+  descargarTablaPDF('Productos', ['SKU','Código de barras','Nombre','Color','Marca','Categoría','Contado','Crédito','Existencia'], productos.map(p=>[
+    p.sku,p.codigoBarras||'',p.nombre,p.color||'',p.marca||'',p.categoria||'',money(p.contado),money(p.credito),p.stock||0
+  ]),'productos');
+});
+
+$('#btnPdfVentas').addEventListener('click',()=>{
+  const ventas=ventasParaFiltro();
+  descargarTablaPDF('Ventas', ['Fecha','Código','Producto','Cliente','Documento','Teléfono','Tipo','Cantidad','Precio unitario','Total','Prima','Saldo','Plazo','Vendedor','Sucursal'], ventas.map(v=>[
+    v.fecha,v.sku,v.producto,v.cliente,v.documento||'',v.telefono||'',v.tipo,v.cantidad||1,money(v.precioUnitario),money(v.total),money(v.prima),money(v.saldo),v.plazo||'',v.vendedor||'',v.sucursal||''
+  ]),'ventas');
+});
+
+$('#btnPdfEntregas').addEventListener('click',()=>{
+  const tipo=$('#filtroEntregasTipo').value, valor=$('#filtroEntregasFecha').value;
+  const entregas=(DB.entregas||[]).filter(e=>coincidePeriodo(e.fecha,tipo,valor));
+  descargarTablaPDF('Entregas y devoluciones', ['Fecha','Vendedor','Zona','Productos entregados','Productos devueltos'], entregas.map(e=>[
+    e.fecha,e.vendor,e.zona||'',(e.entregados||[]).map(i=>`${i.nombre} x${i.cantidad||1}`).join(', '),(e.devueltos||[]).map(i=>`${i.nombre} x${i.cantidad||1}`).join(', ')
+  ]),'entregas');
+});
+
+$('#btnPdfCartera').addEventListener('click',()=>{
+  const tipo=$('#filtroCarteraTipo').value, valor=$('#filtroCarteraFecha').value;
+  const creditos=DB.ventas.filter(v=>v.tipo==='credito'&&coincidePeriodo(v.fecha,tipo,valor));
+  descargarTablaPDF('Cartera', ['Fecha','Cliente','Documento','Producto','Total','Prima','Saldo','Estado','Cuota mensual','Plazo','Vendedor'], creditos.map(v=>[
+    v.fecha,v.cliente,v.documento||'',v.producto,money(v.total),money(v.prima),money(v.saldo),v.estado||'',money(v.cuotaMensual),v.plazo||'',v.vendedor||''
+  ]),'cartera');
 });
 
 /* ============================================================

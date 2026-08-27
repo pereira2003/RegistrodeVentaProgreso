@@ -76,13 +76,13 @@ Con `rol: "vendedor"` la persona puede registrar ventas y cobros, pero no puede 
 
 **Escanear** — Antes de encender la cámara puedes elegir *Código QR* o *Código de barras* y luego indicar si la venta será *al contado* o *a crédito*. Al reconocer un código la cámara se apaga sola y abre el registro de venta. Si el código no existe, se abre el formulario para poner nombre, marca, categoría, precios y existencia. También acepta el código escrito a mano, útil si la etiqueta está rayada.
 
-**Productos** — Catálogo con buscador, existencias y alta de productos nuevos. Cada producto puede tener un SKU interno y el código de barras que ya trae de fábrica; ambos sirven para buscarlo y registrarlo. Desde el formulario de nuevo producto, el botón de cámara muestra un popup para leer y llenar automáticamente el código de barras.
+**Productos** — Catálogo con buscador, existencias y alta de productos nuevos. Cada producto puede tener un SKU interno y el código de barras que ya trae de fábrica; ambos sirven para buscarlo y registrarlo. Desde el formulario de nuevo producto, el botón de cámara muestra un popup para leer y llenar automáticamente el código de barras. El catálogo también se puede descargar como tabla PDF.
 
-**Ventas** — Filtra el resumen e historial por mes, día o año, consulta el ranking por vendedor, descarga el CSV con cantidad, precio unitario, prima y saldo, y limpia todos los registros de ventas con confirmación.
+**Ventas** — Filtra el resumen e historial por mes, día o año, consulta el ranking por vendedor, descarga el CSV o una tabla PDF con cantidad, precio unitario, prima y saldo, y limpia todos los registros de ventas con confirmación.
 
 **Cartera** — Créditos activos ordenados por fecha de vencimiento, total por cobrar, monto vencido y clientes en mora. Desde aquí se registran los abonos: el monto se aplica solo a la cuota más antigua pendiente.
 
-**Entregas y devoluciones** — Permite gestionar vendedores (agregar, actualizar y eliminar), filtrar los registros por mes, día o año, limpiarlos con confirmación y tocar cualquier registro para editar vendedor, zona, productos entregados y devoluciones. Dentro del formulario, escanear el mismo producto suma su cantidad; también puedes ajustarla con menos y más, o deslizar el producto para borrarlo. **Cartera** también permite filtrar por período, limpiar todos los créditos y, deslizando un crédito, eliminarlo o marcarlo como pagado completamente.
+**Entregas y devoluciones** — Permite gestionar vendedores (agregar, actualizar y eliminar), filtrar los registros por mes, día o año, limpiarlos con confirmación, descargar una tabla PDF y tocar cualquier registro para editar vendedor, zona, productos entregados y devoluciones. Dentro del formulario, escanear el mismo producto suma su cantidad; también puedes ajustarla con menos y más, o deslizar el producto para borrarlo. **Cartera** también permite filtrar por período, descargar una tabla PDF, limpiar todos los créditos y, deslizando un crédito, eliminarlo o marcarlo como pagado completamente.
 
 **Etiquetas** — Genera el código QR de cada producto y lo entrega listo para pegar.
 
