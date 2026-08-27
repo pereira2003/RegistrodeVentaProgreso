@@ -1574,7 +1574,7 @@ function pintarCartera(){
     return `<div class="product-swipe cartera-swipe" data-id="${esc(v.id)}">
       <div class="swipe-actions">
         <button class="btn-contado" type="button" onclick="eliminarCredito('${v.id}')">Eliminar</button>
-        <button class="btn-credito" type="button" onclick="cancelarCredito('${v.id}')">Cancelar</button>
+        <button class="btn-credito" type="button" onclick="marcarCreditoPagado('${v.id}')">Pagado</button>
       </div>
       <div class="swipe-content item">
         <div class="cont"><h4>${esc(v.cliente)}</h4>
@@ -1608,12 +1608,12 @@ async function eliminarCredito(id){
   await DB.eliminarVenta(id); cerrarHoja(); brindis('Crédito eliminado');
 }
 
-async function cancelarCredito(id){
+async function marcarCreditoPagado(id){
   const v=DB.ventas.find(x=>x.id===id); if(!v) return;
-  if(!confirm('¿Marcar este crédito como cancelado por completo?')) return;
+  if(!confirm('¿Confirmas que este crédito ya fue pagado completamente?')) return;
   v.saldo=0; v.estado='pagada';
   (v.cuotas||[]).forEach(c=>{c.pagado=c.monto;c.estado='pagada';});
-  await DB.actualizarVenta(v); cerrarHoja(); brindis('Crédito cancelado por completo');
+  await DB.actualizarVenta(v); cerrarHoja(); brindis('Crédito marcado como pagado');
 }
 
 /* ============================================================
