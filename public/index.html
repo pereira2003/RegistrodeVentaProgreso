@@ -666,7 +666,7 @@ $('#velo').addEventListener('click',cerrarHoja);
 /* ============================================================
    ESCÁNER
    ============================================================ */
-let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito';
+let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo='credito';
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let productoPendiente=null;
 const recientes = [];
@@ -693,14 +693,28 @@ function seleccionarTipoEscaneo(modo){
     <div class="hoja-tope"><h2>Tipo de código</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="aviso">Elige el tipo de código antes de activar la cámara.</div>
     <div class="fila" style="margin-top:14px">
-      <button class="btn ambar" onclick="iniciarEscaneo('${modo}','qr'); cerrarHoja()">Código QR</button>
-      <button class="btn plano" onclick="iniciarEscaneo('${modo}','barra'); cerrarHoja()">Código de barras</button>
+      <button class="btn ambar" onclick="seleccionarFormaVenta('${modo}','qr')">Código QR</button>
+      <button class="btn plano" onclick="seleccionarFormaVenta('${modo}','barra')">Código de barras</button>
     </div>`);
 }
 
-async function iniciarEscaneo(modo, tipo='qr'){
+function seleccionarFormaVenta(modo, tipo){
+  if(modo!=='credito'){
+    iniciarEscaneo(modo, tipo); cerrarHoja(); return;
+  }
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Tipo de venta</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="aviso">¿Cómo se registrará esta venta?</div>
+    <div class="fila" style="margin-top:14px">
+      <button class="btn ambar" onclick="iniciarEscaneo('credito','${tipo}','contado'); cerrarHoja()">Al contado</button>
+      <button class="btn plano" onclick="iniciarEscaneo('credito','${tipo}','credito'); cerrarHoja()">A crédito</button>
+    </div>`);
+}
+
+async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito'){
   modoEscaneo = modo;
   tipoCodigo = tipo;
+  tipoVentaEscaneo = tipoVenta;
   if(tipoCodigo === 'barra' && !('BarcodeDetector' in window) && typeof ZXingBrowser === 'undefined'){
     $('#apagado').innerHTML = '<b>Lectura de barras no disponible</b>Usa Chrome o Edge actualizado en el celular, o escribe el código manualmente.';
     $('#apagado').hidden=false;
@@ -786,13 +800,13 @@ function procesarCodigoLeido(valor){
     abrirFormularioProducto({...productoPendiente, codigoBarras:sku});
     productoPendiente=null;
   }else{
-    abrirProducto(sku);
+    abrirProducto(sku, tipoVentaEscaneo);
   }
 }
 $('#btnBuscar').addEventListener('click',()=>abrirProducto($('#skuManual').value));
 $('#skuManual').addEventListener('keydown',e=>{ if(e.key==='Enter') abrirProducto(e.target.value); });
 
-function abrirProducto(sku){
+function abrirProducto(sku, tipoVenta=null){
   const p = DB.buscar(sku);
   if(!p){
     abrirFormularioProducto({sku:String(sku).trim().toUpperCase()});
@@ -801,7 +815,7 @@ function abrirProducto(sku){
   }
   if(!recientes.find(r=>r.sku===p.sku)) recientes.unshift(p);
   recientes.splice(6); pintarRecientes();
-  fichaProducto(p);
+  if(tipoVenta) formVenta(p.sku, tipoVenta); else fichaProducto(p);
 }
 
 function mostrarHojaEntrega(){
