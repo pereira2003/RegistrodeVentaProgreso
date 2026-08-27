@@ -668,11 +668,25 @@ $('#velo').addEventListener('click',cerrarHoja);
    ============================================================ */
 let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito';
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null;
+let productoPendiente=null;
 const recientes = [];
 const entregaActual = { vendor: CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
 
 $('#btnCam').addEventListener('click', ()=>seleccionarTipoEscaneo('credito'));
 $('#btnCamEntrega').addEventListener('click', ()=>seleccionarTipoEscaneo('entrega'));
+
+function escanearBarrasProducto(){
+  productoPendiente = {
+    sku:$('#pSku')?.value.trim().toUpperCase() || '',
+    nombre:$('#pNombre')?.value.trim() || '',
+    marca:$('#pMarca')?.value.trim() || '',
+    categoria:$('#pCat')?.value || 'Otros',
+    contado:$('#pContado')?.value || '', credito:$('#pCredito')?.value || '',
+    stock:$('#pStock')?.value || 0
+  };
+  cerrarHoja();
+  iniciarEscaneo('producto','barra');
+}
 
 function seleccionarTipoEscaneo(modo){
   abrirHoja(`
@@ -721,6 +735,10 @@ async function iniciarEscaneo(modo, tipo='qr'){
     $('#apagado').innerHTML = '<b>No se pudo abrir la cámara</b>La página necesita HTTPS y permiso de cámara. Mientras tanto, escribe el código del producto abajo.';
     $('#visor').classList.remove('encendida');
     $('#apagado').hidden=false;
+    if(modo==='producto' && productoPendiente){
+      abrirFormularioProducto(productoPendiente);
+      productoPendiente=null;
+    }
   }
 }
 function apagarCamara(){
@@ -755,6 +773,9 @@ function cicloLectura(){
       apagarCamara();
       if(modoEscaneo === 'entrega'){
         procesarEscaneoEntrega(sku);
+      }else if(modoEscaneo === 'producto'){
+        abrirFormularioProducto({...productoPendiente, codigoBarras:sku});
+        productoPendiente=null;
       }else{
         abrirProducto(sku);
       }
@@ -1214,6 +1235,7 @@ function abrirFormularioProducto(p = null){
         style="font-family:var(--dato);text-transform:uppercase"></div>
       <div class="campo"><label>Código de barras del producto</label><input id="pBarras" value="${esc(p ? p.codigoBarras || '' : '')}" placeholder="Ej. 7501234567890"
         inputmode="numeric" style="font-family:var(--dato);letter-spacing:.08em"></div>
+      <button class="btn plano chico" type="button" onclick="escanearBarrasProducto()">Leer código con cámara</button>
       <div class="campo"><label>Nombre</label><input id="pNombre" value="${esc(p ? p.nombre : '')}" placeholder="Refrigeradora No Frost 14 pies"></div>
       <div class="dosc">
         <div class="campo"><label>Marca</label><input id="pMarca" value="${esc(p ? p.marca || '' : '')}"></div>
