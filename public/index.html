@@ -360,6 +360,8 @@ button{cursor:pointer;border:none;background:none}
     <input id="filtroEntregasFecha" type="month" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
   </div>
   <button class="btn plano chico" id="btnLimpiarEntregas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
+  <div class="rotulo">Vendedores</div>
+  <button class="btn plano chico" id="btnGestionVendedores" style="width:100%;margin-bottom:14px">Gestionar vendedores</button>
   <div class="rotulo">Entregas y devoluciones</div>
   <div class="cifras" id="resumenEntregas"></div>
   <div id="listaEntregas"></div>
@@ -703,6 +705,10 @@ const DB = {
   }
 };
 
+function vendedoresActuales(){
+  return caja.leer('gp_vendedores', CFG.vendedores.slice());
+}
+
 function sello(txt,tipo){
   const e=$('#estado');
   if(!e) return;
@@ -737,7 +743,7 @@ let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
-const entregaActual = { vendor: CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
+const entregaActual = { vendor: vendedoresActuales()[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
 let entregaEditando=null;
 
 $('#btnCam').addEventListener('click', ()=>seleccionarTipoEscaneo('credito'));
@@ -810,7 +816,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     }
     if(!detectorBarras) lectorBarras = new ZXingBrowser.BrowserMultiFormatReader();
   }
-  if(modo==='entrega' && !entregaActual.vendor && CFG.vendedores.length) entregaActual.vendor = CFG.vendedores[0];
+  if(modo==='entrega' && !entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
   if(modo==='entrega' && entregaActual.items.length){
     mostrarHojaEntrega();
   }
@@ -906,8 +912,52 @@ function abrirProducto(sku, tipoVenta=null){
   if(tipoVenta) formVenta(p.sku, tipoVenta); else fichaProducto(p);
 }
 
+function gestionarVendedores(){
+  const vendedores=vendedoresActuales();
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Gestionar vendedores</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="tarjeta pad">
+      <div class="campo" style="margin-bottom:8px"><label>Nuevo vendedor</label>
+        <input id="nuevoVendedor" placeholder="Nombre del vendedor"></div>
+      <button class="btn ambar" onclick="agregarVendedor()">Agregar vendedor</button>
+    </div>
+    <div class="rotulo">Vendedores registrados</div>
+    <div id="listaVendedores">${vendedores.length ? vendedores.map((v,i)=>`
+      <div class="item" style="padding:10px 12px">
+        <div class="cont"><h4>${esc(v)}</h4></div>
+        <div style="display:flex;gap:6px"><button class="btn chico" onclick="editarVendedor(${i})">Actualizar</button>
+          <button class="btn plano chico" onclick="eliminarVendedor(${i})">Eliminar</button></div>
+      </div>`).join('') : '<div class="vacio"><b>No hay vendedores</b>Agrega el primero.</div>'}</div>`);
+}
+
+function guardarVendedores(lista){
+  caja.guardar('gp_vendedores',lista); pintarTodo();
+}
+
+function agregarVendedor(){
+  const nombre=$('#nuevoVendedor').value.trim(); if(!nombre){brindis('Escribe el nombre del vendedor');return;}
+  const lista=vendedoresActuales();
+  if(lista.some(v=>v.toLowerCase()===nombre.toLowerCase())){brindis('Ese vendedor ya existe');return;}
+  lista.push(nombre); guardarVendedores(lista); gestionarVendedores(); brindis('Vendedor agregado');
+}
+
+function editarVendedor(indice){
+  const lista=vendedoresActuales(), anterior=lista[indice]; if(!anterior)return;
+  const nombre=prompt('Nuevo nombre del vendedor',anterior)?.trim(); if(!nombre||nombre===anterior)return;
+  if(lista.some((v,i)=>i!==indice&&v.toLowerCase()===nombre.toLowerCase())){brindis('Ese vendedor ya existe');return;}
+  lista[indice]=nombre; if(entregaActual.vendor===anterior) entregaActual.vendor=nombre;
+  guardarVendedores(lista); gestionarVendedores(); brindis('Vendedor actualizado');
+}
+
+function eliminarVendedor(indice){
+  const lista=vendedoresActuales(), nombre=lista[indice]; if(!nombre)return;
+  if(!confirm(`¿Eliminar al vendedor "${nombre}"?`))return;
+  lista.splice(indice,1); if(entregaActual.vendor===nombre) entregaActual.vendor=lista[0]||'';
+  guardarVendedores(lista); gestionarVendedores(); brindis('Vendedor eliminado');
+}
+
 function mostrarHojaEntrega(){
-  const vendedor = entregaActual.vendor || CFG.vendedores[0] || '';
+  const vendedor = entregaActual.vendor || vendedoresActuales()[0] || '';
   const zona = entregaActual.zona || CFG.zonas[0] || '';
   const items = entregaActual.items || [];
   const devueltos = entregaActual.devueltos || [];
@@ -918,7 +968,7 @@ function mostrarHojaEntrega(){
         <div class="campo" style="margin-bottom:0">
           <label>Vendedor</label>
           <select id="entregaVendor" onchange="entregaActual.vendor=this.value; mostrarHojaEntrega()">
-            ${CFG.vendedores.map(v=>`<option value="${esc(v)}" ${v===vendedor?'selected':''}>${esc(v)}</option>`).join('')}
+            ${vendedoresActuales().map(v=>`<option value="${esc(v)}" ${v===vendedor?'selected':''}>${esc(v)}</option>`).join('')}
           </select>
         </div>
         <div class="campo" style="margin-bottom:0">
@@ -980,7 +1030,7 @@ function ajustarCantidadEntrega(tipo,indice,cambio){
 }
 
 function guardarEntrega(){
-  const vendedor = entregaActual.vendor || CFG.vendedores[0] || 'Sin vendedor';
+  const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
   const zona = entregaActual.zona || CFG.zonas[0] || 'Sin zona';
   if(!entregaActual.items.length && !entregaActual.devueltos.length){ brindis('Escanea al menos un producto antes de guardar'); return; }
   DB.entregas = (DB.entregas||[]).filter(x=>entregaEditando ? x.creado!==entregaEditando : !(x.vendor===vendedor && x.zona===zona));
@@ -1005,7 +1055,7 @@ function editarEntrega(creado){
   const registro=(DB.entregas||[]).find(x=>x.creado===creado);
   if(!registro) return;
   entregaEditando=registro.creado;
-  entregaActual.vendor=registro.vendor||CFG.vendedores[0]||'';
+  entregaActual.vendor=registro.vendor||vendedoresActuales()[0]||'';
   entregaActual.zona=registro.zona||CFG.zonas[0]||'';
   entregaActual.items=(registro.entregados||[]).map(item=>({...item}));
   entregaActual.devueltos=(registro.devueltos||[]).map(item=>({...item}));
@@ -1015,9 +1065,9 @@ function editarEntrega(creado){
 function procesarEscaneoEntrega(sku){
   const p = DB.buscar(sku);
   if(!p){ brindis('No hay ningún producto con el código '+sku); return; }
-  if(!entregaActual.vendor && CFG.vendedores.length) entregaActual.vendor = CFG.vendedores[0];
+  if(!entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
   if(!entregaActual.zona && CFG.zonas.length) entregaActual.zona = CFG.zonas[0];
-  const vendedor = entregaActual.vendor || CFG.vendedores[0] || 'Sin vendedor';
+  const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
 
   const idxActual = entregaActual.items.findIndex(item=>item.sku===p.sku);
   if(idxActual >= 0){
@@ -1158,7 +1208,7 @@ function formVenta(sku, tipo){
     <div class="tarjeta pad">
       <div class="dosc" style="margin-bottom:0">
         <div class="campo" style="margin-bottom:0"><label>Vendedor</label>
-          <select id="vVendedor">${CFG.vendedores.map(v=>`<option>${esc(v)}</option>`).join('')}</select></div>
+          <select id="vVendedor">${vendedoresActuales().map(v=>`<option>${esc(v)}</option>`).join('')}</select></div>
         <div class="campo" style="margin-bottom:0"><label>Fecha</label>
           <input id="vFecha" type="date" value="${hoy()}" onchange="calcular()"></div>
       </div>
@@ -1992,6 +2042,7 @@ function configurarFiltroFecha(tipoId, fechaId, pintar){
 }
 $('#filtroEntregasTipo').addEventListener('change',()=>configurarFiltroFecha('filtroEntregasTipo','filtroEntregasFecha',pintarEntregas));
 $('#filtroEntregasFecha').addEventListener('input',pintarEntregas);
+$('#btnGestionVendedores').addEventListener('click',gestionarVendedores);
 $('#filtroCarteraTipo').addEventListener('change',()=>configurarFiltroFecha('filtroCarteraTipo','filtroCarteraFecha',pintarCartera));
 $('#filtroCarteraFecha').addEventListener('input',pintarCartera);
 $('#btnLimpiarEntregas').addEventListener('click',async()=>{
