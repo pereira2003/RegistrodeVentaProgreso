@@ -570,18 +570,20 @@ const SEMILLA = [
 ];
 
 const DB = {
-  modo:'local', productos:[], ventas:[], fb:null,
+  modo:'local', productos:[], ventas:[], entregas:[], vendedores:[], fb:null,
 
   async iniciar(){
     if(CFG.firebase){
-      try{ await this.conectarFirebase(); this.modo='firebase'; sello('Firebase','ok'); return; }
+      try{ this.modo='firebase'; await this.conectarFirebase(); sello('Firebase','ok'); return; }
       catch(e){ console.warn('Firebase no disponible:',e); }
     }
     this.productos = caja.leer('gp_productos', null) || SEMILLA.slice();
     this.ventas    = caja.leer('gp_ventas', []);
     this.entregas  = caja.leer('gp_entregas', []);
+    this.vendedores = caja.leer('gp_vendedores', CFG.vendedores.slice());
     caja.guardar('gp_productos', this.productos);
     caja.guardar('gp_entregas', this.entregas);
+    caja.guardar('gp_vendedores', this.vendedores);
     sello('Modo prueba','local');
     pintarTodo();
   },
@@ -605,6 +607,15 @@ const DB = {
       this.ventas = s.docs.map(d=>({id:d.id,...d.data()}));
       pintarTodo();
     });
+    f.onSnapshot(f.collection(bd,'entregas'), s=>{
+      this.entregas = s.docs.map(d=>({id:d.id,...d.data()}));
+      pintarTodo();
+    });
+    f.onSnapshot(f.collection(bd,'vendedores'), s=>{
+      this.vendedores = s.docs.map(d=>d.data().nombre).filter(Boolean);
+      if(!this.vendedores.length) this.sembrarVendedores();
+      pintarTodo();
+    });
   },
 
   async sembrar(){ for(const p of SEMILLA) await this.agregarProducto(p); },
@@ -617,9 +628,45 @@ const DB = {
     }
   },
 
-  async actualizarProducto(p){
+  async sembrarVendedores(){ for(const nombre of CFG.vendedores) await this.guardarVendedor(nombre); },
+
+  async guardarVendedor(nombre, anterior=''){
+    const id = nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-');
     if(this.modo==='firebase'){
-      const {f,bd}=this.fb; await f.updateDoc(f.doc(bd,'productos',p.sku), p);
+      const {f,bd}=this.fb;
+      if(anterior && anterior!==nombre) await f.deleteDoc(f.doc(bd,'vendedores',anterior.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-')));
+      await f.setDoc(f.doc(bd,'vendedores',id),{nombre});
+    }else{
+      const lista=this.vendedores.length?this.vendedores:CFG.vendedores.slice();
+      const i=anterior?lista.indexOf(anterior):-1; if(i>=0) lista[i]=nombre; else lista.push(nombre);
+      this.vendedores=lista; caja.guardar('gp_vendedores',lista); pintarTodo();
+    }
+  },
+
+  async eliminarVendedor(nombre){
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; const id=nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'); await f.deleteDoc(f.doc(bd,'vendedores',id));
+    }else{ this.vendedores=this.vendedores.filter(v=>v!==nombre); caja.guardar('gp_vendedores',this.vendedores); pintarTodo(); }
+  },
+
+  async guardarEntrega(e){
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; await f.setDoc(f.doc(bd,'entregas',e.creado),e);
+    }else{ this.entregas=(this.entregas||[]).filter(x=>x.creado!==e.creado); this.entregas.push(e); caja.guardar('gp_entregas',this.entregas); pintarTodo(); }
+  },
+
+  async limpiarEntregas(){
+    if(this.modo==='firebase'){ const {f,bd}=this.fb; const snap=await f.getDocs(f.collection(bd,'entregas')); await Promise.all(snap.docs.map(d=>f.deleteDoc(d.ref))); }
+    else{ this.entregas=[]; caja.guardar('gp_entregas',this.entregas); pintarTodo(); }
+  },
+
+  async actualizarProducto(p, skuAnterior=''){
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb;
+      if(skuAnterior && skuAnterior.toUpperCase()!==p.sku.toUpperCase()){
+        await f.setDoc(f.doc(bd,'productos',p.sku), p);
+        await f.deleteDoc(f.doc(bd,'productos',skuAnterior.toUpperCase()));
+      }else await f.updateDoc(f.doc(bd,'productos',p.sku), p);
     }else{
       const idx = this.productos.findIndex(item => item.sku.toUpperCase() === String(p.sku).trim().toUpperCase());
       if(idx >= 0){ this.productos[idx] = { ...this.productos[idx], ...p }; }
@@ -672,12 +719,6 @@ const DB = {
     }
   },
 
-  async limpiarEntregas(){
-    this.entregas = [];
-    caja.guardar('gp_entregas', this.entregas);
-    pintarTodo();
-  },
-
   async limpiarCartera(){
     if(this.modo==='firebase'){
       const {f,bd}=this.fb;
@@ -706,7 +747,7 @@ const DB = {
 };
 
 function vendedoresActuales(){
-  return caja.leer('gp_vendedores', CFG.vendedores.slice());
+  return DB.modo==='firebase' ? (DB.vendedores||[]) : caja.leer('gp_vendedores', CFG.vendedores.slice());
 }
 
 function sello(txt,tipo){
@@ -930,30 +971,32 @@ function gestionarVendedores(){
       </div>`).join('') : '<div class="vacio"><b>No hay vendedores</b>Agrega el primero.</div>'}</div>`);
 }
 
-function guardarVendedores(lista){
-  caja.guardar('gp_vendedores',lista); pintarTodo();
+async function guardarVendedores(lista, anterior=''){
+  const nombre=lista[lista.length-1];
+  if(anterior) await DB.guardarVendedor(nombre,anterior); else await DB.guardarVendedor(nombre);
+  pintarTodo();
 }
 
-function agregarVendedor(){
+async function agregarVendedor(){
   const nombre=$('#nuevoVendedor').value.trim(); if(!nombre){brindis('Escribe el nombre del vendedor');return;}
   const lista=vendedoresActuales();
   if(lista.some(v=>v.toLowerCase()===nombre.toLowerCase())){brindis('Ese vendedor ya existe');return;}
-  lista.push(nombre); guardarVendedores(lista); gestionarVendedores(); brindis('Vendedor agregado');
+  lista.push(nombre); await DB.guardarVendedor(nombre); gestionarVendedores(); brindis('Vendedor agregado');
 }
 
-function editarVendedor(indice){
+async function editarVendedor(indice){
   const lista=vendedoresActuales(), anterior=lista[indice]; if(!anterior)return;
   const nombre=prompt('Nuevo nombre del vendedor',anterior)?.trim(); if(!nombre||nombre===anterior)return;
   if(lista.some((v,i)=>i!==indice&&v.toLowerCase()===nombre.toLowerCase())){brindis('Ese vendedor ya existe');return;}
   lista[indice]=nombre; if(entregaActual.vendor===anterior) entregaActual.vendor=nombre;
-  guardarVendedores(lista); gestionarVendedores(); brindis('Vendedor actualizado');
+  await DB.guardarVendedor(nombre,anterior); gestionarVendedores(); brindis('Vendedor actualizado');
 }
 
-function eliminarVendedor(indice){
+async function eliminarVendedor(indice){
   const lista=vendedoresActuales(), nombre=lista[indice]; if(!nombre)return;
   if(!confirm(`¿Eliminar al vendedor "${nombre}"?`))return;
   lista.splice(indice,1); if(entregaActual.vendor===nombre) entregaActual.vendor=lista[0]||'';
-  guardarVendedores(lista); gestionarVendedores(); brindis('Vendedor eliminado');
+  await DB.eliminarVendedor(nombre); gestionarVendedores(); brindis('Vendedor eliminado');
 }
 
 function mostrarHojaEntrega(){
@@ -1029,20 +1072,19 @@ function ajustarCantidadEntrega(tipo,indice,cambio){
   mostrarHojaEntrega();
 }
 
-function guardarEntrega(){
+async function guardarEntrega(){
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
   const zona = entregaActual.zona || CFG.zonas[0] || 'Sin zona';
   if(!entregaActual.items.length && !entregaActual.devueltos.length){ brindis('Escanea al menos un producto antes de guardar'); return; }
-  DB.entregas = (DB.entregas||[]).filter(x=>entregaEditando ? x.creado!==entregaEditando : !(x.vendor===vendedor && x.zona===zona));
-  DB.entregas.push({
+  const registro={
     vendor: vendedor,
     zona: zona,
     entregados: entregaActual.items.map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     devueltos: entregaActual.devueltos.map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     fecha: hoy(),
     creado: entregaEditando || new Date().toISOString()
-  });
-  caja.guardar('gp_entregas', DB.entregas);
+  };
+  await DB.guardarEntrega(registro);
   brindis(`Entrega guardada para ${vendedor}`);
   entregaActual.items = [];
   entregaActual.devueltos = [];
@@ -1476,10 +1518,8 @@ async function guardarProducto(skuOriginal = ''){
     if(existe && sku !== original){ brindis('Ya existe un producto con ese código'); return; }
     const idx = DB.productos.findIndex(p => p.sku.toUpperCase() === original);
     if(idx >= 0){
-      DB.productos[idx] = { ...DB.productos[idx], ...producto };
-      caja.guardar('gp_productos', DB.productos);
+      await DB.actualizarProducto(producto, original);
       cerrarHoja(); brindis('Producto actualizado');
-      pintarTodo();
       return;
     }
   }

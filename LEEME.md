@@ -35,6 +35,8 @@ const CFG = {
 
 En esa misma sección ajusta tus vendedores y los recargos por plazo.
 
+Con Firebase configurado, los productos, ventas, vendedores y entregas se sincronizan en tiempo real entre los dispositivos. Las actualizaciones y eliminaciones realizadas en un dispositivo aparecen en los demás. Después de agregar esta sincronización, vuelve a publicar las reglas con `firebase deploy --only firestore:rules`.
+
 `CFG.sucursales` viene vacío a propósito. Si lo dejas así, la app nunca pregunta por sucursal. Si escribes las tuyas, aparece un campo para elegirla al registrar la venta y queda guardada en cada registro.
 
 ---

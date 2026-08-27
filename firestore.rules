@@ -51,5 +51,14 @@ service cloud.firestore {
            .hasOnly(['cuotas','saldo','estado','abonos']));
       allow delete: if false;
     }
+
+    // Vendedores y entregas se sincronizan entre los dispositivos del equipo.
+    match /vendedores/{id} {
+      allow read, write: if autenticado();
+    }
+
+    match /entregas/{id} {
+      allow read, write: if autenticado();
+    }
   }
 }
