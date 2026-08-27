@@ -76,7 +76,7 @@ Con `rol: "vendedor"` la persona puede registrar ventas y cobros, pero no puede 
 
 **Productos** — Catálogo con buscador, existencias y alta de productos nuevos. Cada producto puede tener un SKU interno y el código de barras que ya trae de fábrica; ambos sirven para buscarlo y registrarlo.
 
-**Ventas** — Resumen del mes, ranking por vendedor, historial completo y descarga en CSV con cantidad, precio unitario, prima y saldo de cada venta.
+**Ventas** — Filtra el resumen e historial por mes, día o año, consulta el ranking por vendedor, descarga el CSV con cantidad, precio unitario, prima y saldo, y limpia todos los registros de ventas con confirmación.
 
 **Cartera** — Créditos activos ordenados por fecha de vencimiento, total por cobrar, monto vencido y clientes en mora. Desde aquí se registran los abonos: el monto se aplica solo a la cuota más antigua pendiente.
 

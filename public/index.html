@@ -364,7 +364,17 @@ button{cursor:pointer;border:none;background:none}
 
 <!-- ================= VENTAS ================= -->
 <section class="vista" data-vista="ventas">
-  <div class="rotulo">Resumen del mes</div>
+  <div class="rotulo">Filtrar ventas</div>
+  <div class="fila" style="align-items:stretch;margin-bottom:8px">
+    <select id="filtroVentasTipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+      <option value="mes">Por mes</option>
+      <option value="dia">Por día</option>
+      <option value="año">Por año</option>
+    </select>
+    <input id="filtroVentasFecha" type="month" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+  </div>
+  <button class="btn plano chico" id="btnLimpiarVentas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
+  <div class="rotulo">Resumen del período</div>
   <div class="cifras" id="resumenVentas"></div>
   <div class="rotulo">Por vendedor</div>
   <div id="porVendedor"></div>
@@ -616,6 +626,18 @@ const DB = {
       this.ventas.push(v);
       const p = this.buscar(v.sku); if(p) p.stock = Math.max(0,(p.stock||0)-(v.cantidad||1));
       caja.guardar('gp_ventas',this.ventas); caja.guardar('gp_productos',this.productos);
+      pintarTodo();
+    }
+  },
+
+  async limpiarVentas(){
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb;
+      const snap = await f.getDocs(f.collection(bd,'ventas'));
+      await Promise.all(snap.docs.map(d=>f.deleteDoc(d.ref)));
+    }else{
+      this.ventas = [];
+      caja.guardar('gp_ventas', this.ventas);
       pintarTodo();
     }
   },
@@ -1398,28 +1420,33 @@ function pintarProductos(){
    VENTAS Y CARTERA
    ============================================================ */
 function pintarVentas(){
-  const mes = hoy().slice(0,7);
-  const delMes = DB.ventas.filter(v=>v.fecha.slice(0,7)===mes);
-  const total = delMes.reduce((s,v)=>s+(v.total||0),0);
-  const contado = delMes.filter(v=>v.tipo==='contado').reduce((s,v)=>s+v.total,0);
-  const credito = delMes.filter(v=>v.tipo==='credito').reduce((s,v)=>s+v.total,0);
+  const tipoFiltro = $('#filtroVentasTipo')?.value || 'mes';
+  const fechaFiltro = $('#filtroVentasFecha')?.value || hoy().slice(0,7);
+  const ventasFiltradas = DB.ventas.filter(v=>{
+    if(tipoFiltro==='dia') return v.fecha===fechaFiltro;
+    if(tipoFiltro==='año') return v.fecha.slice(0,4)===fechaFiltro;
+    return v.fecha.slice(0,7)===fechaFiltro;
+  });
+  const total = ventasFiltradas.reduce((s,v)=>s+(v.total||0),0);
+  const contado = ventasFiltradas.filter(v=>v.tipo==='contado').reduce((s,v)=>s+v.total,0);
+  const credito = ventasFiltradas.filter(v=>v.tipo==='credito').reduce((s,v)=>s+v.total,0);
 
   $('#resumenVentas').innerHTML = `
-    <div class="cifra"><em>Ventas del mes</em><b>${delMes.length}</b></div>
+    <div class="cifra"><em>Ventas filtradas</em><b>${ventasFiltradas.length}</b></div>
     <div class="cifra bien"><em>Monto total</em><b>${money(total)}</b></div>
     <div class="cifra"><em>De contado</em><b>${money(contado)}</b></div>
     <div class="cifra"><em>A crédito</em><b>${money(credito)}</b></div>`;
 
   const grupos = {};
-  delMes.forEach(v=>{ grupos[v.vendedor]=(grupos[v.vendedor]||0)+v.total; });
+  ventasFiltradas.forEach(v=>{ grupos[v.vendedor]=(grupos[v.vendedor]||0)+v.total; });
   const orden = Object.entries(grupos).sort((a,b)=>b[1]-a[1]);
   $('#porVendedor').innerHTML = orden.length ? orden.map(([n,m])=>`
     <div class="item" style="padding:11px 12px"><div class="cont"><h4>${esc(n)}</h4>
-      <div class="meta">${delMes.filter(v=>v.vendedor===n).length} ventas este mes</div></div>
+      <div class="meta">${ventasFiltradas.filter(v=>v.vendedor===n).length} ventas en el filtro</div></div>
       <div class="val">${money(m)}</div></div>`).join('')
   : `<div class="vacio" style="padding:20px"><b>Todavía no hay ventas este mes</b></div>`;
 
-  const todas = DB.ventas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
+  const todas = ventasFiltradas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
   $('#listaVentas').innerHTML = todas.length ? todas.map(v=>`
     <div class="item" onclick="detalleVenta('${v.id}')">
       <div class="cont"><h4>${esc(v.cliente)}</h4>
@@ -1774,6 +1801,28 @@ $('#btnCsv').addEventListener('click',()=>{
   a.href = URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
   a.download = `ventas-${hoy()}.csv`; a.click();
   brindis('Archivo CSV descargado');
+});
+
+function configurarFiltroVentas(){
+  const tipo = $('#filtroVentasTipo').value;
+  const campo = $('#filtroVentasFecha');
+  if(tipo==='dia'){
+    campo.type='date'; campo.value = campo.value.length===10 ? campo.value : hoy();
+  }else if(tipo==='año'){
+    campo.type='number'; campo.min='2000'; campo.max='2100'; campo.step='1';
+    campo.value = campo.value.length===4 ? campo.value : hoy().slice(0,4);
+  }else{
+    campo.type='month'; campo.value = campo.value.length===7 ? campo.value : hoy().slice(0,7);
+  }
+  pintarVentas();
+}
+$('#filtroVentasTipo').addEventListener('change', configurarFiltroVentas);
+$('#filtroVentasFecha').addEventListener('input', pintarVentas);
+$('#btnLimpiarVentas').addEventListener('click', async ()=>{
+  if(!DB.ventas.length){ brindis('No hay registros para limpiar'); return; }
+  if(!confirm('¿Deseas eliminar todos los registros de ventas? Esta acción no se puede deshacer.')) return;
+  await DB.limpiarVentas();
+  brindis('Registros de ventas eliminados');
 });
 
 /* ============================================================
