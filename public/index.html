@@ -328,7 +328,7 @@ button{cursor:pointer;border:none;background:none}
     </div>
     <div class="apagado" id="apagado">
       <b>Listo para escanear</b>
-      Toca “Escanear QR” y apunta al código del producto. La cámara se apaga sola al leerlo.
+      Elige QR o código de barras, activa la cámara y apunta al código del producto. La cámara se apaga sola al leerlo.
     </div>
   </div>
 
@@ -661,14 +661,41 @@ $('#velo').addEventListener('click',cerrarHoja);
    ESCÁNER
    ============================================================ */
 let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito';
+let tipoCodigo='qr', detectorBarras=null;
 const recientes = [];
 const entregaActual = { vendor: CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
 
-$('#btnCam').addEventListener('click', async ()=>{ iniciarEscaneo('credito'); });
-$('#btnCamEntrega').addEventListener('click', async ()=>{ iniciarEscaneo('entrega'); });
+$('#btnCam').addEventListener('click', ()=>seleccionarTipoEscaneo('credito'));
+$('#btnCamEntrega').addEventListener('click', ()=>seleccionarTipoEscaneo('entrega'));
 
-async function iniciarEscaneo(modo){
+function seleccionarTipoEscaneo(modo){
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Tipo de código</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="aviso">Elige el tipo de código antes de activar la cámara.</div>
+    <div class="fila" style="margin-top:14px">
+      <button class="btn ambar" onclick="iniciarEscaneo('${modo}','qr'); cerrarHoja()">Código QR</button>
+      <button class="btn plano" onclick="iniciarEscaneo('${modo}','barra'); cerrarHoja()">Código de barras</button>
+    </div>`);
+}
+
+async function iniciarEscaneo(modo, tipo='qr'){
   modoEscaneo = modo;
+  tipoCodigo = tipo;
+  if(tipoCodigo === 'barra' && !('BarcodeDetector' in window)){
+    $('#apagado').innerHTML = '<b>Lectura de barras no disponible</b>Usa Chrome o Edge actualizado en el celular, o escribe el código manualmente.';
+    $('#apagado').hidden=false;
+    return;
+  }
+  detectorBarras = null;
+  if(tipoCodigo === 'barra'){
+    try{
+      detectorBarras = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf']});
+    }catch(e){
+      $('#apagado').innerHTML = '<b>Formato de barras no disponible</b>Usa Chrome o Edge actualizado en el celular, o escribe el código manualmente.';
+      $('#apagado').hidden=false;
+      return;
+    }
+  }
   if(modo==='entrega' && !entregaActual.vendor && CFG.vendedores.length) entregaActual.vendor = CFG.vendedores[0];
   if(modo==='entrega' && entregaActual.items.length){
     mostrarHojaEntrega();
@@ -701,23 +728,28 @@ function apagarCamara(){
 function cicloLectura(){
   if(!leyendo) return;
   const v=$('#video'), c=$('#lienzo');
-  if(v.readyState===v.HAVE_ENOUGH_DATA && typeof jsQR==='function'){
+  if(v.readyState===v.HAVE_ENOUGH_DATA){
     c.width=v.videoWidth; c.height=v.videoHeight;
     const cx=c.getContext('2d',{willReadFrequently:true});
     cx.drawImage(v,0,0,c.width,c.height);
-    const img=cx.getImageData(0,0,c.width,c.height);
-    const cod=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
-    if(cod && cod.data){
+    const leer = detectorBarras
+      ? detectorBarras.detect(v).then(codigos=>codigos[0]?.rawValue || '')
+      : Promise.resolve((()=>{
+          if(typeof jsQR!=='function') return '';
+          const img=cx.getImageData(0,0,c.width,c.height);
+          return jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'})?.data || '';
+        })());
+    leer.then(valor=>{
+      if(!leyendo || !valor) return;
       if(navigator.vibrate) navigator.vibrate(60);
-      const sku = cod.data.trim();
+      const sku = valor.trim();
       apagarCamara();
       if(modoEscaneo === 'entrega'){
         procesarEscaneoEntrega(sku);
       }else{
         abrirProducto(sku);
       }
-      return;
-    }
+    }).catch(()=>{});
   }
   requestAnimationFrame(cicloLectura);
 }
@@ -726,7 +758,11 @@ $('#skuManual').addEventListener('keydown',e=>{ if(e.key==='Enter') abrirProduct
 
 function abrirProducto(sku){
   const p = DB.buscar(sku);
-  if(!p){ brindis('No hay ningún producto con el código '+sku); return; }
+  if(!p){
+    abrirFormularioProducto({sku:String(sku).trim().toUpperCase()});
+    brindis('Código nuevo: completa los datos del producto');
+    return;
+  }
   if(!recientes.find(r=>r.sku===p.sku)) recientes.unshift(p);
   recientes.splice(6); pintarRecientes();
   fichaProducto(p);
@@ -1161,7 +1197,7 @@ $('#filtroProd').addEventListener('input', pintarProductos);
 $('#btnNuevoProd').addEventListener('click', ()=>abrirFormularioProducto());
 
 function abrirFormularioProducto(p = null){
-  const editando = !!p;
+  const editando = !!(p && DB.buscar(p.sku));
   abrirHoja(`
     <div class="hoja-tope"><h2>${editando ? 'Editar producto' : 'Nuevo producto'}</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="tarjeta pad">
@@ -1182,7 +1218,7 @@ function abrirFormularioProducto(p = null){
       <div class="campo" style="margin-bottom:0"><label>Existencia</label>
         <input id="pStock" type="number" inputmode="numeric" value="${p ? (p.stock ?? 0) : 0}"></div>
     </div>
-    <button class="btn ambar" style="margin-top:14px" onclick="guardarProducto('${p ? p.sku : ''}')">${editando ? 'Actualizar producto' : 'Guardar producto'}</button>
+    <button class="btn ambar" style="margin-top:14px" onclick="guardarProducto('${editando ? p.sku : ''}')">${editando ? 'Actualizar producto' : 'Guardar producto'}</button>
   `);
 }
 

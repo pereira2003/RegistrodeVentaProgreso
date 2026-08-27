@@ -72,7 +72,7 @@ Con `rol: "vendedor"` la persona puede registrar ventas y cobros, pero no puede 
 
 ## Qué hace cada pantalla
 
-**Escanear** — El botón *Escanear QR* enciende la cámara. Al reconocer un código la cámara se apaga sola y se abre la ficha del producto, así no queda consumiendo batería entre venta y venta. También acepta el código escrito a mano, útil si la etiqueta está rayada.
+**Escanear** — Antes de encender la cámara puedes elegir *Código QR* o *Código de barras*. Al reconocer un código la cámara se apaga sola y se abre la ficha del producto, así no queda consumiendo batería entre venta y venta. Si el código no existe, se abre el formulario para poner nombre, marca, categoría, precios y existencia. También acepta el código escrito a mano, útil si la etiqueta está rayada.
 
 **Productos** — Catálogo con buscador, existencias y alta de productos nuevos.
 
