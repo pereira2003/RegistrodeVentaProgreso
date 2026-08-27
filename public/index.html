@@ -907,20 +907,43 @@ function mostrarHojaEntrega(){
       </div>
     </div>
     <div class="rotulo">Productos que lleva</div>
-    ${items.length ? `<div>${items.map(item=>`
-      <div class="item" style="padding:10px 12px">
-        <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
-        <div class="val">${money(item.precio||0)}<small>${item.cantidad||1} pieza</small></div>
+    ${items.length ? `<div>${items.map((item,i)=>`
+      <div class="product-swipe entrega-item-swipe" data-tipo="entregados" data-indice="${i}">
+        <div class="swipe-actions"><button class="btn-credito" type="button" onclick="borrarItemEntrega('entregados',${i})">Borrar</button></div>
+        <div class="swipe-content item" style="padding:10px 12px">
+          <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
+          <div class="val">${money(item.precio||0)}<small>${item.cantidad||1} pieza</small></div>
+        </div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin productos</b>Escanea uno para agregarlo a la entrega.</div>`}
     <div class="rotulo">Productos que regresan</div>
-    ${devueltos.length ? `<div>${devueltos.map(item=>`
-      <div class="item" style="padding:10px 12px; border-color:rgba(216,194,164,.7)">
-        <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
-        <div class="val">${money(item.precio||0)}<small>${item.cantidad||1} devuelto</small></div>
+    ${devueltos.length ? `<div>${devueltos.map((item,i)=>`
+      <div class="product-swipe entrega-item-swipe" data-tipo="devueltos" data-indice="${i}">
+        <div class="swipe-actions"><button class="btn-credito" type="button" onclick="borrarItemEntrega('devueltos',${i})">Borrar</button></div>
+        <div class="swipe-content item" style="padding:10px 12px; border-color:rgba(216,194,164,.7)">
+          <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
+          <div class="val">${money(item.precio||0)}<small>${item.cantidad||1} devuelto</small></div>
+        </div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin devoluciones</b>Si escaneas el mismo producto otra vez, queda aquí.</div>`}
     <button class="btn ambar" style="margin-top:14px" onclick="guardarEntrega()">Guardar</button>
     <button class="btn plano" style="margin-top:8px" onclick="cerrarHoja(); iniciarEscaneo('entrega')">Escaneo otro producto</button>
   `);
+  $('#hojaCont').querySelectorAll('.entrega-item-swipe').forEach(bindSwipeEntrega);
+}
+
+function bindSwipeEntrega(card){
+  const cont=card.querySelector('.swipe-content'); let inicio=0,actual=0,arrastrando=false;
+  const mover=x=>{const offset=Math.max(Math.min(x,0),-174);cont.style.transform=`translateX(${offset}px)`;card.classList.toggle('open',offset<=-60);cont.classList.toggle('open',offset<=-60);};
+  cont.addEventListener('pointerdown',e=>{inicio=actual=e.clientX;arrastrando=true;cont.setPointerCapture?.(e.pointerId);});
+  cont.addEventListener('pointermove',e=>{if(arrastrando&&e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}});
+  const terminar=()=>{if(!arrastrando)return;mover(actual-inicio<=-60?-174:0);arrastrando=false;};
+  cont.addEventListener('pointerup',terminar);cont.addEventListener('pointerleave',terminar);
+  cont.addEventListener('click',e=>{if(cont.classList.contains('open')){mover(0);e.preventDefault();}});
+}
+
+function borrarItemEntrega(tipo,indice){
+  entregaActual[tipo].splice(indice,1);
+  mostrarHojaEntrega();
+  brindis('Producto borrado de la entrega');
 }
 
 function guardarEntrega(){
