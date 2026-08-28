@@ -1103,10 +1103,10 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     leyendo=true;
     ultimo=0;
     if(tipoCodigo==='barra'){
-      lectorBarras.decodeFromVideoElementContinuously(v, (resultado, error) => {
+      controlBarras=lectorBarras.decodeFromStream(flujo, v, (resultado, error) => {
         if(resultado && leyendo) procesarCodigoLeido(resultado.getText());
       }).catch(()=>{
-        if(leyendo) brindis('No se pudo iniciar el lector de barras');
+        if(leyendo) brindis('No se pudo iniciar el lector de barras. Mantén el código dentro del marco.');
       });
     }else{
       esperarVideoParaLeer(v);
