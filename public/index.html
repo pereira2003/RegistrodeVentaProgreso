@@ -39,7 +39,7 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden}
 body{
   font-family:var(--texto);background:var(--fondo);color:var(--tinta);
   font-size:14px;line-height:1.55;
@@ -66,7 +66,7 @@ button,input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
   .filtro-control{font-size:12px}
   .filtro-fecha label{font-size:12px}
 }
-@media (max-width:340px){
+@media (max-width:380px){
   .filtro-fila{grid-template-columns:minmax(0,1fr);gap:8px;height:auto;overflow:visible}
 }
 button{cursor:pointer;border:none;background:none}
