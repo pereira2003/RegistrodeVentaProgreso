@@ -49,6 +49,9 @@ body{
 h1,h2,h3,h4{font-family:var(--display);margin:0;letter-spacing:-.015em;font-weight:700}
 button,input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 .filtro-placeholder{color:#a9a39b}
+.filtro-fecha{position:relative;flex:1}
+.filtro-fecha label{position:absolute;z-index:1;top:50%;left:12px;transform:translateY(-50%);margin:0;color:#a9a39b;font-size:12px;pointer-events:none}
+.filtro-fecha label.oculta{display:none}
 button{cursor:pointer;border:none;background:none}
 :focus-visible{outline:3px solid var(--rojo);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -398,7 +401,7 @@ button{cursor:pointer;border:none;background:none}
       <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
     </select>
-    <div style="flex:1"><label id="etiquetaFiltroEntregasFecha" for="filtroEntregasFecha" style="display:block;font-size:11px;color:var(--tinta-3);margin-bottom:4px">Seleccione mes</label><input id="filtroEntregasFecha" type="month" aria-label="Seleccione mes" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
+    <div class="filtro-fecha"><label id="etiquetaFiltroEntregasFecha" for="filtroEntregasFecha">Seleccione fecha</label><input id="filtroEntregasFecha" type="month" aria-label="Seleccione fecha" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarEntregas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Administrar</div>
@@ -431,7 +434,7 @@ button{cursor:pointer;border:none;background:none}
       <option value="dia">Por día</option>
       <option value="año">Por año</option>
     </select>
-    <div style="flex:1"><label id="etiquetaFiltroVentasFecha" for="filtroVentasFecha" style="display:block;font-size:11px;color:var(--tinta-3);margin-bottom:4px">Seleccione mes</label><input id="filtroVentasFecha" type="month" aria-label="Seleccione mes" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
+    <div class="filtro-fecha"><label id="etiquetaFiltroVentasFecha" for="filtroVentasFecha">Seleccione fecha</label><input id="filtroVentasFecha" type="month" aria-label="Seleccione fecha" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarVentas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Resumen del período</div>
@@ -452,7 +455,7 @@ button{cursor:pointer;border:none;background:none}
       <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
     </select>
-    <div style="flex:1"><label id="etiquetaFiltroCarteraFecha" for="filtroCarteraFecha" style="display:block;font-size:11px;color:var(--tinta-3);margin-bottom:4px">Seleccione mes</label><input id="filtroCarteraFecha" type="month" aria-label="Seleccione mes" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
+    <div class="filtro-fecha"><label id="etiquetaFiltroCarteraFecha" for="filtroCarteraFecha">Seleccione fecha</label><input id="filtroCarteraFecha" type="month" aria-label="Seleccione fecha" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarCartera" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Cuentas por cobrar</div>
@@ -732,12 +735,12 @@ const DB = {
     });
     f.onSnapshot(f.collection(bd,'vendedores'), s=>{
       this.vendedores = s.docs.map(d=>d.data().nombre).filter(Boolean);
-      if(!this.vendedores.length) this.sembrarVendedores();
+      caja.guardar('gp_vendedores', this.vendedores);
       pintarTodo();
     });
     f.onSnapshot(f.collection(bd,'zonas'), s=>{
       this.zonas = s.docs.map(d=>d.data().nombre).filter(Boolean);
-      if(!this.zonas.length) this.sembrarZonas();
+      caja.guardar('gp_zonas', this.zonas);
       pintarTodo();
     });
   },
@@ -756,8 +759,6 @@ const DB = {
     };
     await migrarColeccion('ventas', caja.leer('gp_ventas', []), v=>String(v.id||'').trim());
     await migrarColeccion('entregas', caja.leer('gp_entregas', []), e=>String(e.creado||'').trim());
-    await migrarColeccion('vendedores', caja.leer('gp_vendedores', CFG.vendedores.slice()), v=>v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'));
-    await migrarColeccion('zonas', caja.leer('gp_zonas', CFG.zonas.slice()), z=>z.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'));
   },
 
   async sembrar(lista=SEMILLA){ for(const p of lista) await this.agregarProducto(p); },
@@ -2553,14 +2554,14 @@ function configurarFiltroVentas(){
   const campo = $('#filtroVentasFecha');
   const etiqueta = $('#etiquetaFiltroVentasFecha');
   if(tipo==='dia'){
-    etiqueta.textContent='Seleccione día'; campo.setAttribute('aria-label','Seleccione día');
+    etiqueta.textContent='Seleccione día'; etiqueta.classList.add('oculta'); campo.setAttribute('aria-label','Seleccione día');
     campo.type='date'; campo.value = campo.value.length===10 ? campo.value : hoy();
   }else if(tipo==='año'){
-    etiqueta.textContent='Seleccione año'; campo.setAttribute('aria-label','Seleccione año');
+    etiqueta.textContent='Seleccione año'; etiqueta.classList.add('oculta'); campo.setAttribute('aria-label','Seleccione año');
     campo.type='number'; campo.min='2000'; campo.max='2100'; campo.step='1';
     campo.value = campo.value.length===4 ? campo.value : hoy().slice(0,4);
   }else{
-    etiqueta.textContent='Seleccione mes'; campo.setAttribute('aria-label','Seleccione mes');
+    etiqueta.textContent='Seleccione mes'; etiqueta.classList.add('oculta'); campo.setAttribute('aria-label','Seleccione mes');
     campo.type='month'; campo.value = campo.value.length===7 ? campo.value : hoy().slice(0,7);
   }
   pintarVentas();
@@ -2581,14 +2582,14 @@ function configurarFiltroFecha(tipoId, fechaId, pintar){
   selector.classList.toggle('filtro-placeholder', !tipo);
   const etiqueta=$('#etiqueta'+fechaId.charAt(0).toUpperCase()+fechaId.slice(1));
   if(tipo==='dia'){
-    etiqueta.textContent='Seleccione día'; campo.setAttribute('aria-label','Seleccione día');
+    etiqueta.textContent='Seleccione día'; etiqueta.classList.add('oculta'); campo.setAttribute('aria-label','Seleccione día');
     campo.type='date'; campo.value=campo.value.length===10?campo.value:hoy();
   }else if(tipo==='año'){
-    etiqueta.textContent='Seleccione año'; campo.setAttribute('aria-label','Seleccione año');
+    etiqueta.textContent='Seleccione año'; etiqueta.classList.add('oculta'); campo.setAttribute('aria-label','Seleccione año');
     campo.type='number'; campo.min='2000'; campo.max='2100'; campo.step='1';
     campo.value=campo.value.length===4?campo.value:hoy().slice(0,4);
   }else{
-    etiqueta.textContent='Seleccione mes'; campo.setAttribute('aria-label','Seleccione mes');
+    etiqueta.textContent='Seleccione mes'; etiqueta.classList.add('oculta'); campo.setAttribute('aria-label','Seleccione mes');
     campo.type='month'; campo.value=campo.value.length===7?campo.value:hoy().slice(0,7);
   }
   pintar();
