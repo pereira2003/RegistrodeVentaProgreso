@@ -723,6 +723,7 @@ const DB = {
     });
     f.onSnapshot(f.collection(bd,'entregas'), s=>{
       this.entregas = s.docs.map(d=>({id:d.id,...d.data()}));
+      caja.guardar('gp_entregas', this.entregas);
       pintarTodo();
     });
     f.onSnapshot(f.collection(bd,'vendedores'), s=>{
@@ -819,7 +820,7 @@ const DB = {
     if(this.modo==='firebase'){
       const {f,bd}=this.fb; const snap=await f.getDocs(f.collection(bd,'entregas'));
       await Promise.all(snap.docs.map(d=>f.deleteDoc(d.ref)));
-      this.entregas=[]; pintarTodo();
+      this.entregas=[]; caja.guardar('gp_entregas', this.entregas); pintarTodo();
     }
     else{ this.entregas=[]; caja.guardar('gp_entregas',this.entregas); pintarTodo(); }
   },
@@ -828,6 +829,7 @@ const DB = {
         const {f,bd}=this.fb;
         await f.deleteDoc(f.doc(bd,'entregas',creado));
         this.entregas=(this.entregas||[]).filter(item=>item.creado!==creado);
+        caja.guardar('gp_entregas', this.entregas);
         pintarTodo();
       }else{
         this.entregas=(this.entregas||[]).filter(item=>item.creado!==creado);
@@ -1487,27 +1489,7 @@ async function guardarEntrega(){
       registroGuardar=registradas[idx];
     }
   }else{
-    const idx = registradas.findIndex(x=>x.vendor===vendedor && x.zona===zona && x.fecha===fechaEntrega);
-    if(idx >= 0){
-      const actual = registradas[idx];
-      const merge = (base, extra)=>{
-        const map = new Map();
-        [...(base||[]), ...(extra||[])].forEach(item=>{
-          const key = `${item.sku}|${item.nombre}`;
-          const prev = map.get(key) || { ...item, cantidad: 0 };
-          prev.cantidad = (prev.cantidad||0) + (item.cantidad||1);
-          map.set(key, prev);
-        });
-        return [...map.values()];
-      };
-      actual.entregados = merge(actual.entregados, agregado.entregados);
-      actual.devueltos = merge(actual.devueltos, agregado.devueltos);
-      actual.zona = zona;
-      actual.devolucionCreado = agregado.devolucionCreado || actual.devolucionCreado || null;
-      registroGuardar=actual;
-    }else{
-      registradas.push(agregado);
-    }
+    registradas.push(agregado);
   }
 
   DB.entregas = registradas;
@@ -1567,16 +1549,28 @@ function procesarEscaneoEntrega(sku){
     return;
   }
 
-  const listaGuardada = (DB.entregas||[]).find(x=>x.vendor===vendedor && x.zona===entregaActual.zona)?.entregados || [];
-  const indiceGuardado = listaGuardada.findIndex(item=>item.sku===p.sku);
-  if(indiceGuardado >= 0){
-    const item = listaGuardada[indiceGuardado];
-    const dev = entregaActual.devueltos.find(x=>x.sku===p.sku);
-    if(dev){ dev.cantidad = (dev.cantidad||1)+1; } else { entregaActual.devueltos.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 }); }
-    entregaActual.devolucionCreado = entregaActual.devolucionCreado || new Date().toISOString();
-    brindis(`${p.nombre} quitado; no se registró como venta`);
-    mostrarHojaEntrega();
-    return;
+  const registroAnterior = (DB.entregas||[]).slice().reverse().find(x=>
+    x.vendor===vendedor && x.zona===entregaActual.zona &&
+    (x.entregados||[]).some(item=>item.sku===p.sku)
+  );
+  if(registroAnterior){
+    const entregado = registroAnterior.entregados.find(item=>item.sku===p.sku);
+    const devuelto = (registroAnterior.devueltos||[]).find(item=>item.sku===p.sku);
+    const cantidadEntregada = entregado.cantidad || 1;
+    const cantidadDevuelta = devuelto?.cantidad || 0;
+    if(cantidadDevuelta < cantidadEntregada){
+      entregaEditando = registroAnterior.creado;
+      entregaActual.entregaCreado = registroAnterior.entregaCreado || registroAnterior.creado;
+      entregaActual.items = (registroAnterior.entregados||[]).map(item=>({...item}));
+      entregaActual.devueltos = (registroAnterior.devueltos||[]).map(item=>({...item}));
+      const dev = entregaActual.devueltos.find(x=>x.sku===p.sku);
+      if(dev){ dev.cantidad = (dev.cantidad||1)+1; } else { entregaActual.devueltos.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 }); }
+      entregaActual.devolucionCreado = entregaActual.devolucionCreado || new Date().toISOString();
+      brindis(`${p.nombre} registrado como devolución`);
+      mostrarHojaEntrega();
+      return;
+    }
+    brindis(`${p.nombre} vuelve a salir en una entrega nueva`);
   }
 
   entregaActual.entregaCreado = entregaActual.entregaCreado || new Date().toISOString();
