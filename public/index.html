@@ -69,6 +69,23 @@ button{cursor:pointer;border:none;background:none}
 .pastilla.sync::before{background:var(--rojo)}
 .pastilla.off{background:rgba(216,194,164,.35);color:#6B5A45}
 .pastilla.off::before{background:var(--rojo)}
+.carga-inicial{
+  position:fixed;inset:0;z-index:200;background:var(--fondo);display:flex;align-items:center;justify-content:center;
+  opacity:1;visibility:visible;transition:opacity .28s ease,visibility .28s ease;
+}
+.carga-inicial.oculta{opacity:0;visibility:hidden;pointer-events:none}
+.carga-contenido{text-align:center;animation:aparece .35s ease both}
+.carga-marca{font-family:var(--display);font-size:24px;font-weight:700}
+.carga-texto{margin-top:10px;font-family:var(--dato);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--tinta-3)}
+.carga-puntos{display:flex;justify-content:center;gap:5px;margin-top:15px}
+.carga-puntos i{width:6px;height:6px;border-radius:50%;background:var(--verde);animation:pulso 1s ease-in-out infinite}
+.carga-puntos i:nth-child(2){animation-delay:.16s}.carga-puntos i:nth-child(3){animation-delay:.32s}
+@keyframes aparece{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulso{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+.datos-cargando{display:none;align-items:center;gap:7px;font-family:var(--dato);font-size:10px;color:var(--tinta-3);margin:0 0 12px}
+.datos-cargando.activo{display:flex}
+.datos-cargando i{width:8px;height:8px;border:1.5px solid var(--suave);border-top-color:var(--verde);border-radius:50%;animation:gira .7s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
 
 /* ---------- Vistas ---------- */
 .vista{display:none;width:min(100%,760px);margin:0 auto;padding:28px 20px 34px}
@@ -317,12 +334,21 @@ button{cursor:pointer;border:none;background:none}
 </head>
 <body>
 
+<div class="carga-inicial" id="cargaInicial" aria-live="polite">
+  <div class="carga-contenido">
+    <div class="carga-marca">Grupo Progreso</div>
+    <div class="carga-texto">Cargando datos</div>
+    <div class="carga-puntos" aria-hidden="true"><i></i><i></i><i></i></div>
+  </div>
+</div>
+
 <header class="tope">
   <div class="marca">Grupo Progreso<span>Registro de ventas</span></div>
 </header>
 
 <!-- ================= ESCANEAR ================= -->
 <section class="vista activa" data-vista="escanear">
+  <div class="datos-cargando activo" id="datosCargando" aria-live="polite"><i></i>Sincronizando datos</div>
   <div class="visor" id="visor">
     <video id="video" playsinline muted></video>
     <canvas id="lienzo"></canvas>
@@ -572,6 +598,10 @@ const esc = s => String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function sumaMeses(iso,n){ const d=new Date(iso+'T12:00:00'); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
 function brindis(txt){ const b=$('#brindis'); b.textContent=txt; b.classList.add('ver'); clearTimeout(b._t); b._t=setTimeout(()=>b.classList.remove('ver'),2800); }
+function ocultarCargaInicial(){
+  $('#datosCargando')?.classList.remove('activo');
+  $('#cargaInicial')?.classList.add('oculta');
+}
 function mostrarEstadoEscaneo(txt, detalle='Registrando…'){ 
   let pop = document.getElementById('escaneoEstado');
   if(!pop){
@@ -644,6 +674,7 @@ const DB = {
     caja.guardar('gp_vendedores', this.vendedores);
     sello('Modo prueba','local');
     pintarTodo();
+    ocultarCargaInicial();
   },
 
   async conectarFirebase(){
@@ -667,6 +698,7 @@ const DB = {
         this.sembrar(locales?.length ? locales : SEMILLA);
       }
       pintarTodo();
+      ocultarCargaInicial();
     });
     f.onSnapshot(f.collection(bd,'ventas'), s=>{
       this.ventas = s.docs.map(d=>({id:d.id,...d.data()}));
@@ -2489,6 +2521,7 @@ const vistaGuardada = caja.leer('gp_vista','escanear');
 const botonVistaGuardada = $(`.barra button[data-ir="${vistaGuardada}"]`) || $('.barra button[data-ir="escanear"]');
 botonVistaGuardada?.click();
 DB.iniciar();
+setTimeout(ocultarCargaInicial, 9000);
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
