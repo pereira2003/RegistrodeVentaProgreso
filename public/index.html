@@ -1385,7 +1385,7 @@ function mostrarHojaEntrega(){
       <div class="dosc" style="margin-bottom:0">
         <div class="campo" style="margin-bottom:0">
           <label>Vendedor</label>
-          <select id="entregaVendor" onchange="aplicarVendedorActual(this.value); entregaActual.vendor=this.value; mostrarHojaEntrega()">
+          <select id="entregaVendor" onchange="cambiarVendedorEntrega(this.value)">
             ${vendedorOptions(vendedor)}
           </select>
         </div>
@@ -1423,6 +1423,21 @@ function mostrarHojaEntrega(){
     <button class="btn plano" style="margin-top:8px" onclick="cerrarHoja(); iniciarEscaneo('entrega', tipoCodigo)">Escaneo otro producto</button>
   `);
   $('#hojaCont').querySelectorAll('.entrega-item-swipe').forEach(bindSwipeEntrega);
+}
+
+function cambiarVendedorEntrega(vendedor){
+  if(vendedor===entregaActual.vendor){ mostrarHojaEntrega(); return; }
+  const teniaPendientes=entregaActual.items.length || entregaActual.devueltos.length;
+  entregaActual.vendor=vendedor;
+  aplicarVendedorActual(vendedor);
+  if(teniaPendientes){
+    entregaActual.items=[];
+    entregaActual.devueltos=[];
+    entregaActual.entregaCreado=null;
+    entregaActual.devolucionCreado=null;
+    brindis('Nueva entrega para '+vendedor);
+  }
+  mostrarHojaEntrega();
 }
 
 function bindSwipeEntrega(card){
@@ -1464,10 +1479,12 @@ async function guardarEntrega(){
     devolucionCreado: entregaActual.devolucionCreado || null
   };
 
+  let registroGuardar=agregado;
   if(entregaEditando){
     const idx = registradas.findIndex(x=>x.creado===entregaEditando);
     if(idx >= 0){
       registradas[idx] = { ...registradas[idx], ...agregado, creado: entregaEditando };
+      registroGuardar=registradas[idx];
     }
   }else{
     const idx = registradas.findIndex(x=>x.vendor===vendedor && x.zona===zona && x.fecha===fechaEntrega);
@@ -1487,12 +1504,14 @@ async function guardarEntrega(){
       actual.devueltos = merge(actual.devueltos, agregado.devueltos);
       actual.zona = zona;
       actual.devolucionCreado = agregado.devolucionCreado || actual.devolucionCreado || null;
+      registroGuardar=actual;
     }else{
       registradas.push(agregado);
     }
   }
 
   DB.entregas = registradas;
+  await DB.guardarEntrega(registroGuardar);
   caja.guardar('gp_entregas', DB.entregas);
   brindis(`Entrega guardada para ${vendedor}`);
   entregaActual.items = [];
