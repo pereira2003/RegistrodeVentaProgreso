@@ -500,23 +500,7 @@ button{cursor:pointer;border:none;background:none}
 <div class="hoja" id="hoja"><div class="asa"></div><div id="hojaCont"></div></div>
 <div class="brindis" id="brindis"></div>
 
-<!-- Librerías incluidas en el proyecto: funcionan sin internet.
-     Si faltan (por ejemplo al abrir este archivo suelto), se bajan de un CDN. -->
-<script src="lib/jsQR.js"></script>
-<script src="lib/qrcode.js"></script>
-<script src="lib/jszip.min.js"></script>
-<script src="lib/zxing-library.min.js"></script>
-<script src="lib/zxing-browser.min.js"></script>
-<script>
-(function(){
-  const cdn = 'https://cdnjs.cloudflare.com/ajax/libs/';
-  const faltan = [];
-  if(typeof jsQR  !== 'function') faltan.push(cdn+'jsQR/1.4.0/jsQR.js');
-  if(typeof qrcode!== 'function') faltan.push(cdn+'qrcode-generator/1.4.4/qrcode.js');
-  if(typeof JSZip !== 'function') faltan.push(cdn+'jszip/3.10.1/jszip.min.js');
-  faltan.forEach(u=>document.write('<scr'+'ipt src="'+u+'"><\/scr'+'ipt>'));
-})();
-</script>
+<!-- Las librerías se cargan bajo demanda para que la pantalla inicial abra rápido. -->
 <script>
 /* ============================================================
    CONFIGURACIÓN — lo único que necesitas tocar
@@ -550,6 +534,17 @@ const CFG = {
 const $  = (s,c=document)=>c.querySelector(s);
 const $$ = (s,c=document)=>[...c.querySelectorAll(s)];
 const money = n => new Intl.NumberFormat('es-PA',{style:'currency',currency:'USD'}).format(n||0);
+const bibliotecas = {};
+function cargarBiblioteca(nombre, archivo){
+  if(window[nombre] || (nombre==='ZXing' && window.ZXingBrowser)) return Promise.resolve();
+  if(bibliotecas[nombre]) return bibliotecas[nombre];
+  bibliotecas[nombre] = new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src=archivo; script.onload=resolve; script.onerror=()=>reject(new Error(`No se pudo cargar ${nombre}`));
+    document.head.appendChild(script);
+  });
+  return bibliotecas[nombre];
+}
 const hoy = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -960,9 +955,13 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
   modoEscaneo = modo;
   tipoCodigo = tipo;
   tipoVentaEscaneo = tipoVenta;
-  if(modo !== 'producto'){
-  }
-  if(tipoCodigo === 'barra' && !('BarcodeDetector' in window) && typeof ZXingBrowser === 'undefined'){
+  try{
+    if(tipoCodigo === 'qr') await cargarBiblioteca('jsQR','lib/jsQR.js');
+    if(tipoCodigo === 'barra' && !('BarcodeDetector' in window)){
+      await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
+      await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
+    }
+  }catch(e){
     $('#apagado').innerHTML = '<b>Lectura de barras no disponible</b>Usa Chrome o Edge actualizado en el celular, o escribe el código manualmente.';
     $('#apagado').hidden=false;
     return;
@@ -2096,7 +2095,7 @@ function pintarSelector(){
   : `<div class="vacio" style="padding:20px"><b>Sin resultados</b></div>`;
 }
 
-function pintarEtiquetas(){
+async function pintarEtiquetas(){
   pintarSelector();
   const cont = $('#rejillaEtiq');
   const elegidos = seleccionados();
@@ -2105,6 +2104,10 @@ function pintarEtiquetas(){
   if(!elegidos.length){
     cont.innerHTML = `<div class="vacio" style="width:100%"><b>No has elegido productos</b>
       Marca arriba los que quieras etiquetar.</div>`;
+    return;
+  }
+  try{ await cargarBiblioteca('qrcode','lib/qrcode.js'); }catch(e){
+    cont.innerHTML = `<div class="vacio" style="width:100%"><b>No se pudo cargar el generador QR</b>Revisa la conexión e inténtalo de nuevo.</div>`;
     return;
   }
   let html='';
@@ -2146,6 +2149,7 @@ async function descargarPNG(sku){
   const p = DB.buscar(sku); if(!p) return;
   const t = TAM[etq.tam];
   try{
+    await cargarBiblioteca('qrcode','lib/qrcode.js');
     const blob = await svgAPng(etiquetaSVG(p), t.w, t.h);
     bajarArchivo(blob, `etiqueta-${p.sku}.png`);
     brindis(`Etiqueta ${p.sku} descargada`);
@@ -2156,6 +2160,7 @@ async function descargarZip(){
   const elegidos = seleccionados();
   if(!elegidos.length){ brindis('Marca al menos un producto'); return; }
   if(elegidos.length === 1) return descargarPNG(elegidos[0].sku);
+  try{ await cargarBiblioteca('JSZip','lib/jszip.min.js'); }catch(e){}
   if(typeof JSZip !== 'function'){
     brindis('Descargando una por una…');
     for(const p of elegidos){ await descargarPNG(p.sku); await new Promise(r=>setTimeout(r,350)); }
@@ -2174,6 +2179,7 @@ async function descargarZip(){
 async function descargarSVG(){
   const elegidos = seleccionados();
   if(!elegidos.length){ brindis('Marca al menos un producto'); return; }
+  try{ await cargarBiblioteca('qrcode','lib/qrcode.js'); }catch(e){ brindis('No se pudo cargar el generador QR'); return; }
   if(elegidos.length === 1){
     bajarArchivo(new Blob([etiquetaSVG(elegidos[0])], {type:'image/svg+xml'}),
       `etiqueta-${elegidos[0].sku}.svg`);
