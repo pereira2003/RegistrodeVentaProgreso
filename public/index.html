@@ -335,6 +335,11 @@ button{cursor:pointer;border:none;background:none}
     </div>
   </div>
 
+  <div class="rotulo">Vendedor activo</div>
+  <div class="fila">
+    <select id="selVendedor" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;font-family:var(--dato)"></select>
+  </div>
+
   <div style="margin-top:10px" class="fila">
     <button class="btn ambar" id="btnCam">Escanear crédito</button>
     <button class="btn plano" id="btnCamEntrega">Escanear entrega y devolución</button>
@@ -544,10 +549,52 @@ const $$ = (s,c=document)=>[...c.querySelectorAll(s)];
 const money = n => new Intl.NumberFormat('es-PA',{style:'currency',currency:'USD'}).format(n||0);
 const hoy = () => new Date().toISOString().slice(0,10);
 const fecha = s => { if(!s) return '—'; const [a,m,d]=s.slice(0,10).split('-'); return `${d}/${m}/${a}`; };
-const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fechaCompleta = s => {
+  if(!s) return '—';
+  const d = new Date(String(s).includes('T') ? s : `${s}T12:00:00`);
+  if(Number.isNaN(d.getTime())) return String(s);
+  return d.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+};
+const fechaHora = s => {
+  if(!s) return '—';
+  const d = new Date(String(s).includes('T') ? s : `${s}T12:00:00`);
+  if(Number.isNaN(d.getTime())) return String(s);
+  return d.toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+};
+const esc = s => String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function sumaMeses(iso,n){ const d=new Date(iso+'T12:00:00'); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
 function brindis(txt){ const b=$('#brindis'); b.textContent=txt; b.classList.add('ver'); clearTimeout(b._t); b._t=setTimeout(()=>b.classList.remove('ver'),2800); }
+function mostrarEstadoEscaneo(txt, detalle='Registrando…'){ 
+  let pop = document.getElementById('escaneoEstado');
+  if(!pop){
+    pop = document.createElement('div');
+    pop.id = 'escaneoEstado';
+    pop.style.position = 'fixed';
+    pop.style.top = '18px';
+    pop.style.left = '50%';
+    pop.style.transform = 'translateX(-50%)';
+    pop.style.zIndex = '1000';
+    pop.style.background = 'rgba(33, 31, 29, 0.92)';
+    pop.style.color = '#fff';
+    pop.style.borderRadius = '14px';
+    pop.style.padding = '12px 18px';
+    pop.style.boxShadow = '0 12px 28px rgba(0,0,0,.22)';
+    pop.style.fontFamily = 'var(--dato, sans-serif)';
+    pop.style.fontSize = '12px';
+    pop.style.letterSpacing = '.08em';
+    pop.style.textTransform = 'uppercase';
+    pop.style.border = '1px solid rgba(216,194,164,.5)';
+    pop.style.display = 'flex';
+    pop.style.flexDirection = 'column';
+    pop.style.gap = '4px';
+    document.body.appendChild(pop);
+  }
+  pop.innerHTML = `<div style="font-weight:700; letter-spacing:.08em;">${esc(txt)}</div><div style="font-size:10px; opacity:.8; text-transform:none; letter-spacing:0;">${esc(detalle)}</div>`;
+  pop.style.display = 'flex';
+  clearTimeout(pop._t);
+  pop._t = setTimeout(()=>{ pop.style.display='none'; }, 1800);
+}
 
 // Almacenamiento tolerante: usa localStorage si existe, si no memoria
 const caja = (()=>{ let mem={},ok=true;
@@ -788,11 +835,40 @@ let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
-const entregaActual = { vendor: vendedoresActuales()[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
+let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
+const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
 let entregaEditando=null;
 
-$('#btnCam').addEventListener('click', ()=>seleccionarTipoEscaneo('credito'));
-$('#btnCamEntrega').addEventListener('click', ()=>seleccionarTipoEscaneo('entrega'));
+function vendedorOptions(selected=''){
+  if(!CFG.vendedores.length) return '';
+  return CFG.vendedores.map(v=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(v)}</option>`).join('');
+}
+
+function aplicarVendedorActual(vendedor){
+  const value = CFG.vendedores.includes(vendedor) ? vendedor : (CFG.vendedores[0] || '');
+  vendedorActual = value;
+  entregaActual.vendor = value;
+  caja.guardar('gp_vendedor_actual', value);
+  const selectorEscaneo = $('#selVendedor');
+  if(selectorEscaneo){ selectorEscaneo.innerHTML = vendedorOptions(value); }
+  const selectorVenta = $('#vVendedor');
+  if(selectorVenta){ selectorVenta.value = value; }
+  const selectorEntrega = $('#entregaVendor');
+  if(selectorEntrega){ selectorEntrega.value = value; }
+}
+
+function inicializarVendedorActual(){
+  if(!CFG.vendedores.length) return;
+  if(!vendedorActual || !CFG.vendedores.includes(vendedorActual)){
+    vendedorActual = CFG.vendedores[0];
+  }
+  entregaActual.vendor = vendedorActual;
+  aplicarVendedorActual(vendedorActual);
+}
+
+$('#selVendedor').addEventListener('change', (e)=>aplicarVendedorActual(e.target.value));
+$('#btnCam').addEventListener('click', async ()=>{ iniciarEscaneo('credito'); });
+$('#btnCamEntrega').addEventListener('click', async ()=>{ iniciarEscaneo('entrega'); });
 
 function escanearBarrasProducto(){
   productoPendiente = {
@@ -954,7 +1030,12 @@ function abrirProducto(sku, tipoVenta=null){
   }
   if(!recientes.find(r=>r.sku===p.sku)) recientes.unshift(p);
   recientes.splice(6); pintarRecientes();
-  if(tipoVenta) formVenta(p.sku, tipoVenta); else fichaProducto(p);
+  mostrarEstadoEscaneo('Producto escaneado', `${p.nombre} · ${p.sku}`);
+  if(tipoVenta) {
+    setTimeout(()=>formVenta(p.sku, tipoVenta), 450);
+  } else {
+    setTimeout(()=>fichaProducto(p), 450);
+  }
 }
 
 function gestionarVendedores(){
@@ -1014,8 +1095,8 @@ function mostrarHojaEntrega(){
       <div class="dosc" style="margin-bottom:0">
         <div class="campo" style="margin-bottom:0">
           <label>Vendedor</label>
-          <select id="entregaVendor" onchange="entregaActual.vendor=this.value; mostrarHojaEntrega()">
-            ${vendedoresActuales().map(v=>`<option value="${esc(v)}" ${v===vendedor?'selected':''}>${esc(v)}</option>`).join('')}
+          <select id="entregaVendor" onchange="aplicarVendedorActual(this.value); entregaActual.vendor=this.value; mostrarHojaEntrega()">
+            ${vendedorOptions(vendedor)}
           </select>
         </div>
         <div class="campo" style="margin-bottom:0">
@@ -1079,16 +1160,48 @@ function ajustarCantidadEntrega(tipo,indice,cambio){
 async function guardarEntrega(){
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
   const zona = entregaActual.zona || CFG.zonas[0] || 'Sin zona';
+  const fechaEntrega = hoy();
   if(!entregaActual.items.length && !entregaActual.devueltos.length){ brindis('Escanea al menos un producto antes de guardar'); return; }
-  const registro={
+  const registradas = (DB.entregas||[]);
+  const agregado = {
     vendor: vendedor,
     zona: zona,
-    entregados: entregaActual.items.map(item=>({ ...item, cantidad: item.cantidad || 1 })),
-    devueltos: entregaActual.devueltos.map(item=>({ ...item, cantidad: item.cantidad || 1 })),
-    fecha: hoy(),
+    entregados: (entregaActual.items||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
+    devueltos: (entregaActual.devueltos||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
+    fecha: fechaEntrega,
     creado: entregaEditando || new Date().toISOString()
   };
-  await DB.guardarEntrega(registro);
+
+  if(entregaEditando){
+    const idx = registradas.findIndex(x=>x.creado===entregaEditando);
+    if(idx >= 0){
+      registradas[idx] = { ...registradas[idx], ...agregado, creado: entregaEditando };
+    }
+  }else{
+    const idx = registradas.findIndex(x=>x.vendor===vendedor && x.zona===zona && x.fecha===fechaEntrega);
+    if(idx >= 0){
+      const actual = registradas[idx];
+      const merge = (base, extra)=>{
+        const map = new Map();
+        [...(base||[]), ...(extra||[])].forEach(item=>{
+          const key = `${item.sku}|${item.nombre}`;
+          const prev = map.get(key) || { ...item, cantidad: 0 };
+          prev.cantidad = (prev.cantidad||0) + (item.cantidad||1);
+          map.set(key, prev);
+        });
+        return [...map.values()];
+      };
+      actual.entregados = merge(actual.entregados, agregado.entregados);
+      actual.devueltos = merge(actual.devueltos, agregado.devueltos);
+      actual.creado = new Date().toISOString();
+      actual.zona = zona;
+    }else{
+      registradas.push(agregado);
+    }
+  }
+
+  DB.entregas = registradas;
+  caja.guardar('gp_entregas', DB.entregas);
   brindis(`Entrega guardada para ${vendedor}`);
   entregaActual.items = [];
   entregaActual.devueltos = [];
@@ -1254,7 +1367,7 @@ function formVenta(sku, tipo){
     <div class="tarjeta pad">
       <div class="dosc" style="margin-bottom:0">
         <div class="campo" style="margin-bottom:0"><label>Vendedor</label>
-          <select id="vVendedor">${vendedoresActuales().map(v=>`<option>${esc(v)}</option>`).join('')}</select></div>
+          <select id="vVendedor" onchange="aplicarVendedorActual(this.value)">${vendedorOptions(vendedorActual)}</select></div>
         <div class="campo" style="margin-bottom:0"><label>Fecha</label>
           <input id="vFecha" type="date" value="${hoy()}" onchange="calcular()"></div>
       </div>
@@ -1606,8 +1719,11 @@ function pintarProductos(){
         <button class="btn-contado" type="button" onclick="formEditarProducto('${p.sku}')">Actualizar</button>
         <button class="btn-credito" type="button" onclick="confirmarEliminarProducto('${p.sku}')">Eliminar</button>
       </div>
-      <div class="swipe-content item" aria-label="Producto ${esc(p.nombre)}">
-        <div class="cont"><h4>${esc(p.nombre)}</h4>
+      <div class="swipe-content item" aria-label="Producto ${esc(p.nombre)}" onclick="fichaProducto(DB.buscar('${p.sku}'))">
+        <div class="cont" style="position:relative; min-width:0;">
+          <div style="position:absolute; right:0; top:0; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">${fechaCompleta(hoy())}</div>
+          <h4 style="margin-right:100px;">${esc(p.nombre)}</h4>
+          <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase; margin:4px 0 6px;">${esc(p.categoria||'Sin categoría')}</div>
           <div class="meta">${esc(p.sku)}${p.codigoBarras ? ' · Barras: '+esc(p.codigoBarras) : ''} · ${esc(p.marca||'')}</div>
           <span class="marbete ${p.stock>3?'m-verde':p.stock>0?'m-ambar':'m-rojo'}">
             ${p.stock>0?p.stock+' en existencia':'Agotado'}</span></div>
@@ -1652,8 +1768,11 @@ function pintarVentas(){
   const todas = ventasFiltradas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
   $('#listaVentas').innerHTML = todas.length ? todas.map(v=>`
     <div class="item" onclick="detalleVenta('${v.id}')">
-      <div class="cont"><h4>${esc(v.cliente)}</h4>
-        <div class="meta">${fecha(v.fecha)} · ${esc(v.producto)}</div>
+      <div class="cont" style="position:relative; min-width:0;">
+        <div style="position:absolute; right:0; top:0; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">${fechaCompleta(v.fecha)}</div>
+        <h4 style="margin-right:100px;">${esc(v.cliente)}</h4>
+        <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase; margin:4px 0 6px;">${esc(v.producto)}</div>
+        <div class="meta">${esc(v.vendedor)} · ${esc(v.tipo==='contado'?'Contado':'Crédito')}</div>
         <span class="marbete ${v.tipo==='contado'?'m-verde':v.estado==='pagada'?'m-verde':'m-ambar'}">
           ${v.tipo==='contado'?'Contado':v.estado==='pagada'?'Crédito saldado':`${v.plazo} meses`}</span></div>
       <div class="val">${money(v.total)}<small>${esc(v.vendedor)}</small></div>
@@ -1737,11 +1856,13 @@ function pintarCartera(){
         <button class="btn-contado" type="button" onclick="eliminarCredito('${v.id}')">Eliminar</button>
         <button class="btn-credito" type="button" onclick="marcarCreditoPagado('${v.id}')">Pagado</button>
       </div>
-      <div class="swipe-content item">
-        <div class="cont"><h4>${esc(v.cliente)}</h4>
-          <div class="meta">${esc(v.producto)} · ${pagadas}/${v.plazo} cuotas</div>
-          <span class="marbete ${mora?'m-rojo':'m-verde'}">
-            ${mora?'Vencida desde '+fecha(prox.vence):'Próxima '+fecha(prox.vence)}</span></div>
+      <div class="swipe-content item" onclick="formAbono('${v.id}')">
+        <div class="cont" style="position:relative; min-width:0;">
+          <div style="position:absolute; right:0; top:0; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">${fechaCompleta(v.fecha)}</div>
+          <h4 style="margin-right:100px;">${esc(v.cliente)}</h4>
+          <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase; margin:4px 0 6px;">${esc(v.producto)}</div>
+          <div class="meta">${esc(v.vendedor)} · ${pagadas}/${v.plazo} cuotas</div>
+          <span class="marbete ${mora?'m-rojo':'m-verde'}">${mora?'Vencida desde '+fecha(prox.vence):'Próxima '+fecha(prox.vence)}</span></div>
         <div class="val">${money(v.saldo)}<small>${money(v.cuotaMensual)}/mes</small></div>
       </div>
     </div>`;}).join('')
@@ -2170,24 +2291,39 @@ function pintarEntregas(){
     const entregados = (e.entregados||[]).map(i=>`${esc(i.nombre)} × ${i.cantidad||1}`).join(', ');
     const devueltos = (e.devueltos||[]).map(i=>`${esc(i.nombre)} × ${i.cantidad||1}`).join(', ');
     const totalEnt = (e.entregados||[]).reduce((t,i)=>t+(i.cantidad||1),0);
+    const totalDev = (e.devueltos||[]).reduce((t,i)=>t+(i.cantidad||1),0);
     return `<div class="item" style="display:block; padding:14px 12px; border-left:4px solid rgba(85,125,115,.8); cursor:pointer" onclick="editarEntrega('${esc(e.creado||'')}')" title="Editar entrega">
       <div class="cont">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px;">
-          <div style="flex:1; min-width:0;"></div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-family:var(--dato); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:6px">Vendedor</div>
+            <h4 style="margin:0">${esc(e.vendor)}</h4>
+          </div>
           <div class="val" style="margin:0; display:block; text-align:right;">${totalEnt}<small>entregados</small></div>
         </div>
-        <div style="padding:10px 12px; border:1px solid rgba(85,125,115,.18); border-radius:8px; background:rgba(226,239,235,.35)">
-          <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:6px">Entrega</div>
+        <div style="margin-top:6px; padding:10px 12px; border:1px solid rgba(85,125,115,.18); border-radius:8px; background:rgba(226,239,235,.35)">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
+            <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Entrega</div>
+            <div style="font-size:10px; color:var(--tinta-3);">${fechaCompleta(e.fecha)}</div>
+          </div>
           <div class="meta">${entregados || '—'}</div>
         </div>
-        <div style="margin-top:12px; padding:10px 12px; border:1px solid rgba(216,194,164,.35); border-radius:8px; background:rgba(247,243,233,.6)">
-          <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:6px">Devolución</div>
+        <div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(216,194,164,.35); border-radius:8px; background:rgba(247,243,233,.6)">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
+            <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Devolución</div>
+            <div style="font-size:10px; color:var(--tinta-3);">${totalDev || 0} unidades</div>
+          </div>
           <div class="meta">${devueltos || '—'}</div>
         </div>
-        <div style="margin-top:14px; padding-top:10px; border-top:1px solid rgba(44,44,44,.12);">
-          <div style="font-family:var(--dato); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:6px">Vendedor</div>
-          <h4 style="margin:0">${esc(e.vendor)}</h4>
-          <div class="meta" style="margin-top:4px;">${fecha(e.fecha)} · ${esc(e.zona||'Sin zona')}</div>
+        <div style="margin-top:14px; padding-top:10px; border-top:1px solid rgba(44,44,44,.12); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <div>
+            <div style="font-family:var(--dato); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:4px">Zona</div>
+            <div class="meta">${esc(e.zona||'Sin zona')}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--dato); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:4px">Fecha</div>
+            <div class="meta">${fechaHora(e.creado || e.fecha)}</div>
+          </div>
         </div>
       </div>
     </div>`;
@@ -2202,6 +2338,7 @@ function sucursalActual(){
   return $('#vSucursal')?.value || caja.leer('gp_sucursal', CFG.sucursales[0]);
 }
 
+inicializarVendedorActual();
 DB.iniciar();
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
