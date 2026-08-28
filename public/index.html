@@ -749,6 +749,7 @@ const DB = {
     });
     f.onSnapshot(f.collection(bd,'ventas'), s=>{
       this.ventas = s.docs.map(d=>({id:d.id,...d.data()}));
+      caja.guardar('gp_ventas', this.ventas);
       pintarTodo();
     });
     f.onSnapshot(f.collection(bd,'entregas'), s=>{
@@ -915,7 +916,7 @@ const DB = {
       const {f,bd}=this.fb;
       const snap = await f.getDocs(f.collection(bd,'ventas'));
       await Promise.all(snap.docs.map(d=>f.deleteDoc(d.ref)));
-      this.ventas=[]; pintarTodo();
+      this.ventas=[]; caja.guardar('gp_ventas', this.ventas); pintarTodo();
     }else{
       this.ventas = [];
       caja.guardar('gp_ventas', this.ventas);
@@ -926,7 +927,7 @@ const DB = {
   async eliminarVenta(id){
     if(this.modo==='firebase'){
       const {f,bd}=this.fb; await f.deleteDoc(f.doc(bd,'ventas',id));
-      this.ventas=this.ventas.filter(v=>v.id!==id); pintarTodo();
+      this.ventas=this.ventas.filter(v=>v.id!==id); caja.guardar('gp_ventas',this.ventas); pintarTodo();
     }else{
       this.ventas = this.ventas.filter(v=>v.id!==id);
       caja.guardar('gp_ventas', this.ventas); pintarTodo();
@@ -939,7 +940,7 @@ const DB = {
       const snap=await f.getDocs(f.collection(bd,'ventas'));
       const ids=snap.docs.filter(d=>d.data().tipo==='credito').map(d=>d.id);
       await Promise.all(ids.map(id=>f.deleteDoc(f.doc(bd,'ventas',id))));
-      this.ventas=this.ventas.filter(v=>v.tipo!=='credito'); pintarTodo();
+      this.ventas=this.ventas.filter(v=>v.tipo!=='credito'); caja.guardar('gp_ventas',this.ventas); pintarTodo();
     }else{
       this.ventas=this.ventas.filter(v=>v.tipo!=='credito');
       caja.guardar('gp_ventas',this.ventas); pintarTodo();
@@ -2894,11 +2895,11 @@ const vistaGuardada = caja.leer('gp_vista','escanear');
 const botonVistaGuardada = $(`.barra button[data-ir="${vistaGuardada}"]`) || $('.barra button[data-ir="escanear"]');
 botonVistaGuardada?.click();
 DB.iniciar();
+setInterval(()=>cerrarEntregasVencidas().catch(errorOperacion),60000);
 setTimeout(ocultarCargaInicial, 9000);
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 </script>
 </body>
-setInterval(()=>cerrarEntregasVencidas().catch(errorOperacion),60000);
 </html>
