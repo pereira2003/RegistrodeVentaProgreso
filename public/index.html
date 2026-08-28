@@ -675,7 +675,11 @@ const DB = {
   async iniciar(){
     if(CFG.firebase){
       try{ this.modo='firebase'; await this.conectarFirebase(); sello('Firebase','ok'); return; }
-      catch(e){ console.warn('Firebase no disponible:',e); }
+      catch(e){
+        console.warn('Firebase no disponible:',e);
+        this.modo='local';
+        this.fb=null;
+      }
     }
     this.productos = caja.leer('gp_productos', null) || SEMILLA.slice();
     this.ventas    = caja.leer('gp_ventas', []);
@@ -742,7 +746,8 @@ const DB = {
       const existentes = new Set(snap.docs.map(doc=>doc.id));
       for(const fila of filas){
         const id = idDe(fila);
-        if(id && !existentes.has(id)) await f.setDoc(f.doc(bd,nombre,id), fila);
+        const documento = typeof fila==='string' ? {nombre:fila} : fila;
+        if(id && !existentes.has(id)) await f.setDoc(f.doc(bd,nombre,id), documento);
       }
     };
     await migrarColeccion('productos', caja.leer('gp_productos', []), p=>String(p.sku||'').trim().toUpperCase());
