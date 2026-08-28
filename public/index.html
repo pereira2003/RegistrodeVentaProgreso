@@ -220,6 +220,7 @@ button{cursor:pointer;border:none;background:none}
   background:var(--papel);border:1px solid var(--suave);border-radius:18px;
   box-shadow:0 10px 22px rgba(24,22,19,.04);overflow:hidden;
 }
+.product-swipe .swipe-content.arrastrando{transition:none;cursor:grabbing}
 .product-swipe .swipe-content.open{transform:translateX(-174px)}
 .cantidad-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:6px}
 .cantidad-control button{width:28px;height:28px;padding:0;border:1px solid var(--linea);border-radius:7px;background:#fff;color:var(--tinta);font-size:18px;line-height:1;cursor:pointer}
@@ -1290,11 +1291,11 @@ function mostrarHojaEntrega(){
 
 function bindSwipeEntrega(card){
   const cont=card.querySelector('.swipe-content'); let inicio=0,actual=0,arrastrando=false;
-  const mover=x=>{const offset=Math.max(Math.min(x,0),-174);cont.style.transform=`translateX(${offset}px)`;card.classList.toggle('open',offset<=-60);cont.classList.toggle('open',offset<=-60);};
-  cont.addEventListener('pointerdown',e=>{inicio=actual=e.clientX;arrastrando=true;cont.setPointerCapture?.(e.pointerId);});
+  const mover=x=>{const offset=Math.max(Math.min(x,0),-174);cont.style.transform=`translate3d(${offset}px,0,0)`;card.classList.toggle('open',offset<=-60);cont.classList.toggle('open',offset<=-60);};
+  cont.addEventListener('pointerdown',e=>{inicio=actual=e.clientX;arrastrando=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);});
   cont.addEventListener('pointermove',e=>{if(arrastrando&&e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}});
-  const terminar=()=>{if(!arrastrando)return;mover(actual-inicio<=-60?-174:0);arrastrando=false;};
-  cont.addEventListener('pointerup',terminar);cont.addEventListener('pointerleave',terminar);
+  const terminar=()=>{if(!arrastrando)return;mover(actual-inicio<=-60?-174:0);arrastrando=false;cont.classList.remove('arrastrando');};
+  cont.addEventListener('pointerup',terminar);cont.addEventListener('pointercancel',terminar);
   cont.addEventListener('click',e=>{if(cont.classList.contains('open')){mover(0);e.preventDefault();}});
 }
 
@@ -1821,7 +1822,7 @@ function bindSwipeVenta(card){
 
   const setOffset = x => {
     const offset = Math.max(Math.min(x, 0), -maxX);
-    cont.style.transform = `translateX(${offset}px)`;
+    cont.style.transform = `translate3d(${offset}px,0,0)`;
     const open = offset <= -60;
     cont.classList.toggle('open', open);
     card.classList.toggle('open', open);
@@ -1832,6 +1833,7 @@ function bindSwipeVenta(card){
     startY = e.clientY;
     currentX = e.clientX;
     dragging = true;
+    cont.classList.add('arrastrando');
     cont.setPointerCapture?.(e.pointerId);
   });
 
@@ -1856,10 +1858,11 @@ function bindSwipeVenta(card){
       card.classList.remove('open');
     }
     dragging = false;
+    cont.classList.remove('arrastrando');
   };
 
   cont.addEventListener('pointerup', finishSwipe);
-  cont.addEventListener('pointerleave', finishSwipe);
+  cont.addEventListener('pointercancel', finishSwipe);
   cont.addEventListener('click', e => {
     if(cont.classList.contains('open')){
       setOffset(0);
@@ -2067,13 +2070,13 @@ function bindSwipeCartera(card){
   let startX=0, currentX=0, dragging=false;
   const setOffset = x => {
     const offset=Math.max(Math.min(x,0),-174);
-    cont.style.transform=`translateX(${offset}px)`;
+    cont.style.transform=`translate3d(${offset}px,0,0)`;
     card.classList.toggle('open',offset<=-60); cont.classList.toggle('open',offset<=-60);
   };
-  cont.addEventListener('pointerdown',e=>{startX=currentX=e.clientX; dragging=true; cont.setPointerCapture?.(e.pointerId);});
+  cont.addEventListener('pointerdown',e=>{startX=currentX=e.clientX; dragging=true; cont.classList.add('arrastrando'); cont.setPointerCapture?.(e.pointerId);});
   cont.addEventListener('pointermove',e=>{if(dragging && e.clientX<startX) {currentX=e.clientX; setOffset(currentX-startX);}});
-  const finish=()=>{if(!dragging)return; setOffset(currentX-startX<=-60?-174:0); dragging=false;};
-  cont.addEventListener('pointerup',finish); cont.addEventListener('pointerleave',finish);
+  const finish=()=>{if(!dragging)return; setOffset(currentX-startX<=-60?-174:0); dragging=false; cont.classList.remove('arrastrando');};
+  cont.addEventListener('pointerup',finish); cont.addEventListener('pointercancel',finish);
   cont.addEventListener('click',e=>{if(cont.classList.contains('open')){setOffset(0);e.preventDefault();return;} formAbono(card.dataset.id);});
 }
 
@@ -2547,13 +2550,14 @@ function bindSwipeEntregaLista(card){
   let startX=0, currentX=0, dragging=false;
   const setOffset = x => {
     const offset = Math.max(Math.min(x, 0), -174);
-    cont.style.transform = `translateX(${offset}px)`;
+    cont.style.transform = `translate3d(${offset}px,0,0)`;
     card.classList.toggle('open', offset <= -60);
     cont.classList.toggle('open', offset <= -60);
   };
   cont.addEventListener('pointerdown', e => {
     startX = currentX = e.clientX;
     dragging = true;
+    cont.classList.add('arrastrando');
     cont.setPointerCapture?.(e.pointerId);
   });
   cont.addEventListener('pointermove', e => {
@@ -2565,9 +2569,10 @@ function bindSwipeEntregaLista(card){
     if(!dragging) return;
     setOffset(currentX - startX <= -60 ? -174 : 0);
     dragging = false;
+    cont.classList.remove('arrastrando');
   };
   cont.addEventListener('pointerup', finish);
-  cont.addEventListener('pointerleave', finish);
+  cont.addEventListener('pointercancel', finish);
   cont.addEventListener('click', e => {
     if(cont.classList.contains('open')){
       setOffset(0);
