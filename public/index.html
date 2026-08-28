@@ -1112,7 +1112,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
       esperarVideoParaLeer(v);
     }
   }catch(e){
-    if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
+    apagarCamara();
     $('#apagado').innerHTML = '<b>No se pudo abrir la cámara</b>La página necesita HTTPS y permiso de cámara. Mientras tanto, escribe el código del producto abajo.';
     $('#visor').classList.remove('encendida');
     $('#apagado').hidden=false;
