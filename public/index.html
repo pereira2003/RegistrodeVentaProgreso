@@ -723,6 +723,7 @@ const DB = {
     caja.guardar('gp_vendedores', this.vendedores);
     caja.guardar('gp_zonas', this.zonas);
     sello('Modo prueba','local');
+    await cerrarEntregasVencidas();
     pintarTodo();
     ocultarCargaInicial();
   },
@@ -753,6 +754,7 @@ const DB = {
     f.onSnapshot(f.collection(bd,'entregas'), s=>{
       this.entregas = s.docs.map(d=>({id:d.id,...d.data()}));
       caja.guardar('gp_entregas', this.entregas);
+      cerrarEntregasVencidas();
       pintarTodo();
     });
     f.onSnapshot(f.collection(bd,'vendedores'), s=>{
@@ -962,6 +964,36 @@ const DB = {
 
 function normalizarCodigo(codigo){
   return String(codigo??'').replace(/^\](?:C1|E[0-9A-Z]|d[0-9A-Z])/, '').replace(/\s+/g,'').toUpperCase();
+}
+
+async function cerrarEntregasVencidas(){
+  const ahora=Date.now();
+  for(const entrega of (DB.entregas||[])){
+    if(entrega.ventaGenerada) continue;
+    const inicio=Date.parse(entrega.entregaCreado||entrega.creado||'');
+    if(!inicio || ahora-inicio < 24*60*60*1000 || !(entrega.entregados||[]).length) continue;
+    const devueltos=new Map((entrega.devueltos||[]).map(item=>[item.sku,(item.cantidad||1)]));
+    const vendidos=(entrega.entregados||[]).map(item=>({
+      ...item, cantidad:Math.max(0,(item.cantidad||1)-(devueltos.get(item.sku)||0))
+    })).filter(item=>item.cantidad>0);
+    entrega.ventaGenerada=true;
+    for(const item of vendidos){
+      const id=`entrega-${encodeURIComponent(entrega.creado)}-${encodeURIComponent(item.sku)}`;
+      if((DB.ventas||[]).some(venta=>venta.id===id)) continue;
+      const total=+((Number(item.precio)||0)*item.cantidad).toFixed(2);
+      const venta={id,sku:item.sku,producto:item.nombre,marca:item.marca||'',tipo:'contado',
+        cantidad:item.cantidad,precioUnitario:Number(item.precio)||0,total,prima:total,
+        totalCancelar:0,saldo:0,estado:'pagada',cuotas:[],cliente:'Venta por entrega',
+        documento:'',telefono:'',direccion:'',vendedor:entrega.vendor||'Sin vendedor',
+        sucursal:sucursalActual(),fecha:entrega.fecha||hoy(),creado:new Date().toISOString(),
+        abonos:[],origen:'entrega',entregaCreado:entrega.creado};
+      if(DB.modo==='firebase') DB.ventas.push(venta);
+      await DB.guardarVenta(venta);
+    }
+    await DB.guardarEntrega(entrega);
+  }
+  caja.guardar('gp_ventas',DB.ventas||[]);
+  caja.guardar('gp_entregas',DB.entregas||[]);
 }
 
 function vendedoresActuales(){
@@ -1606,6 +1638,7 @@ function procesarEscaneoEntrega(sku){
 
   const registroAnterior = (DB.entregas||[]).slice().reverse().find(x=>
     x.vendor===vendedor && x.zona===entregaActual.zona &&
+    !x.ventaGenerada &&
     (x.entregados||[]).some(item=>item.sku===p.sku)
   );
   if(registroAnterior){
@@ -2867,4 +2900,5 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 }
 </script>
 </body>
+setInterval(()=>cerrarEntregasVencidas().catch(errorOperacion),60000);
 </html>
