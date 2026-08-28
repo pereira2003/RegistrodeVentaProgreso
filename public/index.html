@@ -1241,8 +1241,13 @@ function procesarCodigoLeido(valor){
   if(modoEscaneo === 'entrega'){
     procesarEscaneoEntrega(sku);
   }else if(modoEscaneo === 'producto'){
+    const productoExistente=DB.buscar(sku);
+    const datosProducto={...productoPendiente, codigoBarras:sku};
     cerrarHoja();
-    abrirFormularioProducto({...productoPendiente, codigoBarras:sku});
+    if(productoExistente){
+      alert(`Este código de barras ya está registrado para: ${productoExistente.nombre}`);
+    }
+    abrirFormularioProducto(datosProducto);
     productoPendiente=null;
   }else{
     abrirProducto(sku, tipoVentaEscaneo);
