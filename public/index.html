@@ -240,11 +240,11 @@ button{cursor:pointer;border:none;background:none}
 .product-swipe .swipe-actions .btn-credito{background:linear-gradient(180deg,#d9c09e,#c7ac7a);color:#2a241d;}
 .product-swipe.open .swipe-actions{width:174px;opacity:1;pointer-events:auto}
 .product-swipe .swipe-content{
-  position:relative;z-index:2;transition:transform .22s ease;will-change:transform;touch-action:pan-y;
+  position:relative;z-index:2;transition:transform .22s ease;touch-action:pan-y;contain:paint;
   background:var(--papel);border:1px solid var(--suave);border-radius:18px;
   box-shadow:0 10px 22px rgba(24,22,19,.04);overflow:hidden;
 }
-.product-swipe .swipe-content.arrastrando{transition:none;cursor:grabbing}
+.product-swipe .swipe-content.arrastrando{transition:none;cursor:grabbing;will-change:transform}
 .product-swipe .swipe-content.open{transform:translateX(-174px)}
 .cantidad-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:6px}
 .cantidad-control button{width:28px;height:28px;padding:0;border:1px solid var(--linea);border-radius:7px;background:#fff;color:var(--tinta);font-size:18px;line-height:1;cursor:pointer}
@@ -1531,10 +1531,10 @@ function cambiarVendedorEntrega(vendedor){
 }
 
 function bindSwipeEntrega(card){
-  const cont=card.querySelector('.swipe-content'); let inicio=0,actual=0,arrastrando=false;
-  const mover=x=>{const offset=Math.max(Math.min(x,0),-174);cont.style.transform=`translate3d(${offset}px,0,0)`;card.classList.toggle('open',offset<=-60);cont.classList.toggle('open',offset<=-60);};
+  const cont=card.querySelector('.swipe-content'); let inicio=0,actual=0,arrastrando=false,frame=0,pendiente=0;
+  const mover=x=>{pendiente=x;if(frame)return;frame=requestAnimationFrame(()=>{frame=0;const offset=Math.max(Math.min(pendiente,0),-174);cont.style.transform=`translate3d(${offset}px,0,0)`;card.classList.toggle('open',offset<=-60);cont.classList.toggle('open',offset<=-60);});};
   cont.addEventListener('pointerdown',e=>{inicio=actual=e.clientX;arrastrando=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);});
-  cont.addEventListener('pointermove',e=>{if(arrastrando&&e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}});
+  cont.addEventListener('pointermove',e=>{if(arrastrando&&e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}}, {passive:true});
   const terminar=()=>{if(!arrastrando)return;mover(actual-inicio<=-60?-174:0);arrastrando=false;cont.classList.remove('arrastrando');};
   cont.addEventListener('pointerup',terminar);cont.addEventListener('pointercancel',terminar);
   cont.addEventListener('click',e=>{if(cont.classList.contains('open')){mover(0);e.preventDefault();}});
@@ -2062,13 +2062,20 @@ function bindSwipeVenta(card){
   let currentX = 0;
   let dragging = false;
   const maxX = 174;
+  let frame = 0;
+  let pendingOffset = 0;
 
   const setOffset = x => {
     const offset = Math.max(Math.min(x, 0), -maxX);
-    cont.style.transform = `translate3d(${offset}px,0,0)`;
-    const open = offset <= -60;
-    cont.classList.toggle('open', open);
-    card.classList.toggle('open', open);
+    pendingOffset = offset;
+    if(frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      cont.style.transform = `translate3d(${pendingOffset}px,0,0)`;
+      const open = pendingOffset <= -60;
+      cont.classList.toggle('open', open);
+      card.classList.toggle('open', open);
+    });
   };
 
   cont.addEventListener('pointerdown', e => {
@@ -2089,7 +2096,7 @@ function bindSwipeVenta(card){
       setOffset(dx);
       currentX = e.clientX;
     }
-  });
+  }, {passive:true});
 
   const finishSwipe = () => {
     const dx = currentX - startX;
@@ -2326,13 +2333,15 @@ function pintarCartera(){
 function bindSwipeCartera(card){
   const cont = card.querySelector('.swipe-content');
   let startX=0, currentX=0, dragging=false;
+  let frame=0, pendingOffset=0;
   const setOffset = x => {
     const offset=Math.max(Math.min(x,0),-174);
-    cont.style.transform=`translate3d(${offset}px,0,0)`;
-    card.classList.toggle('open',offset<=-60); cont.classList.toggle('open',offset<=-60);
+    pendingOffset=offset;
+    if(frame)return;
+    frame=requestAnimationFrame(()=>{frame=0;cont.style.transform=`translate3d(${pendingOffset}px,0,0)`;card.classList.toggle('open',pendingOffset<=-60);cont.classList.toggle('open',pendingOffset<=-60);});
   };
   cont.addEventListener('pointerdown',e=>{startX=currentX=e.clientX; dragging=true; cont.classList.add('arrastrando'); cont.setPointerCapture?.(e.pointerId);});
-  cont.addEventListener('pointermove',e=>{if(dragging && e.clientX<startX) {currentX=e.clientX; setOffset(currentX-startX);}});
+  cont.addEventListener('pointermove',e=>{if(dragging && e.clientX<startX) {currentX=e.clientX; setOffset(currentX-startX);}}, {passive:true});
   const finish=()=>{if(!dragging)return; setOffset(currentX-startX<=-60?-174:0); dragging=false; cont.classList.remove('arrastrando');};
   cont.addEventListener('pointerup',finish); cont.addEventListener('pointercancel',finish);
   cont.addEventListener('click',e=>{if(cont.classList.contains('open')){setOffset(0);e.preventDefault();return;} formAbono(card.dataset.id);});
@@ -2837,11 +2846,12 @@ function bindSwipeEntregaLista(card){
   const cont = card.querySelector('.swipe-content');
   if(!cont) return;
   let startX=0, currentX=0, dragging=false;
+  let frame=0, pendingOffset=0;
   const setOffset = x => {
     const offset = Math.max(Math.min(x, 0), -174);
-    cont.style.transform = `translate3d(${offset}px,0,0)`;
-    card.classList.toggle('open', offset <= -60);
-    cont.classList.toggle('open', offset <= -60);
+    pendingOffset=offset;
+    if(frame)return;
+    frame=requestAnimationFrame(()=>{frame=0;cont.style.transform=`translate3d(${pendingOffset}px,0,0)`;card.classList.toggle('open',pendingOffset<=-60);cont.classList.toggle('open',pendingOffset<=-60);});
   };
   cont.addEventListener('pointerdown', e => {
     startX = currentX = e.clientX;
@@ -2853,7 +2863,7 @@ function bindSwipeEntregaLista(card){
     if(!dragging || e.clientX > startX) return;
     currentX = e.clientX;
     setOffset(currentX - startX);
-  });
+  }, {passive:true});
   const finish = () => {
     if(!dragging) return;
     setOffset(currentX - startX <= -60 ? -174 : 0);
