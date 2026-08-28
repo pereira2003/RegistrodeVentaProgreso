@@ -1753,7 +1753,7 @@ function pintarProductos(){
               <small style="display:block; margin-top:2px; font-family:var(--dato); font-size:9px; font-weight:500; letter-spacing:.04em; color:var(--tinta-3);">${money(p.credito)} crédito</small>
             </div>
           </div>
-          ${p.codigoBarras ? `<div style="font-family:var(--dato); font-size:11px; color:var(--tinta-2); margin:-2px 0 8px;">Código de barras: ${esc(p.codigoBarras)}</div>` : ''}
+          ${p.codigoBarras ? `<div style="font-family:var(--dato); font-size:11px; color:var(--tinta-2); margin:-2px 0 8px;">${esc(p.codigoBarras)}</div>` : ''}
           <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
             <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase;">${esc(p.categoria||'Sin categoría')}</div>
             <div style="font-size:10px; color:var(--tinta-3); white-space:nowrap;">${fechaCompleta(p.fecha || hoy())}</div>
