@@ -547,7 +547,10 @@ const CFG = {
 const $  = (s,c=document)=>c.querySelector(s);
 const $$ = (s,c=document)=>[...c.querySelectorAll(s)];
 const money = n => new Intl.NumberFormat('es-PA',{style:'currency',currency:'USD'}).format(n||0);
-const hoy = () => new Date().toISOString().slice(0,10);
+const hoy = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
 const fecha = s => { if(!s) return '—'; const [a,m,d]=s.slice(0,10).split('-'); return `${d}/${m}/${a}`; };
 const fechaCompleta = s => {
   if(!s) return '—';
@@ -560,6 +563,12 @@ const fechaHora = s => {
   const d = new Date(String(s).includes('T') ? s : `${s}T12:00:00`);
   if(Number.isNaN(d.getTime())) return String(s);
   return d.toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric',hour:'numeric',minute:'2-digit',hour12:true});
+};
+const hora = s => {
+  if(!s) return '—';
+  const d = new Date(String(s).includes('T') ? s : `${s}T12:00:00`);
+  if(Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('es-ES',{hour:'numeric',minute:'2-digit',hour12:true});
 };
 const esc = s => String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -2326,14 +2335,14 @@ function pintarEntregas(){
           <div style="margin-top:6px; padding:10px 12px; border:1px solid rgba(85,125,115,.18); border-radius:8px; background:rgba(226,239,235,.35)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
               <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Entrega</div>
-              <div style="font-size:10px; color:var(--tinta-3);">${fechaHora(e.creado || e.fecha)}</div>
+              <div style="font-size:10px; color:var(--tinta-3);">${hora(e.creado || e.fecha)}</div>
             </div>
             <div class="meta">${entregados || '—'}</div>
           </div>
           <div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(216,194,164,.35); border-radius:8px; background:rgba(247,243,233,.6)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
               <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Devolución</div>
-              <div style="font-size:10px; color:var(--tinta-3);">${fechaHora((e.devueltos && e.devueltos.length) ? (e.creado || e.fecha) : e.fecha)}</div>
+              <div style="font-size:10px; color:var(--tinta-3);">${hora((e.devueltos && e.devueltos.length) ? (e.creado || e.fecha) : e.fecha)}</div>
             </div>
             <div class="meta">${devueltos || '—'}</div>
           </div>
@@ -2344,8 +2353,8 @@ function pintarEntregas(){
                 <div class="meta">${esc(e.zona||'Sin zona')}</div>
               </div>
               <div style="text-align:right; font-size:10px; line-height:1.7; color:var(--tinta-3); font-family:var(--dato);">
-                <div>Entrega: ${fechaCompleta(e.fecha)}</div>
-                <div>Devolución: ${fechaCompleta(e.fecha)}</div>
+                <div>Entrega: ${fechaCompleta(e.creado || e.fecha)}</div>
+                <div>Devolución: ${fechaCompleta(e.creado || e.fecha)}</div>
               </div>
             </div>
           </div>
