@@ -394,9 +394,10 @@ button{cursor:pointer;border:none;background:none}
   <div class="rotulo">Filtrar entregas</div>
   <div class="fila" style="align-items:stretch;margin-bottom:8px">
     <select id="filtroEntregasTipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+      <option value="" disabled>Seleccione el filtro</option>
       <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
     </select>
-    <input id="filtroEntregasFecha" type="month" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+    <div style="flex:1"><label id="etiquetaFiltroEntregasFecha" for="filtroEntregasFecha" style="display:block;font-size:11px;color:var(--tinta-3);margin-bottom:4px">Seleccione mes</label><input id="filtroEntregasFecha" type="month" aria-label="Seleccione mes" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarEntregas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Administrar</div>
@@ -424,11 +425,12 @@ button{cursor:pointer;border:none;background:none}
   <div class="rotulo">Filtrar ventas</div>
   <div class="fila" style="align-items:stretch;margin-bottom:8px">
     <select id="filtroVentasTipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+      <option value="" disabled>Seleccione el filtro</option>
       <option value="mes">Por mes</option>
       <option value="dia">Por día</option>
       <option value="año">Por año</option>
     </select>
-    <input id="filtroVentasFecha" type="month" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+    <div style="flex:1"><label id="etiquetaFiltroVentasFecha" for="filtroVentasFecha" style="display:block;font-size:11px;color:var(--tinta-3);margin-bottom:4px">Seleccione mes</label><input id="filtroVentasFecha" type="month" aria-label="Seleccione mes" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarVentas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Resumen del período</div>
@@ -446,9 +448,10 @@ button{cursor:pointer;border:none;background:none}
   <div class="rotulo">Filtrar cartera</div>
   <div class="fila" style="align-items:stretch;margin-bottom:8px">
     <select id="filtroCarteraTipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+      <option value="" disabled>Seleccione el filtro</option>
       <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
     </select>
-    <input id="filtroCarteraFecha" type="month" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+    <div style="flex:1"><label id="etiquetaFiltroCarteraFecha" for="filtroCarteraFecha" style="display:block;font-size:11px;color:var(--tinta-3);margin-bottom:4px">Seleccione mes</label><input id="filtroCarteraFecha" type="month" aria-label="Seleccione mes" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarCartera" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Cuentas por cobrar</div>
@@ -2546,12 +2549,16 @@ $('#btnCsv').addEventListener('click',()=>{
 function configurarFiltroVentas(){
   const tipo = $('#filtroVentasTipo').value;
   const campo = $('#filtroVentasFecha');
+  const etiqueta = $('#etiquetaFiltroVentasFecha');
   if(tipo==='dia'){
+    etiqueta.textContent='Seleccione día'; campo.setAttribute('aria-label','Seleccione día');
     campo.type='date'; campo.value = campo.value.length===10 ? campo.value : hoy();
   }else if(tipo==='año'){
+    etiqueta.textContent='Seleccione año'; campo.setAttribute('aria-label','Seleccione año');
     campo.type='number'; campo.min='2000'; campo.max='2100'; campo.step='1';
     campo.value = campo.value.length===4 ? campo.value : hoy().slice(0,4);
   }else{
+    etiqueta.textContent='Seleccione mes'; campo.setAttribute('aria-label','Seleccione mes');
     campo.type='month'; campo.value = campo.value.length===7 ? campo.value : hoy().slice(0,7);
   }
   pintarVentas();
@@ -2569,12 +2576,16 @@ $('#btnLimpiarVentas').addEventListener('click', async ()=>{
 
 function configurarFiltroFecha(tipoId, fechaId, pintar){
   const tipo=$('#'+tipoId).value, campo=$('#'+fechaId);
+  const etiqueta=$('#etiqueta'+fechaId.charAt(0).toUpperCase()+fechaId.slice(1));
   if(tipo==='dia'){
+    etiqueta.textContent='Seleccione día'; campo.setAttribute('aria-label','Seleccione día');
     campo.type='date'; campo.value=campo.value.length===10?campo.value:hoy();
   }else if(tipo==='año'){
+    etiqueta.textContent='Seleccione año'; campo.setAttribute('aria-label','Seleccione año');
     campo.type='number'; campo.min='2000'; campo.max='2100'; campo.step='1';
     campo.value=campo.value.length===4?campo.value:hoy().slice(0,4);
   }else{
+    etiqueta.textContent='Seleccione mes'; campo.setAttribute('aria-label','Seleccione mes');
     campo.type='month'; campo.value=campo.value.length===7?campo.value:hoy().slice(0,7);
   }
   pintar();
