@@ -2687,9 +2687,12 @@ function ventasParaFiltro(){
 $('#btnPdfProductos').addEventListener('click',()=>{
   const q=$('#filtroProd').value.toLowerCase().trim();
   const productos=DB.productos.filter(p=>!q||(p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q));
+  const existenciaTotal=productos.reduce((s,p)=>s+(Number(p.stock)||0),0);
+  const valorContado=productos.reduce((s,p)=>s+(Number(p.contado)||0)*(Number(p.stock)||0),0);
+  const valorCredito=productos.reduce((s,p)=>s+(Number(p.credito)||0)*(Number(p.stock)||0),0);
   descargarTablaPDF('Productos', ['SKU','Código de barras','Nombre','Color','Marca','Categoría','Contado','Crédito','Existencia'], productos.map(p=>[
     p.sku,p.codigoBarras||'',p.nombre,p.color||'',p.marca||'',p.categoria||'',money(p.contado),money(p.credito),p.stock||0
-  ]),'productos');
+  ]),'productos', [['TOTAL PRODUCTOS: '+productos.length,'','','','','',money(valorContado),money(valorCredito),existenciaTotal]]);
 });
 
 $('#btnPdfVentas').addEventListener('click',()=>{
