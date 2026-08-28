@@ -911,9 +911,10 @@ const DB = {
   },
 
   buscar(codigo){
-    const clave = String(codigo).trim().toUpperCase();
-    return this.productos.find(p=>p.sku.toUpperCase()===clave ||
-      String(p.codigoBarras||'').trim().toUpperCase()===clave);
+    const clave = String(codigo??'').replace(/\s+/g,'').toUpperCase();
+    return this.productos.find(p=>
+      String(p.sku||'').replace(/\s+/g,'').toUpperCase()===clave ||
+      String(p.codigoBarras||'').replace(/\s+/g,'').toUpperCase()===clave);
   }
 };
 
@@ -1233,7 +1234,7 @@ function procesarCodigoLeido(valor){
     procesarEscaneoEntrega(sku);
   }else if(modoEscaneo === 'producto'){
     cerrarHoja();
-    abrirFormularioProducto({...productoPendiente, sku:productoPendiente.sku || sku, codigoBarras:sku});
+    abrirFormularioProducto({...productoPendiente, codigoBarras:sku});
     productoPendiente=null;
   }else{
     abrirProducto(sku, tipoVentaEscaneo);
@@ -1245,7 +1246,7 @@ $('#skuManual').addEventListener('keydown',e=>{ if(e.key==='Enter') abrirProduct
 function abrirProducto(sku, tipoVenta=null){
   const p = DB.buscar(sku);
   if(!p){
-    abrirFormularioProducto({sku:String(sku).trim().toUpperCase()});
+    abrirFormularioProducto({codigoBarras:String(sku).trim()});
     brindis('Código nuevo: completa los datos del producto');
     return;
   }
@@ -1863,8 +1864,8 @@ function abrirFormularioProducto(p = null){
   abrirHoja(`
     <div class="hoja-tope"><h2>${editando ? 'Editar producto' : 'Nuevo producto'}</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="tarjeta pad">
-      <div class="campo"><label>Código interno (SKU)</label><input id="pSku" value="${esc(p ? p.sku : '')}" placeholder="GP-0000"
-        style="font-family:var(--dato);text-transform:uppercase"></div>
+      ${editando ? `<div class="campo"><label>Código interno (SKU)</label><input id="pSku" value="${esc(p.sku)}" readonly
+        style="font-family:var(--dato);text-transform:uppercase;background:var(--suave)"></div>` : '<input id="pSku" type="hidden" value="">'}
       <div class="campo"><label>Código de barras del producto</label><input id="pBarras" value="${esc(p ? p.codigoBarras || '' : '')}" placeholder="Ej. 7501234567890"
         inputmode="numeric" style="font-family:var(--dato);letter-spacing:.08em"></div>
       <button class="btn plano chico" type="button" onclick="escanearBarrasProducto()">Leer código con cámara</button>
@@ -1890,7 +1891,7 @@ function abrirFormularioProducto(p = null){
 
 async function guardarProducto(skuOriginal = ''){
   const codigoBarras = $('#pBarras').value.trim();
-  const sku = ($('#pSku').value.trim() || codigoBarras).toUpperCase();
+  const sku = ($('#pSku')?.value.trim() || codigoBarras).toUpperCase();
   const nombre = $('#pNombre').value.trim();
   if(!sku || !nombre){ brindis('El código y el nombre son obligatorios'); return; }
 
@@ -1902,7 +1903,7 @@ async function guardarProducto(skuOriginal = ''){
   const existe = DB.buscar(sku);
   const barrasOcupadas = DB.productos.find(p=>producto.codigoBarras &&
     String(p.codigoBarras||'').trim().toUpperCase()===producto.codigoBarras.toUpperCase() &&
-    p.sku.toUpperCase()!==(skuOriginal||'').toUpperCase());
+    String(p.sku||'').toUpperCase()!==(skuOriginal||'').toUpperCase());
   if(barrasOcupadas){ brindis('Ya existe un producto con ese código de barras'); return; }
   if(skuOriginal){
     const original = skuOriginal.toUpperCase();
