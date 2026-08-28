@@ -50,8 +50,9 @@ h1,h2,h3,h4{font-family:var(--display);margin:0;letter-spacing:-.015em;font-weig
 button,input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 .filtro-placeholder{color:#a9a39b}
 .filtro-fecha{position:relative;flex:1;height:44px;min-height:44px;max-height:44px}
-.filtro-fecha input{width:100%;height:44px;min-height:44px;max-height:44px;box-sizing:border-box}
-.filtro-fecha label{position:absolute;z-index:1;top:50%;left:12px;transform:translateY(-50%);margin:0;color:#a9a39b;font-size:12px;pointer-events:none}
+.filtro-control{width:100%;height:44px;min-height:44px;max-height:44px;box-sizing:border-box;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;font:inherit;line-height:18px}
+.filtro-fecha input{width:100%}
+.filtro-fecha label{position:absolute;z-index:1;top:50%;left:12px;transform:translateY(-50%);margin:0;color:#a9a39b;font-size:16px;line-height:18px;pointer-events:none}
 .filtro-fecha label.oculta{display:none}
 .filtro-tipo{height:44px;align-self:center}
 .fila>.filtro-tipo,.fila>.filtro-fecha{min-width:0;width:0}
@@ -406,11 +407,11 @@ button{cursor:pointer;border:none;background:none}
 <section class="vista" data-vista="entregas">
   <div class="rotulo">Filtrar entregas</div>
   <div class="filtro-fila" style="margin-bottom:8px">
-    <select id="filtroEntregasTipo" class="filtro-placeholder filtro-tipo" style="padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+    <select id="filtroEntregasTipo" class="filtro-control filtro-placeholder filtro-tipo">
       <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
     </select>
-    <div class="filtro-fecha"><label id="etiquetaFiltroEntregasFecha" for="filtroEntregasFecha">Seleccione fecha</label><input id="filtroEntregasFecha" type="month" aria-label="Seleccione fecha" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
+    <div class="filtro-fecha"><label id="etiquetaFiltroEntregasFecha" for="filtroEntregasFecha">Seleccione fecha</label><input id="filtroEntregasFecha" class="filtro-control" type="month" aria-label="Seleccione fecha"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarEntregas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Administrar</div>
@@ -442,13 +443,13 @@ button{cursor:pointer;border:none;background:none}
 <section class="vista" data-vista="ventas">
   <div class="rotulo">Filtrar ventas</div>
   <div class="filtro-fila" style="margin-bottom:8px">
-    <select id="filtroVentasTipo" class="filtro-placeholder filtro-tipo" style="padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+    <select id="filtroVentasTipo" class="filtro-control filtro-placeholder filtro-tipo">
       <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option>
       <option value="dia">Por día</option>
       <option value="año">Por año</option>
     </select>
-    <div class="filtro-fecha"><label id="etiquetaFiltroVentasFecha" for="filtroVentasFecha">Seleccione fecha</label><input id="filtroVentasFecha" type="month" aria-label="Seleccione fecha" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
+    <div class="filtro-fecha"><label id="etiquetaFiltroVentasFecha" for="filtroVentasFecha">Seleccione fecha</label><input id="filtroVentasFecha" class="filtro-control" type="month" aria-label="Seleccione fecha"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarVentas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Resumen del período</div>
@@ -465,11 +466,11 @@ button{cursor:pointer;border:none;background:none}
 <section class="vista" data-vista="cartera">
   <div class="rotulo">Filtrar cartera</div>
   <div class="filtro-fila" style="margin-bottom:8px">
-    <select id="filtroCarteraTipo" class="filtro-placeholder filtro-tipo" style="padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+    <select id="filtroCarteraTipo" class="filtro-control filtro-placeholder filtro-tipo">
       <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
     </select>
-    <div class="filtro-fecha"><label id="etiquetaFiltroCarteraFecha" for="filtroCarteraFecha">Seleccione fecha</label><input id="filtroCarteraFecha" type="month" aria-label="Seleccione fecha" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
+    <div class="filtro-fecha"><label id="etiquetaFiltroCarteraFecha" for="filtroCarteraFecha">Seleccione fecha</label><input id="filtroCarteraFecha" class="filtro-control" type="month" aria-label="Seleccione fecha"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarCartera" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Cuentas por cobrar</div>
