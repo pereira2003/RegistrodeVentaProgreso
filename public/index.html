@@ -1072,17 +1072,10 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
   }
   detectorBarras = null;
   if(tipoCodigo === 'barra'){
-    if('BarcodeDetector' in window){
-      try{
-      detectorBarras = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf']});
-      }catch(e){ detectorBarras = null; }
-    }
-    if(!detectorBarras){
-      await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
-      await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
-      if(!window.ZXingBrowser?.BrowserMultiFormatReader) throw new Error('Lector de barras no disponible');
-      lectorBarras = new ZXingBrowser.BrowserMultiFormatReader();
-    }
+    await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
+    await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
+    if(!window.ZXingBrowser?.BrowserMultiFormatReader) throw new Error('Lector de barras no disponible');
+    lectorBarras = new ZXingBrowser.BrowserMultiFormatReader();
   }
   if(modo==='entrega' && !entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
   if(modo==='entrega' && entregaActual.items.length){
@@ -1111,8 +1104,8 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     }
     leyendo=true;
     ultimo=0;
-    if(tipoCodigo==='barra' && !detectorBarras){
-      controlBarras = await lectorBarras.decodeFromVideoElementContinuously(v, (resultado, error) => {
+    if(tipoCodigo==='barra'){
+      lectorBarras.decodeFromVideoElementContinuously(v, (resultado, error) => {
         if(resultado && leyendo) procesarCodigoLeido(resultado.getText());
       });
     }else{
@@ -1166,7 +1159,10 @@ function apagarCamara(){
   leyendo=false;
   leyendoFrame=false;
   linternaActiva=false;
-  if(controlBarras){ controlBarras.stop(); controlBarras=null; }
+  if(controlBarras?.stop) controlBarras.stop();
+  if(lectorBarras?.reset) lectorBarras.reset();
+  controlBarras=null;
+  lectorBarras=null;
   if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
   $('#visor').classList.remove('encendida');
   if($('#video')) $('#video').srcObject=null;
