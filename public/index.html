@@ -1093,7 +1093,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
       pista.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
     }
     actualizarControlLinterna(capacidades.torch === true);
-    if(!(tipoCodigo==='barra' && !detectorBarras)) await v.play();
+    await v.play();
     $('#visor').classList.add('encendida');
     $('#apagado').hidden=true; $('#reticula').hidden=false;
     const btn = modo === 'producto' ? null : modo === 'entrega' ? $('#btnCamEntrega') : $('#btnCam');
@@ -1106,7 +1106,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     leyendo=true;
     ultimo=0;
     if(tipoCodigo==='barra' && !detectorBarras){
-      controlBarras = await lectorBarras.decodeFromVideoElement(v, (resultado, error) => {
+      controlBarras = await lectorBarras.decodeFromVideoElementContinuously(v, (resultado, error) => {
         if(resultado && leyendo) procesarCodigoLeido(resultado.getText());
       });
     }else{
