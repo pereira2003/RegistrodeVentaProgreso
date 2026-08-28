@@ -639,6 +639,10 @@ function mostrarEstadoEscaneo(txt, detalle='Registrando…'){
   clearTimeout(pop._t);
   pop._t = setTimeout(()=>{ pop.style.display='none'; }, 1800);
 }
+function errorOperacion(e){
+  console.error(e);
+  brindis(e?.code==='permission-denied' ? 'No tienes permisos para realizar esta acción' : 'No se pudo completar la operación');
+}
 
 // Almacenamiento tolerante: usa localStorage si existe, si no memoria
 const caja = (()=>{ let mem={},ok=true;
@@ -818,7 +822,8 @@ const DB = {
         await f.deleteDoc(f.doc(bd,'productos',skuAnterior.toUpperCase()));
       }else await f.updateDoc(f.doc(bd,'productos',p.sku), p);
     }else{
-      const idx = this.productos.findIndex(item => item.sku.toUpperCase() === String(p.sku).trim().toUpperCase());
+      const claveAnterior = String(skuAnterior || p.sku).trim().toUpperCase();
+      const idx = this.productos.findIndex(item => item.sku.toUpperCase() === claveAnterior);
       if(idx >= 0){ this.productos[idx] = { ...this.productos[idx], ...p }; }
       caja.guardar('gp_productos',this.productos); pintarTodo();
     }
@@ -1454,9 +1459,10 @@ function fichaProducto(p){
 function confirmarEliminarProducto(sku){
   const p = DB.buscar(sku); if(!p) return;
   if(!confirm(`¿Deseas eliminar el producto "${p.nombre}"?`)) return;
-  DB.eliminarProducto(sku);
-  cerrarHoja();
-  brindis('Producto eliminado');
+  DB.eliminarProducto(sku).then(()=>{
+    cerrarHoja();
+    brindis('Producto eliminado');
+  }).catch(errorOperacion);
 }
 
 function formEditarProducto(sku){
@@ -1800,8 +1806,10 @@ async function guardarProducto(skuOriginal = ''){
     if(existe && sku !== original){ brindis('Ya existe un producto con ese código'); return; }
     const idx = DB.productos.findIndex(p => p.sku.toUpperCase() === original);
     if(idx >= 0){
-      await DB.actualizarProducto(producto, original);
-      cerrarHoja(); brindis('Producto actualizado');
+      try{
+        await DB.actualizarProducto(producto, original);
+        cerrarHoja(); brindis('Producto actualizado');
+      }catch(e){ errorOperacion(e); }
       return;
     }
   }
@@ -2097,7 +2105,8 @@ function bindSwipeCartera(card){
 
 async function eliminarCredito(id){
   if(!confirm('¿Deseas eliminar este crédito y su registro de venta? Esta acción no se puede deshacer.')) return;
-  await DB.eliminarVenta(id); cerrarHoja(); brindis('Crédito eliminado');
+  try{ await DB.eliminarVenta(id); cerrarHoja(); brindis('Crédito eliminado'); }
+  catch(e){ errorOperacion(e); }
 }
 
 async function marcarCreditoPagado(id){
@@ -2105,7 +2114,8 @@ async function marcarCreditoPagado(id){
   if(!confirm('¿Confirmas que este crédito ya fue pagado completamente?')) return;
   v.saldo=0; v.estado='pagada';
   (v.cuotas||[]).forEach(c=>{c.pagado=c.monto;c.estado='pagada';});
-  await DB.actualizarVenta(v); cerrarHoja(); brindis('Crédito marcado como pagado');
+  try{ await DB.actualizarVenta(v); cerrarHoja(); brindis('Crédito marcado como pagado'); }
+  catch(e){ errorOperacion(e); }
 }
 
 /* ============================================================
@@ -2406,8 +2416,10 @@ $('#filtroVentasFecha').addEventListener('input', pintarVentas);
 $('#btnLimpiarVentas').addEventListener('click', async ()=>{
   if(!DB.ventas.length){ brindis('No hay registros para limpiar'); return; }
   if(!confirm('¿Deseas eliminar todos los registros de ventas? Esta acción no se puede deshacer.')) return;
-  await DB.limpiarVentas();
-  brindis('Registros de ventas eliminados');
+  try{
+    await DB.limpiarVentas();
+    brindis('Registros de ventas eliminados');
+  }catch(e){ errorOperacion(e); }
 });
 
 function configurarFiltroFecha(tipoId, fechaId, pintar){
@@ -2431,13 +2443,15 @@ $('#filtroCarteraFecha').addEventListener('input',pintarCartera);
 $('#btnLimpiarEntregas').addEventListener('click',async()=>{
   if(!DB.entregas?.length){brindis('No hay registros para limpiar');return;}
   if(!confirm('¿Deseas eliminar todos los registros de entregas? Esta acción no se puede deshacer.'))return;
-  await DB.limpiarEntregas(); brindis('Registros de entregas eliminados');
+  try{ await DB.limpiarEntregas(); brindis('Registros de entregas eliminados'); }
+  catch(e){ errorOperacion(e); }
 });
 $('#btnLimpiarCartera').addEventListener('click',async()=>{
   const creditos=DB.ventas.filter(v=>v.tipo==='credito');
   if(!creditos.length){brindis('No hay registros en cartera');return;}
   if(!confirm('¿Deseas eliminar todos los créditos de cartera? Esta acción no se puede deshacer.'))return;
-  await DB.limpiarCartera(); brindis('Registros de cartera eliminados');
+  try{ await DB.limpiarCartera(); brindis('Registros de cartera eliminados'); }
+  catch(e){ errorOperacion(e); }
 });
 
 function descargarTablaPDF(titulo,columnas,filas,nombre){
