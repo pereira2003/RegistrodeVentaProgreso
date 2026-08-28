@@ -1061,7 +1061,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
   tipoVentaEscaneo = tipoVenta;
   try{
     if(tipoCodigo === 'qr') await cargarBiblioteca('jsQR','lib/jsQR.js');
-    if(tipoCodigo === 'barra' && !('BarcodeDetector' in window)){
+    if(tipoCodigo === 'barra'){
       await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
       await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
     }
@@ -1070,7 +1070,6 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     $('#apagado').hidden=false;
     return;
   }
-  detectorBarras = null;
   if(tipoCodigo === 'barra'){
     await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
     await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
@@ -1109,6 +1108,8 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     if(tipoCodigo==='barra'){
       lectorBarras.decodeFromVideoElementContinuously(v, (resultado, error) => {
         if(resultado && leyendo) procesarCodigoLeido(resultado.getText());
+      }).catch(()=>{
+        if(leyendo) brindis('No se pudo iniciar el lector de barras');
       });
     }else{
       esperarVideoParaLeer(v);
@@ -1224,13 +1225,6 @@ function cicloLectura(){
     const cx=c.getContext('2d',{willReadFrequently:true});
     cx.drawImage(v,0,0,c.width,c.height);
     const leer = (async()=>{
-      if(detectorBarras){
-        try{
-          const codigos = await detectorBarras.detect(v);
-          const valor = codigos[0]?.rawValue || '';
-          if(valor) return valor;
-        }catch(e){}
-      }
       return leerQR(cx,c.width,c.height);
     })();
     leer.then(procesarCodigoLeido).catch(()=>{}).finally(()=>{leyendoFrame=false;});
