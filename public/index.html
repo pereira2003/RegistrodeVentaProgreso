@@ -816,7 +816,11 @@ const DB = {
   },
 
   async limpiarEntregas(){
-    if(this.modo==='firebase'){ const {f,bd}=this.fb; const snap=await f.getDocs(f.collection(bd,'entregas')); await Promise.all(snap.docs.map(d=>f.deleteDoc(d.ref))); }
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; const snap=await f.getDocs(f.collection(bd,'entregas'));
+      await Promise.all(snap.docs.map(d=>f.deleteDoc(d.ref)));
+      this.entregas=[]; pintarTodo();
+    }
     else{ this.entregas=[]; caja.guardar('gp_entregas',this.entregas); pintarTodo(); }
   },
 
@@ -827,6 +831,9 @@ const DB = {
         await f.setDoc(f.doc(bd,'productos',p.sku), p);
         await f.deleteDoc(f.doc(bd,'productos',skuAnterior.toUpperCase()));
       }else await f.updateDoc(f.doc(bd,'productos',p.sku), p);
+      const claveAnterior=String(skuAnterior||p.sku).trim().toUpperCase();
+      this.productos=this.productos.map(item=>item.sku.toUpperCase()===claveAnterior?{...item,...p}:item);
+      pintarTodo();
     }else{
       const claveAnterior = String(skuAnterior || p.sku).trim().toUpperCase();
       const idx = this.productos.findIndex(item => item.sku.toUpperCase() === claveAnterior);
@@ -839,6 +846,7 @@ const DB = {
     const clave = String(sku).trim().toUpperCase();
     if(this.modo==='firebase'){
       const {f,bd}=this.fb; await f.deleteDoc(f.doc(bd,'productos',clave));
+      this.productos=this.productos.filter(p=>p.sku.toUpperCase()!==clave); pintarTodo();
     }else{
       this.productos = this.productos.filter(p => p.sku.toUpperCase() !== clave);
       caja.guardar('gp_productos',this.productos); pintarTodo();
@@ -864,6 +872,7 @@ const DB = {
       const {f,bd}=this.fb;
       const snap = await f.getDocs(f.collection(bd,'ventas'));
       await Promise.all(snap.docs.map(d=>f.deleteDoc(d.ref)));
+      this.ventas=[]; pintarTodo();
     }else{
       this.ventas = [];
       caja.guardar('gp_ventas', this.ventas);
@@ -874,6 +883,7 @@ const DB = {
   async eliminarVenta(id){
     if(this.modo==='firebase'){
       const {f,bd}=this.fb; await f.deleteDoc(f.doc(bd,'ventas',id));
+      this.ventas=this.ventas.filter(v=>v.id!==id); pintarTodo();
     }else{
       this.ventas = this.ventas.filter(v=>v.id!==id);
       caja.guardar('gp_ventas', this.ventas); pintarTodo();
@@ -884,7 +894,9 @@ const DB = {
     if(this.modo==='firebase'){
       const {f,bd}=this.fb;
       const snap=await f.getDocs(f.collection(bd,'ventas'));
-      await Promise.all(snap.docs.filter(d=>d.data().tipo==='credito').map(d=>f.deleteDoc(d.ref)));
+      const ids=snap.docs.filter(d=>d.data().tipo==='credito').map(d=>d.id);
+      await Promise.all(ids.map(id=>f.deleteDoc(f.doc(bd,'ventas',id))));
+      this.ventas=this.ventas.filter(v=>v.tipo!=='credito'); pintarTodo();
     }else{
       this.ventas=this.ventas.filter(v=>v.tipo!=='credito');
       caja.guardar('gp_ventas',this.ventas); pintarTodo();
