@@ -49,6 +49,15 @@ body{
 h1,h2,h3,h4{font-family:var(--display);margin:0;letter-spacing:-.015em;font-weight:700}
 button,input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
 .filtro-placeholder{color:#a9a39b}
+.filtro-fecha{position:relative;flex:1;height:44px}
+.filtro-fecha input{height:44px}
+.filtro-fecha label{position:absolute;z-index:1;top:50%;left:12px;transform:translateY(-50%);margin:0;color:#a9a39b;font-size:12px;pointer-events:none}
+.filtro-fecha label.oculta{display:none}
+.filtro-tipo{height:44px;align-self:center}
+.buscador-productos{display:flex;gap:8px;margin-bottom:12px;align-items:center}
+.buscador-productos input{flex:1;min-width:0;margin:0}
+.buscador-productos input{height:44px}
+.btn-icono{width:44px;height:44px;flex:0 0 44px;padding:0;border-radius:var(--r)}
 .filtro-fecha{position:relative;flex:1}
 .filtro-fecha label{position:absolute;z-index:1;top:50%;left:12px;transform:translateY(-50%);margin:0;color:#a9a39b;font-size:12px;pointer-events:none}
 .filtro-fecha label.oculta{display:none}
@@ -396,8 +405,8 @@ button{cursor:pointer;border:none;background:none}
 <!-- ================= ENTREGAS Y DEVOLUCIONES ================= -->
 <section class="vista" data-vista="entregas">
   <div class="rotulo">Filtrar entregas</div>
-  <div class="fila" style="align-items:stretch;margin-bottom:8px">
-    <select id="filtroEntregasTipo" class="filtro-placeholder" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+  <div class="fila" style="align-items:center;margin-bottom:8px">
+    <select id="filtroEntregasTipo" class="filtro-placeholder filtro-tipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
       <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
     </select>
@@ -417,8 +426,13 @@ button{cursor:pointer;border:none;background:none}
 
 <!-- ================= PRODUCTOS ================= -->
 <section class="vista" data-vista="productos">
-  <input id="filtroProd" placeholder="Buscar por nombre, marca o código"
-    style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;margin-bottom:12px">
+  <div class="buscador-productos">
+    <input id="filtroProd" placeholder="Buscar por nombre, marca o código"
+      style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+    <button class="btn plano btn-icono" id="btnBuscarProductoCamara" type="button" title="Buscar producto con cámara" aria-label="Buscar producto con cámara">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4zM12 9.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="18" cy="9" r="1" fill="currentColor"/></svg>
+    </button>
+  </div>
   <button class="btn plano" id="btnNuevoProd" style="margin-bottom:14px">+ Agregar producto</button>
   <button class="btn plano chico" id="btnPdfProductos" style="width:100%;margin-bottom:10px">Descargar PDF</button>
   <div id="listaProd"></div>
@@ -427,8 +441,8 @@ button{cursor:pointer;border:none;background:none}
 <!-- ================= VENTAS ================= -->
 <section class="vista" data-vista="ventas">
   <div class="rotulo">Filtrar ventas</div>
-  <div class="fila" style="align-items:stretch;margin-bottom:8px">
-    <select id="filtroVentasTipo" class="filtro-placeholder" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+  <div class="fila" style="align-items:center;margin-bottom:8px">
+    <select id="filtroVentasTipo" class="filtro-placeholder filtro-tipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
       <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option>
       <option value="dia">Por día</option>
@@ -450,8 +464,8 @@ button{cursor:pointer;border:none;background:none}
 <!-- ================= CARTERA ================= -->
 <section class="vista" data-vista="cartera">
   <div class="rotulo">Filtrar cartera</div>
-  <div class="fila" style="align-items:stretch;margin-bottom:8px">
-    <select id="filtroCarteraTipo" class="filtro-placeholder" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+  <div class="fila" style="align-items:center;margin-bottom:8px">
+    <select id="filtroCarteraTipo" class="filtro-placeholder filtro-tipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
       <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
     </select>
@@ -1051,6 +1065,24 @@ function cancelarEscaneoProducto(){
   sesionProducto++; apagarCamara(); productoPendiente=null; abrirFormularioProducto(datos);
 }
 
+function escanearProductoDesdeLista(){
+  const sesion=++sesionProducto;
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Buscar producto</h2><button class="cerrar" onclick="cancelarBusquedaProducto()">✕</button></div>
+    <div class="visor encendida" style="margin:0;border-radius:14px;min-height:260px">
+      <video id="videoProducto" playsinline muted></video>
+      <div class="reticula"><div class="marco"><i></i><i></i><i></i><i></i><div class="barrido"></div></div></div>
+      <button class="btn-linterna" id="btnLinternaProducto" type="button" hidden aria-pressed="false">Activar linterna</button>
+    </div>
+    <div class="aviso" style="margin-top:12px">Apunta la cámara al código de barras del producto.</div>
+    <button class="btn plano" style="margin-top:10px" type="button" onclick="cancelarBusquedaProducto()">Detener cámara</button>`);
+  setTimeout(()=>{ if(sesion===sesionProducto) iniciarEscaneo('buscarProducto','barra','credito',sesion); },0);
+}
+
+function cancelarBusquedaProducto(){
+  sesionProducto++; apagarCamara(); cerrarHoja();
+}
+
 function seleccionarTipoEscaneo(modo){
   abrirHoja(`
     <div class="hoja-tope"><h2>Tipo de código</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
@@ -1262,6 +1294,10 @@ function procesarCodigoLeido(valor,sesionActual=sesionEscaneo){
   apagarCamara();
   if(modoEscaneo === 'entrega'){
     procesarEscaneoEntrega(sku);
+  }else if(modoEscaneo === 'buscarProducto'){
+    cerrarHoja();
+    if(DB.buscar(sku)) abrirProducto(sku);
+    else brindis('No hay ningún producto con el código '+sku);
   }else if(modoEscaneo === 'producto'){
     const productoExistente=DB.buscar(sku);
     const datosProducto={...productoPendiente, codigoBarras:sku};
@@ -1903,6 +1939,7 @@ async function aplicarAbono(id){
    PRODUCTOS
    ============================================================ */
 $('#filtroProd').addEventListener('input', pintarProductos);
+$('#btnBuscarProductoCamara').addEventListener('click', escanearProductoDesdeLista);
 $('#btnNuevoProd').addEventListener('click', ()=>abrirFormularioProducto());
 
 function abrirFormularioProducto(p = null){
