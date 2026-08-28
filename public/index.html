@@ -760,6 +760,8 @@ const DB = {
   async agregarProducto(p){
     if(this.modo==='firebase'){
       const {f,bd}=this.fb; await f.setDoc(f.doc(bd,'productos',p.sku), p);
+      this.productos = [...this.productos.filter(item=>item.sku!==p.sku), p];
+      pintarTodo();
     }else{
       this.productos.push(p); caja.guardar('gp_productos',this.productos); pintarTodo();
     }
@@ -911,12 +913,15 @@ const DB = {
   },
 
   buscar(codigo){
-    const clave = String(codigo??'').replace(/\s+/g,'').toUpperCase();
+    const clave = normalizarCodigo(codigo);
     return this.productos.find(p=>
-      String(p.sku||'').replace(/\s+/g,'').toUpperCase()===clave ||
-      String(p.codigoBarras||'').replace(/\s+/g,'').toUpperCase()===clave);
+      normalizarCodigo(p.sku)===clave || normalizarCodigo(p.codigoBarras)===clave);
   }
 };
+
+function normalizarCodigo(codigo){
+  return String(codigo??'').replace(/^\](?:C1|E[0-9A-Z]|d[0-9A-Z])/, '').replace(/\s+/g,'').toUpperCase();
+}
 
 function vendedoresActuales(){
   return DB.modo==='firebase' ? (DB.vendedores||[]) : caja.leer('gp_vendedores', CFG.vendedores.slice());
@@ -1228,7 +1233,7 @@ function cicloLectura(){
 function procesarCodigoLeido(valor){
   if(!leyendo || !valor) return;
   if(navigator.vibrate) navigator.vibrate(60);
-  const sku = String(valor).trim();
+  const sku = normalizarCodigo(valor);
   apagarCamara();
   if(modoEscaneo === 'entrega'){
     procesarEscaneoEntrega(sku);
@@ -1890,7 +1895,7 @@ function abrirFormularioProducto(p = null){
 }
 
 async function guardarProducto(skuOriginal = ''){
-  const codigoBarras = $('#pBarras').value.trim();
+  const codigoBarras = normalizarCodigo($('#pBarras').value);
   const sku = ($('#pSku')?.value.trim() || codigoBarras).toUpperCase();
   const nombre = $('#pNombre').value.trim();
   if(!sku || !nombre){ brindis('El código y el nombre son obligatorios'); return; }
@@ -1902,7 +1907,7 @@ async function guardarProducto(skuOriginal = ''){
 
   const existe = DB.buscar(sku);
   const barrasOcupadas = DB.productos.find(p=>producto.codigoBarras &&
-    String(p.codigoBarras||'').trim().toUpperCase()===producto.codigoBarras.toUpperCase() &&
+    normalizarCodigo(p.codigoBarras)===normalizarCodigo(producto.codigoBarras) &&
     String(p.sku||'').toUpperCase()!==(skuOriginal||'').toUpperCase());
   if(barrasOcupadas){ brindis('Ya existe un producto con ese código de barras'); return; }
   if(skuOriginal){
