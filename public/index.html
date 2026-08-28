@@ -374,15 +374,9 @@ button{cursor:pointer;border:none;background:none}
     <select id="selVendedor" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;font-family:var(--dato)"></select>
   </div>
 
-  <div class="rotulo" style="margin-top:22px">Registrar venta</div>
-  <div class="fila">
-    <button class="btn ambar" id="btnCamCreditoQr">Escanear QR</button>
-    <button class="btn plano" id="btnCamCreditoBarra">Escanear barras</button>
-  </div>
-  <div class="rotulo" style="margin-top:18px">Entrega y devolución</div>
-  <div class="fila">
-    <button class="btn ambar" id="btnCamEntregaQr">Escanear QR</button>
-    <button class="btn plano" id="btnCamEntregaBarra">Escanear barras</button>
+  <div style="margin-top:10px" class="fila">
+    <button class="btn ambar" id="btnCam">Escanear crédito</button>
+    <button class="btn plano" id="btnCamEntrega">Escanear entrega y devolución</button>
   </div>
 
   <div class="rotulo">Buscar sin escanear</div>
@@ -1005,10 +999,8 @@ function inicializarVendedorActual(){
 }
 
 $('#selVendedor').addEventListener('change', (e)=>aplicarVendedorActual(e.target.value));
-$('#btnCamCreditoQr').addEventListener('click', ()=>iniciarEscaneo('credito','qr'));
-$('#btnCamCreditoBarra').addEventListener('click', ()=>iniciarEscaneo('credito','barra'));
-$('#btnCamEntregaQr').addEventListener('click', ()=>iniciarEscaneo('entrega','qr'));
-$('#btnCamEntregaBarra').addEventListener('click', ()=>iniciarEscaneo('entrega','barra'));
+$('#btnCam').addEventListener('click', ()=>seleccionarTipoEscaneo('credito'));
+$('#btnCamEntrega').addEventListener('click', ()=>seleccionarTipoEscaneo('entrega'));
 document.addEventListener('click', e=>{
   if(e.target.matches('.btn-linterna')) alternarLinterna(e.target);
 });
@@ -1139,8 +1131,7 @@ function esperarVideoParaLeer(video){
   setTimeout(()=>esperarVideoParaLeer(video),100);
 }
 function botonEscaneo(modo,tipo){
-  if(modo==='credito') return $(tipo==='qr'?'#btnCamCreditoQr':'#btnCamCreditoBarra');
-  return $(tipo==='qr'?'#btnCamEntregaQr':'#btnCamEntregaBarra');
+  return modo==='credito' ? $('#btnCam') : $('#btnCamEntrega');
 }
 async function abrirCamaraCompatible(){
   if(!navigator.mediaDevices?.getUserMedia) throw new Error('Cámara no disponible');
@@ -1190,11 +1181,10 @@ function apagarCamara(){
   if($('#videoProducto')){ $('#videoProducto').pause(); $('#videoProducto').srcObject=null; }
   actualizarControlLinterna(false);
   $('#reticula').hidden=true; $('#apagado').hidden=false;
-  $$('#btnCamCreditoQr,#btnCamCreditoBarra,#btnCamEntregaQr,#btnCamEntregaBarra').forEach(btn=>{
-    btn.textContent='Escanear '+(btn.id.includes('Barra')?'barras':'QR');
-    btn.classList.toggle('ambar',btn.id.includes('Qr'));
-    btn.classList.toggle('plano',btn.id.includes('Barra'));
-  });
+  $('#btnCam').textContent='Escanear crédito';
+  $('#btnCam').classList.add('ambar'); $('#btnCam').classList.remove('plano');
+  $('#btnCamEntrega').textContent='Escanear entrega y devolución';
+  $('#btnCamEntrega').classList.add('plano'); $('#btnCamEntrega').classList.remove('ambar');
 }
 function leerQR(cx,ancho,alto){
   if(typeof jsQR!=='function') return '';

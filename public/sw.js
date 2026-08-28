@@ -1,6 +1,6 @@
 /* Service worker: guarda la app en el teléfono para que abra sin internet.
    Sube el número de versión cada vez que cambies index.html. */
-const VERSION = 'gp-ventas-v28';
+const VERSION = 'gp-ventas-v29';
 const BASICOS = [
   './',
   './index.html',
