@@ -1871,8 +1871,10 @@ function bindSwipeVenta(card){
       e.stopPropagation();
       return;
     }
+    const id = card.dataset.id;
     const sku = card.dataset.sku;
-    if(sku) fichaProducto(DB.buscar(sku));
+    if(id) detalleVenta(id);
+    else if(sku) fichaProducto(DB.buscar(sku));
   });
 }
 
@@ -1944,7 +1946,12 @@ function pintarVentas(){
 
   const todas = ventasFiltradas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
   $('#listaVentas').innerHTML = todas.length ? todas.map(v=>`
-    <div class="item" onclick="detalleVenta('${v.id}')">
+    <div class="product-swipe venta-swipe" data-id="${esc(v.id)}">
+      <div class="swipe-actions">
+        <button class="btn-contado" type="button" onclick="detalleVenta('${esc(v.id)}')">Actualizar</button>
+        <button class="btn-credito" type="button" onclick="eliminarRegistroVenta('${esc(v.id)}')">Eliminar</button>
+      </div>
+      <div class="swipe-content item">
       <div class="cont" style="min-width:0; flex:1;">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:7px;">
           <div style="min-width:0;"><h4 style="margin:0;">${esc(v.cliente)}</h4>
@@ -1962,8 +1969,16 @@ function pintarVentas(){
         <span class="marbete ${v.tipo==='contado'?'m-verde':v.estado==='pagada'?'m-verde':'m-ambar'}">
           ${v.tipo==='contado'?'Contado':v.estado==='pagada'?'Crédito saldado':`${v.plazo} meses`}</span>
       </div>
+      </div>
     </div>`).join('')
   : `<div class="vacio"><b>Sin ventas registradas</b>Escanea un producto para registrar la primera.</div>`;
+  $('#listaVentas').querySelectorAll('.venta-swipe').forEach(bindSwipeVenta);
+}
+
+async function eliminarRegistroVenta(id){
+  const venta=DB.ventas.find(v=>v.id===id); if(!venta)return;
+  if(!confirm(`¿Eliminar la venta de "${venta.cliente}"? Esta acción no se puede deshacer.`))return;
+  await DB.eliminarVenta(id); cerrarHoja(); brindis('Venta eliminada');
 }
 
 function detalleVenta(id){
