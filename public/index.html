@@ -1805,14 +1805,23 @@ function pintarVentas(){
   const todas = ventasFiltradas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
   $('#listaVentas').innerHTML = todas.length ? todas.map(v=>`
     <div class="item" onclick="detalleVenta('${v.id}')">
-      <div class="cont" style="position:relative; min-width:0;">
-        <div style="position:absolute; right:0; top:0; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">${fechaCompleta(v.fecha)}</div>
-        <h4 style="margin-right:100px;">${esc(v.cliente)}</h4>
-        <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase; margin:4px 0 6px;">${esc(v.producto)}</div>
-        <div class="meta">${esc(v.vendedor)} · ${esc(v.tipo==='contado'?'Contado':'Crédito')}</div>
+      <div class="cont" style="min-width:0; flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:7px;">
+          <div style="min-width:0;"><h4 style="margin:0;">${esc(v.cliente)}</h4>
+            <div style="font-family:var(--dato); font-size:11px; color:var(--tinta-2); margin-top:2px;">${esc(v.sku)}</div>
+          </div>
+          <div style="flex:none; text-align:right; font-family:var(--display); font-size:18px; font-weight:800; white-space:nowrap;">${money(v.total)}
+            <small style="display:block; margin-top:2px; font-family:var(--dato); font-size:9px; font-weight:500; color:var(--tinta-3);">${esc(v.tipo==='contado'?'Contado':'Crédito')}</small>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+          <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase;">${esc(v.producto)}</div>
+          <div style="font-size:10px; color:var(--tinta-3); white-space:nowrap;">${fechaCompleta(v.fecha)}</div>
+        </div>
+        <div class="meta" style="line-height:1.5;">${esc(v.vendedor)} · ${v.cantidad||1} unidad${(v.cantidad||1)!==1?'es':''}</div>
         <span class="marbete ${v.tipo==='contado'?'m-verde':v.estado==='pagada'?'m-verde':'m-ambar'}">
-          ${v.tipo==='contado'?'Contado':v.estado==='pagada'?'Crédito saldado':`${v.plazo} meses`}</span></div>
-      <div class="val">${money(v.total)}<small>${esc(v.vendedor)}</small></div>
+          ${v.tipo==='contado'?'Contado':v.estado==='pagada'?'Crédito saldado':`${v.plazo} meses`}</span>
+      </div>
     </div>`).join('')
   : `<div class="vacio"><b>Sin ventas registradas</b>Escanea un producto para registrar la primera.</div>`;
 }
@@ -1894,13 +1903,22 @@ function pintarCartera(){
         <button class="btn-credito" type="button" onclick="marcarCreditoPagado('${v.id}')">Pagado</button>
       </div>
       <div class="swipe-content item" onclick="formAbono('${v.id}')">
-        <div class="cont" style="position:relative; min-width:0;">
-          <div style="position:absolute; right:0; top:0; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">${fechaCompleta(v.fecha)}</div>
-          <h4 style="margin-right:100px;">${esc(v.cliente)}</h4>
-          <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase; margin:4px 0 6px;">${esc(v.producto)}</div>
-          <div class="meta">${esc(v.vendedor)} · ${pagadas}/${v.plazo} cuotas</div>
-          <span class="marbete ${mora?'m-rojo':'m-verde'}">${mora?'Vencida desde '+fecha(prox.vence):'Próxima '+fecha(prox.vence)}</span></div>
-        <div class="val">${money(v.saldo)}<small>${money(v.cuotaMensual)}/mes</small></div>
+        <div class="cont" style="min-width:0; flex:1;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:7px;">
+            <div style="min-width:0;"><h4 style="margin:0;">${esc(v.cliente)}</h4>
+              <div style="font-family:var(--dato); font-size:11px; color:var(--tinta-2); margin-top:2px;">${esc(v.sku)}</div>
+            </div>
+            <div style="flex:none; text-align:right; font-family:var(--display); font-size:18px; font-weight:800; white-space:nowrap;">${money(v.saldo)}
+              <small style="display:block; margin-top:2px; font-family:var(--dato); font-size:9px; font-weight:500; color:var(--tinta-3);">${money(v.cuotaMensual)}/mes</small>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+            <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase;">${esc(v.producto)}</div>
+            <div style="font-size:10px; color:var(--tinta-3); white-space:nowrap;">${fechaCompleta(v.fecha)}</div>
+          </div>
+          <div class="meta" style="line-height:1.5;">${esc(v.vendedor)} · ${pagadas}/${v.plazo} cuotas</div>
+          <span class="marbete ${mora?'m-rojo':'m-verde'}">${mora?'Vencida desde '+fecha(prox.vence):'Próxima '+fecha(prox.vence)}</span>
+        </div>
       </div>
     </div>`;}).join('')
   : `<div class="vacio"><b>No hay créditos abiertos</b>Las ventas a plazo aparecerán aquí para su cobro.</div>`;
