@@ -1071,7 +1071,12 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
       detectorBarras = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf']});
       }catch(e){ detectorBarras = null; }
     }
-    if(!detectorBarras) lectorBarras = new ZXingBrowser.BrowserMultiFormatReader();
+    if(!detectorBarras){
+      await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
+      await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
+      if(!window.ZXingBrowser?.BrowserMultiFormatReader) throw new Error('Lector de barras no disponible');
+      lectorBarras = new ZXingBrowser.BrowserMultiFormatReader();
+    }
   }
   if(modo==='entrega' && !entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
   if(modo==='entrega' && entregaActual.items.length){
@@ -1079,10 +1084,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
   }
   if(flujo){ apagarCamara(); return; }
   try{
-    flujo = await navigator.mediaDevices.getUserMedia({video:{
-      facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720},
-      focusMode:{ideal:'continuous'}
-    }});
+    flujo = await abrirCamaraCompatible();
     if(modo==='producto' && sesion!==sesionProducto){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; return; }
     const v=$('#videoProducto')||$('#video'); v.srcObject=flujo;
     const pista=flujo.getVideoTracks()[0];
@@ -1118,6 +1120,17 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
       abrirFormularioProducto(productoPendiente);
       productoPendiente=null;
     }
+  }
+}
+async function abrirCamaraCompatible(){
+  if(!navigator.mediaDevices?.getUserMedia) throw new Error('Cámara no disponible');
+  try{
+    return await navigator.mediaDevices.getUserMedia({video:{
+      facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720},
+      focusMode:{ideal:'continuous'}
+    }});
+  }catch(e){
+    return navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
   }
 }
 function actualizarControlLinterna(disponible){
