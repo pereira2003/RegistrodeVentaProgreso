@@ -2605,7 +2605,7 @@ function descargarTablaPDF(titulo,columnas,filas,nombre){
   const encabezados=columnas.map(c=>`<th>${esc(c)}</th>`).join('');
   const cuerpo=filas.map(f=>`<tr>${f.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('');
   ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(nombre)}</title>
-    <style>body{font-family:Arial,sans-serif;color:#222;margin:24px}h1{font-size:20px;margin:0 0 16px}table{border-collapse:collapse;width:100%;font-size:10px}th{background:#e7ddce;text-align:left}th,td{border:1px solid #bbb;padding:6px;vertical-align:top}tr:nth-child(even){background:#f7f5f1}@media print{body{margin:10mm}h1{font-size:16px}table{font-size:8px}}</style></head>
+    <style>@page{margin:10mm}body{font-family:Arial,sans-serif;color:#222;margin:24px}h1{font-size:20px;margin:0 0 16px}table{border-collapse:collapse;width:100%;font-size:10px}th{background:#e7ddce;text-align:left}th,td{border:1px solid #bbb;padding:6px;vertical-align:top}tr:nth-child(even){background:#f7f5f1}@media print{body{margin:0}h1{font-size:16px}table{font-size:8px}}</style></head>
     <body><h1>${esc(titulo)}</h1><table><thead><tr>${encabezados}</tr></thead><tbody>${cuerpo}</tbody></table>
     <script>window.onload=function(){window.print();};<\/script></body></html>`);
   ventana.document.close();
@@ -2634,8 +2634,8 @@ $('#btnPdfVentas').addEventListener('click',()=>{
 $('#btnPdfEntregas').addEventListener('click',()=>{
   const tipo=$('#filtroEntregasTipo').value, valor=$('#filtroEntregasFecha').value;
   const entregas=(DB.entregas||[]).filter(e=>coincidePeriodo(e.fecha,tipo,valor));
-  descargarTablaPDF('Entregas y devoluciones', ['Fecha','Vendedor','Zona','Productos entregados','Productos devueltos'], entregas.map(e=>[
-    e.fecha,e.vendor,e.zona||'',(e.entregados||[]).map(i=>`${i.nombre} x${i.cantidad||1}`).join(', '),(e.devueltos||[]).map(i=>`${i.nombre} x${i.cantidad||1}`).join(', ')
+  descargarTablaPDF('Entregas y devoluciones', ['Fecha','Hora entrega','Hora devolución','Vendedor','Zona','Productos entregados','Productos devueltos'], entregas.map(e=>[
+    e.fecha,hora(e.entregaCreado || e.creado || e.fecha),hora(e.devolucionCreado || ((e.devueltos||[]).length ? (e.creado || e.fecha) : null)),e.vendor,e.zona||'',(e.entregados||[]).map(i=>`${i.nombre} x${i.cantidad||1}`).join(', '),(e.devueltos||[]).map(i=>`${i.nombre} x${i.cantidad||1}`).join(', ')
   ]),'entregas');
 });
 
