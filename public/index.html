@@ -1092,7 +1092,9 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
       pista.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
     }
     actualizarControlLinterna(capacidades.torch === true);
-    await v.play();
+    v.muted=true;
+    v.setAttribute('playsinline','');
+    v.play().catch(()=>{});
     $('#visor').classList.add('encendida');
     $('#apagado').hidden=true; $('#reticula').hidden=false;
     const btn = modo === 'producto' ? null : modo === 'entrega' ? $('#btnCamEntrega') : $('#btnCam');
@@ -1109,9 +1111,10 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
         if(resultado && leyendo) procesarCodigoLeido(resultado.getText());
       });
     }else{
-      requestAnimationFrame(cicloLectura);
+      esperarVideoParaLeer(v);
     }
   }catch(e){
+    if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
     $('#apagado').innerHTML = '<b>No se pudo abrir la cámara</b>La página necesita HTTPS y permiso de cámara. Mientras tanto, escribe el código del producto abajo.';
     $('#visor').classList.remove('encendida');
     $('#apagado').hidden=false;
@@ -1120,6 +1123,14 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
       productoPendiente=null;
     }
   }
+}
+function esperarVideoParaLeer(video){
+  if(!leyendo) return;
+  if(video.readyState>=video.HAVE_CURRENT_DATA && video.videoWidth){
+    requestAnimationFrame(cicloLectura);
+    return;
+  }
+  setTimeout(()=>esperarVideoParaLeer(video),100);
 }
 async function abrirCamaraCompatible(){
   if(!navigator.mediaDevices?.getUserMedia) throw new Error('Cámara no disponible');
