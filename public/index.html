@@ -664,6 +664,7 @@ const DB = {
       bd = f.initializeFirestore(app,{localCache:f.persistentLocalCache({tabManager:f.persistentMultipleTabManager()})});
     }catch(e){ bd = f.getFirestore(app); }
     this.fb = {f, bd};
+    await this.migrarDatosLocales();
     f.onSnapshot(f.collection(bd,'productos'), s=>{
       this.productos = s.docs.map(d=>({id:d.id,...d.data()}));
       if(!this.productos.length){
@@ -685,6 +686,23 @@ const DB = {
       if(!this.vendedores.length) this.sembrarVendedores();
       pintarTodo();
     });
+  },
+
+  async migrarDatosLocales(){
+    const {f,bd}=this.fb;
+    const migrarColeccion = async (nombre, filas, idDe) => {
+      if(!filas?.length) return;
+      const snap = await f.getDocs(f.collection(bd,nombre));
+      const existentes = new Set(snap.docs.map(doc=>doc.id));
+      for(const fila of filas){
+        const id = idDe(fila);
+        if(id && !existentes.has(id)) await f.setDoc(f.doc(bd,nombre,id), fila);
+      }
+    };
+    await migrarColeccion('productos', caja.leer('gp_productos', []), p=>String(p.sku||'').trim().toUpperCase());
+    await migrarColeccion('ventas', caja.leer('gp_ventas', []), v=>String(v.id||'').trim());
+    await migrarColeccion('entregas', caja.leer('gp_entregas', []), e=>String(e.creado||'').trim());
+    await migrarColeccion('vendedores', caja.leer('gp_vendedores', CFG.vendedores.slice()), v=>v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'));
   },
 
   async sembrar(lista=SEMILLA){ for(const p of lista) await this.agregarProducto(p); },
