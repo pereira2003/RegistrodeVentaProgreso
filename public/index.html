@@ -2321,15 +2321,19 @@ function pintarEntregas(){
               <div style="font-family:var(--dato); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:6px">Vendedor</div>
               <h4 style="margin:0">${esc(e.vendor)}</h4>
             </div>
-            <div class="val" style="margin:0; display:block; text-align:right;">${totalEnt}<small>entregados</small></div>
+            <div class="val" style="margin:0; display:block; text-align:right;">${totalEnt}<small>entregados</small>
+              <div style="margin-top:7px; font-size:10px; line-height:1.5; color:var(--tinta-3); font-family:var(--dato); font-weight:400;">
+                Entrega: ${fechaCompleta(e.fecha)}<br>
+                Devolución: ${fechaCompleta(e.fecha)}
+              </div>
+            </div>
           </div>
           <div style="margin-top:6px; padding:10px 12px; border:1px solid rgba(85,125,115,.18); border-radius:8px; background:rgba(226,239,235,.35)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
               <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Entrega</div>
-              <div style="font-size:10px; color:var(--tinta-3);">${fechaCompleta(e.fecha)}</div>
+              <div style="font-size:10px; color:var(--tinta-3);">${fechaHora(e.creado || e.fecha)}</div>
             </div>
             <div class="meta">${entregados || '—'}</div>
-            <div style="margin-top:6px; font-size:10px; color:var(--tinta-3); font-family:var(--dato);">${fechaHora(e.creado || e.fecha)}</div>
           </div>
           <div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(216,194,164,.35); border-radius:8px; background:rgba(247,243,233,.6)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
