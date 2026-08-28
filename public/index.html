@@ -1799,7 +1799,7 @@ function pintarVentas(){
   $('#porVendedor').innerHTML = orden.length ? orden.map(([n,m])=>`
     <div class="item" style="padding:11px 12px"><div class="cont"><h4>${esc(n)}</h4>
       <div class="meta">${ventasFiltradas.filter(v=>v.vendedor===n).length} ventas en el filtro</div></div>
-      <div class="val">${money(m)}</div></div>`).join('')
+      <div class="val">${money(m)}<small>Total vendido</small></div></div>`).join('')
   : `<div class="vacio" style="padding:20px"><b>Todavía no hay ventas este mes</b></div>`;
 
   const todas = ventasFiltradas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
