@@ -394,10 +394,11 @@ button{cursor:pointer;border:none;background:none}
     <input id="filtroEntregasFecha" type="month" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
   </div>
   <button class="btn plano chico" id="btnLimpiarEntregas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
-  <div class="rotulo">Vendedores</div>
-  <button class="btn plano chico" id="btnGestionVendedores" style="width:100%;margin-bottom:14px">Gestionar vendedores</button>
-  <div class="rotulo">Zonas</div>
-  <button class="btn plano chico" id="btnGestionZonas" style="width:100%;margin-bottom:14px">Gestionar zonas</button>
+  <div class="rotulo">Administrar</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px">
+    <button class="btn plano chico" id="btnGestionVendedores" style="width:100%;margin:0">Gestionar vendedores</button>
+    <button class="btn plano chico" id="btnGestionZonas" style="width:100%;margin:0">Gestionar zonas</button>
+  </div>
   <div class="rotulo">Entregas y devoluciones</div>
   <button class="btn plano chico" id="btnPdfEntregas" style="width:100%;margin-bottom:10px">Descargar PDF</button>
   <div class="cifras" id="resumenEntregas"></div>
