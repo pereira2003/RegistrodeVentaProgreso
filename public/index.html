@@ -939,7 +939,7 @@ $('#velo').addEventListener('click',cerrarHoja);
 /* ============================================================
    ESCÁNER
    ============================================================ */
-let flujo=null, leyendo=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo='credito';
+let flujo=null, leyendo=false, leyendoFrame=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo='credito';
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
@@ -1057,9 +1057,17 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
   }
   if(flujo){ apagarCamara(); return; }
   try{
-    flujo = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+    flujo = await navigator.mediaDevices.getUserMedia({video:{
+      facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720},
+      focusMode:{ideal:'continuous'}
+    }});
     if(modo==='producto' && sesion!==sesionProducto){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; return; }
     const v=$('#videoProducto')||$('#video'); v.srcObject=flujo;
+    const pista=flujo.getVideoTracks()[0];
+    const capacidades=pista?.getCapabilities?.() || {};
+    if(capacidades.focusMode?.includes('continuous')){
+      pista.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
+    }
     if(!(tipoCodigo==='barra' && !detectorBarras)) await v.play();
     $('#visor').classList.add('encendida');
     $('#apagado').hidden=true; $('#reticula').hidden=false;
@@ -1090,6 +1098,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
 }
 function apagarCamara(){
   leyendo=false;
+  leyendoFrame=false;
   if(controlBarras){ controlBarras.stop(); controlBarras=null; }
   if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
   $('#visor').classList.remove('encendida');
@@ -1099,10 +1108,38 @@ function apagarCamara(){
   $('#btnCam').textContent='Escanear crédito'; $('#btnCam').classList.add('ambar'); $('#btnCam').classList.remove('plano');
   $('#btnCamEntrega').textContent='Escanear entrega y devolución'; $('#btnCamEntrega').classList.add('ambar'); $('#btnCamEntrega').classList.remove('plano');
 }
+function leerQR(cx,ancho,alto){
+  if(typeof jsQR!=='function') return '';
+  const probar=(datos,w,h,inversionAttempts='attemptBoth')=>{
+    const resultado=jsQR(datos,w,h,{inversionAttempts});
+    if(resultado?.data) return resultado.data;
+    return '';
+  };
+  const imagen=cx.getImageData(0,0,ancho,alto);
+  let valor=probar(imagen.data,ancho,alto,'attemptBoth');
+  if(valor) return valor;
+  const gris=new Uint8ClampedArray(imagen.data);
+  for(let i=0;i<gris.length;i+=4){
+    const tono=0.299*gris[i]+0.587*gris[i+1]+0.114*gris[i+2];
+    const contraste=Math.max(0,Math.min(255,(tono-128)*1.45+128));
+    gris[i]=gris[i+1]=gris[i+2]=contraste;
+  }
+  valor=probar(gris,ancho,alto,'attemptBoth');
+  if(valor) return valor;
+  const recorte=document.createElement('canvas');
+  const rw=Math.floor(ancho*.78), rh=Math.floor(alto*.78);
+  recorte.width=rw; recorte.height=rh;
+  const rx=Math.floor((ancho-rw)/2), ry=Math.floor((alto-rh)/2);
+  const rc=recorte.getContext('2d',{willReadFrequently:true});
+  rc.drawImage(cx.canvas,rx,ry,rw,rh,0,0,rw,rh);
+  const recortado=rc.getImageData(0,0,rw,rh);
+  return probar(recortado.data,rw,rh,'attemptBoth');
+}
 function cicloLectura(){
   if(!leyendo) return;
   const v=$('#video'), c=$('#lienzo');
-  if(v.readyState===v.HAVE_ENOUGH_DATA){
+  if(v.readyState===v.HAVE_ENOUGH_DATA && !leyendoFrame){
+    leyendoFrame=true;
     c.width=v.videoWidth; c.height=v.videoHeight;
     const cx=c.getContext('2d',{willReadFrequently:true});
     cx.drawImage(v,0,0,c.width,c.height);
@@ -1114,11 +1151,9 @@ function cicloLectura(){
           if(valor) return valor;
         }catch(e){}
       }
-      if(typeof jsQR!=='function') return '';
-      const img = cx.getImageData(0,0,c.width,c.height);
-      return jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'})?.data || '';
+      return leerQR(cx,c.width,c.height);
     })();
-    leer.then(procesarCodigoLeido).catch(()=>{});
+    leer.then(procesarCodigoLeido).catch(()=>{}).finally(()=>{leyendoFrame=false;});
   }
   requestAnimationFrame(cicloLectura);
 }
