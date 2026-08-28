@@ -1,10 +1,12 @@
 /* Service worker: guarda la app en el teléfono para que abra sin internet.
    Sube el número de versión cada vez que cambies index.html. */
-const VERSION = 'gp-ventas-v18';
+const VERSION = 'gp-ventas-v19';
 const BASICOS = [
   './',
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './icono-192.png',
+  './icono-512.png'
 ];
 
 self.addEventListener('install', e => {
