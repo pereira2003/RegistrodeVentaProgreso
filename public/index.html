@@ -845,7 +845,7 @@ let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
 let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
-const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [] };
+const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [], entregaCreado: null, devolucionCreado: null };
 let entregaEditando=null;
 
 function vendedorOptions(selected=''){
@@ -933,7 +933,6 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
   tipoCodigo = tipo;
   tipoVentaEscaneo = tipoVenta;
   if(modo !== 'producto'){
-    mostrarEstadoEscaneo('Escaneando producto', tipo === 'barra' ? 'Leyendo código de barras…' : 'Leyendo QR…');
   }
   if(tipoCodigo === 'barra' && !('BarcodeDetector' in window) && typeof ZXingBrowser === 'undefined'){
     $('#apagado').innerHTML = '<b>Lectura de barras no disponible</b>Usa Chrome o Edge actualizado en el celular, o escribe el código manualmente.';
@@ -1047,7 +1046,6 @@ function abrirProducto(sku, tipoVenta=null){
   }
   if(!recientes.find(r=>r.sku===p.sku)) recientes.unshift(p);
   recientes.splice(6); pintarRecientes();
-  mostrarEstadoEscaneo('Producto escaneado', `${p.nombre} · ${p.sku}`);
   if(tipoVenta) {
     setTimeout(()=>formVenta(p.sku, tipoVenta), 450);
   } else {
@@ -1186,7 +1184,9 @@ async function guardarEntrega(){
     entregados: (entregaActual.items||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     devueltos: (entregaActual.devueltos||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     fecha: fechaEntrega,
-    creado: entregaEditando || new Date().toISOString()
+    creado: entregaEditando || entregaActual.entregaCreado || new Date().toISOString(),
+    entregaCreado: entregaActual.entregaCreado || new Date().toISOString(),
+    devolucionCreado: entregaActual.devolucionCreado || null
   };
 
   if(entregaEditando){
@@ -1210,8 +1210,8 @@ async function guardarEntrega(){
       };
       actual.entregados = merge(actual.entregados, agregado.entregados);
       actual.devueltos = merge(actual.devueltos, agregado.devueltos);
-      actual.creado = new Date().toISOString();
       actual.zona = zona;
+      actual.devolucionCreado = agregado.devolucionCreado || actual.devolucionCreado || null;
     }else{
       registradas.push(agregado);
     }
@@ -1222,6 +1222,8 @@ async function guardarEntrega(){
   brindis(`Entrega guardada para ${vendedor}`);
   entregaActual.items = [];
   entregaActual.devueltos = [];
+  entregaActual.entregaCreado = null;
+  entregaActual.devolucionCreado = null;
   entregaEditando=null;
   cerrarHoja();
   pintarEntregas();
@@ -1235,6 +1237,8 @@ function editarEntrega(creado){
   entregaActual.zona=registro.zona||CFG.zonas[0]||'';
   entregaActual.items=(registro.entregados||[]).map(item=>({...item}));
   entregaActual.devueltos=(registro.devueltos||[]).map(item=>({...item}));
+  entregaActual.entregaCreado=registro.entregaCreado||registro.creado||null;
+  entregaActual.devolucionCreado=registro.devolucionCreado||((registro.devueltos||[]).length ? registro.creado : null);
   mostrarHojaEntrega();
 }
 
@@ -1248,7 +1252,6 @@ async function eliminarEntrega(creado){
 function procesarEscaneoEntrega(sku){
   const p = DB.buscar(sku);
   if(!p){ brindis('No hay ningún producto con el código '+sku); return; }
-  mostrarEstadoEscaneo('Producto registrado', `${p.nombre} · ${p.sku}`);
   if(!entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
   if(!entregaActual.zona && CFG.zonas.length) entregaActual.zona = CFG.zonas[0];
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
@@ -1264,6 +1267,7 @@ function procesarEscaneoEntrega(sku){
   const idxDev = entregaActual.devueltos.findIndex(item=>item.sku===p.sku);
   if(idxDev >= 0){
     entregaActual.devueltos[idxDev].cantidad=(entregaActual.devueltos[idxDev].cantidad||1)+1;
+    entregaActual.devolucionCreado = entregaActual.devolucionCreado || new Date().toISOString();
     brindis(`${p.nombre}: devolución ${entregaActual.devueltos[idxDev].cantidad}`);
     mostrarHojaEntrega();
     return;
@@ -1275,11 +1279,13 @@ function procesarEscaneoEntrega(sku){
     const item = listaGuardada[indiceGuardado];
     const dev = entregaActual.devueltos.find(x=>x.sku===p.sku);
     if(dev){ dev.cantidad = (dev.cantidad||1)+1; } else { entregaActual.devueltos.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 }); }
+    entregaActual.devolucionCreado = entregaActual.devolucionCreado || new Date().toISOString();
     brindis(`${p.nombre} quitado; no se registró como venta`);
     mostrarHojaEntrega();
     return;
   }
 
+  entregaActual.entregaCreado = entregaActual.entregaCreado || new Date().toISOString();
   entregaActual.items.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 });
   brindis(`${p.nombre} agregado a la entrega`);
   mostrarHojaEntrega();
@@ -2335,14 +2341,14 @@ function pintarEntregas(){
           <div style="margin-top:6px; padding:10px 12px; border:1px solid rgba(85,125,115,.18); border-radius:8px; background:rgba(226,239,235,.35)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
               <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Entrega</div>
-              <div style="font-size:10px; color:var(--tinta-3);">${hora(e.creado || e.fecha)}</div>
+              <div style="font-size:10px; color:var(--tinta-3);">${hora(e.entregaCreado || e.creado || e.fecha)}</div>
             </div>
             <div class="meta">${entregados || '—'}</div>
           </div>
           <div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(216,194,164,.35); border-radius:8px; background:rgba(247,243,233,.6)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
               <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Devolución</div>
-              <div style="font-size:10px; color:var(--tinta-3);">${hora((e.devueltos && e.devueltos.length) ? (e.creado || e.fecha) : e.fecha)}</div>
+              <div style="font-size:10px; color:var(--tinta-3);">${hora(e.devolucionCreado || ((e.devueltos && e.devueltos.length) ? (e.creado || e.fecha) : e.fecha))}</div>
             </div>
             <div class="meta">${devueltos || '—'}</div>
           </div>
@@ -2353,8 +2359,8 @@ function pintarEntregas(){
                 <div class="meta">${esc(e.zona||'Sin zona')}</div>
               </div>
               <div style="text-align:right; font-size:10px; line-height:1.7; color:var(--tinta-3); font-family:var(--dato);">
-                <div>Entrega: ${fechaCompleta(e.creado || e.fecha)}</div>
-                <div>Devolución: ${fechaCompleta(e.creado || e.fecha)}</div>
+                <div>Entrega: ${fechaCompleta(e.entregaCreado || e.creado || e.fecha)}</div>
+                <div>Devolución: ${fechaCompleta(e.devolucionCreado || e.creado || e.fecha)}</div>
               </div>
             </div>
           </div>
