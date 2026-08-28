@@ -923,6 +923,9 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
   modoEscaneo = modo;
   tipoCodigo = tipo;
   tipoVentaEscaneo = tipoVenta;
+  if(modo !== 'producto'){
+    mostrarEstadoEscaneo('Escaneando producto', tipo === 'barra' ? 'Leyendo código de barras…' : 'Leyendo QR…');
+  }
   if(tipoCodigo === 'barra' && !('BarcodeDetector' in window) && typeof ZXingBrowser === 'undefined'){
     $('#apagado').innerHTML = '<b>Lectura de barras no disponible</b>Usa Chrome o Edge actualizado en el celular, o escribe el código manualmente.';
     $('#apagado').hidden=false;
@@ -1229,6 +1232,7 @@ function editarEntrega(creado){
 function procesarEscaneoEntrega(sku){
   const p = DB.buscar(sku);
   if(!p){ brindis('No hay ningún producto con el código '+sku); return; }
+  mostrarEstadoEscaneo('Producto registrado', `${p.nombre} · ${p.sku}`);
   if(!entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
   if(!entregaActual.zona && CFG.zonas.length) entregaActual.zona = CFG.zonas[0];
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
