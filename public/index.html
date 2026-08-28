@@ -1746,14 +1746,21 @@ function pintarProductos(){
         <button class="btn-credito" type="button" onclick="confirmarEliminarProducto('${p.sku}')">Eliminar</button>
       </div>
       <div class="swipe-content item" aria-label="Producto ${esc(p.nombre)}" onclick="fichaProducto(DB.buscar('${p.sku}'))">
-        <div class="cont" style="position:relative; min-width:0;">
-          <div style="position:absolute; right:0; top:0; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">${fechaCompleta(hoy())}</div>
-          <h4 style="margin-right:100px;">${esc(p.nombre)}</h4>
-          <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase; margin:4px 0 6px;">${esc(p.categoria||'Sin categoría')}</div>
-          <div class="meta">${esc(p.sku)}${p.codigoBarras ? ' · Barras: '+esc(p.codigoBarras) : ''} · ${esc(p.marca||'')}</div>
+        <div class="cont" style="min-width:0; flex:1;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:7px;">
+            <h4 style="margin:0; min-width:0;">${esc(p.nombre)}</h4>
+            <div style="flex:none; text-align:right; font-family:var(--display); font-size:18px; font-weight:800; white-space:nowrap;">${money(p.contado)}
+              <small style="display:block; margin-top:2px; font-family:var(--dato); font-size:9px; font-weight:500; letter-spacing:.04em; color:var(--tinta-3);">${money(p.credito)} crédito</small>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px;">
+            <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase;">${esc(p.categoria||'Sin categoría')}</div>
+            <div style="font-size:10px; color:var(--tinta-3); white-space:nowrap;">${fechaCompleta(p.fecha || hoy())}</div>
+          </div>
+          <div class="meta" style="line-height:1.5;">${esc(p.sku)}${p.codigoBarras ? ' · Barras: '+esc(p.codigoBarras) : ''}<br>${esc(p.marca||'Sin marca')}</div>
           <span class="marbete ${p.stock>3?'m-verde':p.stock>0?'m-ambar':'m-rojo'}">
-            ${p.stock>0?p.stock+' en existencia':'Agotado'}</span></div>
-        <div class="val">${money(p.contado)}<small>${money(p.credito)} crédito</small></div>
+            ${p.stock>0?p.stock+' en existencia':'Agotado'}</span>
+        </div>
       </div>
     </div>`).join('')
   : `<div class="vacio"><b>Sin resultados</b>Prueba con otro nombre o código.</div>`;
