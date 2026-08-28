@@ -1388,10 +1388,6 @@ function formVenta(sku, tipo){
         <div class="campo"><label>Teléfono</label><input id="vTel" type="tel" placeholder="6000-0000"></div>
       </div>
       <div class="campo"><label>Dirección de entrega</label><input id="vDir" placeholder="Barrio, calle, referencia"></div>
-      <div class="campo" style="margin-bottom:0">
-        <label>Ubicación de la venta</label>
-        <div id="geoTxt" style="font-family:var(--dato);font-size:11px;color:var(--tinta-3);margin-top:6px">Detectando ubicación...</div>
-      </div>
     </div>
 
     <div class="rotulo">Registra a nombre de</div>
@@ -1412,7 +1408,6 @@ function formVenta(sku, tipo){
     <button class="btn plano" style="margin-top:8px" onclick="cerrarHoja()">Cancelar</button>
   `);
   calcular();
-  capturarUbicacion();
 }
 
 let _tipo = 'contado';
