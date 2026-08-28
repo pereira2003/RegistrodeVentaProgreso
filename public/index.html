@@ -48,6 +48,7 @@ body{
 }
 h1,h2,h3,h4{font-family:var(--display);margin:0;letter-spacing:-.015em;font-weight:700}
 button,input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
+.filtro-placeholder{color:#a9a39b}
 button{cursor:pointer;border:none;background:none}
 :focus-visible{outline:3px solid var(--rojo);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -393,8 +394,8 @@ button{cursor:pointer;border:none;background:none}
 <section class="vista" data-vista="entregas">
   <div class="rotulo">Filtrar entregas</div>
   <div class="fila" style="align-items:stretch;margin-bottom:8px">
-    <select id="filtroEntregasTipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
-      <option value="" disabled>Seleccione el filtro</option>
+    <select id="filtroEntregasTipo" class="filtro-placeholder" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+      <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
     </select>
     <div style="flex:1"><label id="etiquetaFiltroEntregasFecha" for="filtroEntregasFecha" style="display:block;font-size:11px;color:var(--tinta-3);margin-bottom:4px">Seleccione mes</label><input id="filtroEntregasFecha" type="month" aria-label="Seleccione mes" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
@@ -424,8 +425,8 @@ button{cursor:pointer;border:none;background:none}
 <section class="vista" data-vista="ventas">
   <div class="rotulo">Filtrar ventas</div>
   <div class="fila" style="align-items:stretch;margin-bottom:8px">
-    <select id="filtroVentasTipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
-      <option value="" disabled>Seleccione el filtro</option>
+    <select id="filtroVentasTipo" class="filtro-placeholder" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+      <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option>
       <option value="dia">Por día</option>
       <option value="año">Por año</option>
@@ -447,8 +448,8 @@ button{cursor:pointer;border:none;background:none}
 <section class="vista" data-vista="cartera">
   <div class="rotulo">Filtrar cartera</div>
   <div class="fila" style="align-items:stretch;margin-bottom:8px">
-    <select id="filtroCarteraTipo" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
-      <option value="" disabled>Seleccione el filtro</option>
+    <select id="filtroCarteraTipo" class="filtro-placeholder" style="flex:1;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
+      <option value="" disabled selected>Seleccione el filtro</option>
       <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
     </select>
     <div style="flex:1"><label id="etiquetaFiltroCarteraFecha" for="filtroCarteraFecha" style="display:block;font-size:11px;color:var(--tinta-3);margin-bottom:4px">Seleccione mes</label><input id="filtroCarteraFecha" type="month" aria-label="Seleccione mes" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff"></div>
@@ -2548,6 +2549,7 @@ $('#btnCsv').addEventListener('click',()=>{
 
 function configurarFiltroVentas(){
   const tipo = $('#filtroVentasTipo').value;
+  $('#filtroVentasTipo').classList.toggle('filtro-placeholder', !tipo);
   const campo = $('#filtroVentasFecha');
   const etiqueta = $('#etiquetaFiltroVentasFecha');
   if(tipo==='dia'){
@@ -2575,7 +2577,8 @@ $('#btnLimpiarVentas').addEventListener('click', async ()=>{
 });
 
 function configurarFiltroFecha(tipoId, fechaId, pintar){
-  const tipo=$('#'+tipoId).value, campo=$('#'+fechaId);
+  const selector=$('#'+tipoId), tipo=selector.value, campo=$('#'+fechaId);
+  selector.classList.toggle('filtro-placeholder', !tipo);
   const etiqueta=$('#etiqueta'+fechaId.charAt(0).toUpperCase()+fechaId.slice(1));
   if(tipo==='dia'){
     etiqueta.textContent='Seleccione día'; campo.setAttribute('aria-label','Seleccione día');
