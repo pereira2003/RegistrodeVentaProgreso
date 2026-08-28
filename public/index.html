@@ -124,6 +124,8 @@ button{cursor:pointer;border:none;background:none}
 @keyframes barre{0%,100%{top:6%}50%{top:94%}}
 .visor .apagado{color:#8F847A;font-size:13px;text-align:center;padding:24px;max-width:280px}
 .visor .apagado b{display:block;color:var(--papel);font-family:var(--display);font-size:16px;margin-bottom:6px}
+.btn-linterna{position:absolute;right:12px;bottom:12px;z-index:2;padding:9px 12px;border:1px solid rgba(255,255,255,.35);border-radius:999px;background:rgba(20,20,20,.72);color:#fff;font-size:12px;font-weight:600}
+.btn-linterna[aria-pressed="true"]{background:var(--arena);color:var(--tinta)}
 
 /* ---------- Botones ---------- */
 .btn{
@@ -360,6 +362,7 @@ button{cursor:pointer;border:none;background:none}
     <div class="reticula" id="reticula" hidden>
       <div class="marco"><i></i><i></i><i></i><i></i><div class="barrido"></div></div>
     </div>
+    <button class="btn-linterna" id="btnLinterna" type="button" hidden aria-pressed="false">Activar linterna</button>
     <div class="apagado" id="apagado">
       <b>Listo para escanear</b>
       Elige QR o código de barras, activa la cámara y apunta al código del producto.
@@ -953,6 +956,8 @@ $('#velo').addEventListener('click',cerrarHoja);
    ESCÁNER
    ============================================================ */
 let flujo=null, leyendo=false, leyendoFrame=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo='credito';
+let linternaActiva=false;
+const intervaloLectura=80, maxDimensionLectura=960;
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
@@ -990,6 +995,9 @@ function inicializarVendedorActual(){
 $('#selVendedor').addEventListener('change', (e)=>aplicarVendedorActual(e.target.value));
 $('#btnCam').addEventListener('click', async ()=>{ iniciarEscaneo('credito'); });
 $('#btnCamEntrega').addEventListener('click', async ()=>{ iniciarEscaneo('entrega'); });
+document.addEventListener('click', e=>{
+  if(e.target.matches('.btn-linterna')) alternarLinterna(e.target);
+});
 
 function escanearBarrasProducto(){
   productoPendiente = {
@@ -1006,6 +1014,7 @@ function escanearBarrasProducto(){
     <div class="visor encendida" style="margin:0;border-radius:14px;min-height:260px">
       <video id="videoProducto" playsinline muted></video>
       <div class="reticula"><div class="marco"><i></i><i></i><i></i><i></i><div class="barrido"></div></div></div>
+      <button class="btn-linterna" id="btnLinternaProducto" type="button" hidden aria-pressed="false">Activar linterna</button>
     </div>
     <div class="aviso" style="margin-top:12px">Apunta la cámara al código del producto (QR o barras).</div>
     <button class="btn plano" style="margin-top:10px" type="button" onclick="cancelarEscaneoProducto()">Detener cámara</button>`);
@@ -1081,6 +1090,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     if(capacidades.focusMode?.includes('continuous')){
       pista.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
     }
+    actualizarControlLinterna(capacidades.torch === true);
     if(!(tipoCodigo==='barra' && !detectorBarras)) await v.play();
     $('#visor').classList.add('encendida');
     $('#apagado').hidden=true; $('#reticula').hidden=false;
@@ -1092,6 +1102,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
       otro.classList.add('ambar'); otro.classList.remove('plano');
     }
     leyendo=true;
+    ultimo=0;
     if(tipoCodigo==='barra' && !detectorBarras){
       controlBarras = await lectorBarras.decodeFromVideoElement(v, (resultado, error) => {
         if(resultado && leyendo) procesarCodigoLeido(resultado.getText());
@@ -1109,14 +1120,39 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     }
   }
 }
+function actualizarControlLinterna(disponible){
+  $$('.btn-linterna').forEach(btn=>{
+    btn.hidden=!disponible;
+    btn.textContent='Activar linterna';
+    btn.setAttribute('aria-pressed','false');
+  });
+  linternaActiva=false;
+}
+async function alternarLinterna(btn){
+  const pista=flujo?.getVideoTracks?.()[0];
+  if(!pista) return;
+  const activar=btn.getAttribute('aria-pressed')!=='true';
+  try{
+    await pista.applyConstraints({advanced:[{torch:activar}]});
+    linternaActiva=activar;
+    $$('.btn-linterna').forEach(control=>{
+      control.setAttribute('aria-pressed',String(activar));
+      control.textContent=activar?'Apagar linterna':'Activar linterna';
+    });
+  }catch(e){
+    brindis('La linterna no está disponible en este dispositivo');
+  }
+}
 function apagarCamara(){
   leyendo=false;
   leyendoFrame=false;
+  linternaActiva=false;
   if(controlBarras){ controlBarras.stop(); controlBarras=null; }
   if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
   $('#visor').classList.remove('encendida');
   if($('#video')) $('#video').srcObject=null;
   if($('#videoProducto')){ $('#videoProducto').pause(); $('#videoProducto').srcObject=null; }
+  actualizarControlLinterna(false);
   $('#reticula').hidden=true; $('#apagado').hidden=false;
   $('#btnCam').textContent='Escanear crédito'; $('#btnCam').classList.add('ambar'); $('#btnCam').classList.remove('plano');
   $('#btnCamEntrega').textContent='Escanear entrega y devolución'; $('#btnCamEntrega').classList.add('ambar'); $('#btnCamEntrega').classList.remove('plano');
@@ -1151,9 +1187,14 @@ function leerQR(cx,ancho,alto){
 function cicloLectura(){
   if(!leyendo) return;
   const v=$('#video'), c=$('#lienzo');
+  const ahora=performance.now();
+  if(ahora-ultimo<intervaloLectura){ requestAnimationFrame(cicloLectura); return; }
   if(v.readyState===v.HAVE_ENOUGH_DATA && !leyendoFrame){
     leyendoFrame=true;
-    c.width=v.videoWidth; c.height=v.videoHeight;
+    ultimo=ahora;
+    const escala=Math.min(1,maxDimensionLectura/v.videoWidth);
+    c.width=Math.max(1,Math.floor(v.videoWidth*escala));
+    c.height=Math.max(1,Math.floor(v.videoHeight*escala));
     const cx=c.getContext('2d',{willReadFrequently:true});
     cx.drawImage(v,0,0,c.width,c.height);
     const leer = (async()=>{
@@ -1179,7 +1220,7 @@ function procesarCodigoLeido(valor){
     procesarEscaneoEntrega(sku);
   }else if(modoEscaneo === 'producto'){
     cerrarHoja();
-    abrirFormularioProducto({...productoPendiente, codigoBarras:sku});
+    abrirFormularioProducto({...productoPendiente, sku:productoPendiente.sku || sku, codigoBarras:sku});
     productoPendiente=null;
   }else{
     abrirProducto(sku, tipoVentaEscaneo);
@@ -1835,12 +1876,13 @@ function abrirFormularioProducto(p = null){
 }
 
 async function guardarProducto(skuOriginal = ''){
-  const sku = $('#pSku').value.trim().toUpperCase();
+  const codigoBarras = $('#pBarras').value.trim();
+  const sku = ($('#pSku').value.trim() || codigoBarras).toUpperCase();
   const nombre = $('#pNombre').value.trim();
   if(!sku || !nombre){ brindis('El código y el nombre son obligatorios'); return; }
 
   const producto = {
-    sku, codigoBarras:$('#pBarras').value.trim(), nombre, color:$('#pColor').value.trim(), marca:$('#pMarca').value.trim(), categoria:$('#pCat').value,
+    sku, codigoBarras, nombre, color:$('#pColor').value.trim(), marca:$('#pMarca').value.trim(), categoria:$('#pCat').value,
     contado:+$('#pContado').value||0, credito:+$('#pCredito').value||0, stock:+$('#pStock').value||0
   };
 
