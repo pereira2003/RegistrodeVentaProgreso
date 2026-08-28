@@ -825,6 +825,7 @@ window.addEventListener('online', ()=> sello(DB.modo==='firebase'?'Firebase':'Mo
 $$('.barra button').forEach(b=>b.addEventListener('click',()=>{
   $$('.barra button').forEach(x=>x.classList.remove('on'));
   b.classList.add('on');
+  caja.guardar('gp_vista', b.dataset.ir);
   $$('.vista').forEach(v=>v.classList.toggle('activa', v.dataset.vista===b.dataset.ir));
   window.scrollTo(0,0);
   if(b.dataset.ir==='etiquetas') pintarEtiquetas();
@@ -2425,6 +2426,9 @@ function sucursalActual(){
 }
 
 inicializarVendedorActual();
+const vistaGuardada = caja.leer('gp_vista','escanear');
+const botonVistaGuardada = $(`.barra button[data-ir="${vistaGuardada}"]`) || $('.barra button[data-ir="escanear"]');
+botonVistaGuardada?.click();
 DB.iniciar();
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
