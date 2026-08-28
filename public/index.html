@@ -524,11 +524,14 @@ button{cursor:pointer;border:none;background:none}
 const CFG = {
   // Pega aquí el objeto de configuración de tu proyecto Firebase.
   // Si lo dejas en null, la app guarda todo en el mismo teléfono (modo prueba).
-  firebase: null,
-  /* firebase: {
-       apiKey:"...", authDomain:"...", projectId:"...",
-       storageBucket:"...", messagingSenderId:"...", appId:"..."
-     }, */
+  firebase: {
+    apiKey:"AIzaSyCnXrbH59q6m5FKe9Hh0uYxPhJeQs47TKM",
+    authDomain:"registro-ventas-progreso-2026.firebaseapp.com",
+    projectId:"registro-ventas-progreso-2026",
+    storageBucket:"registro-ventas-progreso-2026.firebasestorage.app",
+    messagingSenderId:"468215141946",
+    appId:"1:468215141946:web:4aedbe1525eb0974018703"
+  },
   // Sucursales. Si dejas la lista vacía, la app no pregunta por sucursal.
   // Cuando escribas las tuyas, aparece un campo para elegirla al registrar la venta.
   sucursales: [],
@@ -652,7 +655,10 @@ const DB = {
     const base = 'https://www.gstatic.com/firebasejs/10.12.2/';
     const {initializeApp} = await import(base+'firebase-app.js');
     const f = await import(base+'firebase-firestore.js');
+    const a = await import(base+'firebase-auth.js');
     const app = initializeApp(CFG.firebase);
+    const auth = a.getAuth(app);
+    await a.signInAnonymously(auth);
     let bd;
     try{
       bd = f.initializeFirestore(app,{localCache:f.persistentLocalCache({tabManager:f.persistentMultipleTabManager()})});
@@ -660,7 +666,10 @@ const DB = {
     this.fb = {f, bd};
     f.onSnapshot(f.collection(bd,'productos'), s=>{
       this.productos = s.docs.map(d=>({id:d.id,...d.data()}));
-      if(!this.productos.length) this.sembrar();
+      if(!this.productos.length){
+        const locales = caja.leer('gp_productos', null);
+        this.sembrar(locales?.length ? locales : SEMILLA);
+      }
       pintarTodo();
     });
     f.onSnapshot(f.collection(bd,'ventas'), s=>{
@@ -678,7 +687,7 @@ const DB = {
     });
   },
 
-  async sembrar(){ for(const p of SEMILLA) await this.agregarProducto(p); },
+  async sembrar(lista=SEMILLA){ for(const p of lista) await this.agregarProducto(p); },
 
   async agregarProducto(p){
     if(this.modo==='firebase'){

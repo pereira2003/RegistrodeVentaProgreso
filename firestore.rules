@@ -27,29 +27,14 @@ service cloud.firestore {
       allow write: if esAdmin();
     }
 
-    // Catálogo: todo empleado autenticado lo lee.
-    // El vendedor solo puede tocar la existencia (al vender); el admin edita todo.
+    // Catálogo compartido: los dispositivos autenticados anónimamente sincronizan el catálogo.
     match /productos/{sku} {
-      allow read: if autenticado();
-      allow create, delete: if esAdmin();
-      allow update: if esAdmin() ||
-        (autenticado() &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']));
+      allow read, write: if autenticado();
     }
 
-    // Ventas: se crean con el vendedor autenticado y ya no se borran.
-    // Solo se permite actualizar los campos de cobro.
+    // Ventas compartidas entre los dispositivos del equipo.
     match /ventas/{id} {
-      allow read: if autenticado();
-      allow create: if autenticado()
-        && request.resource.data.cliente is string
-        && request.resource.data.cliente.size() > 0
-        && request.resource.data.total is number;
-      allow update: if esAdmin() ||
-        (autenticado() &&
-         request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['cuotas','saldo','estado','abonos']));
-      allow delete: if false;
+      allow read, write: if autenticado();
     }
 
     // Vendedores y entregas se sincronizan entre los dispositivos del equipo.
