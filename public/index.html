@@ -2665,14 +2665,15 @@ $('#btnLimpiarCartera').addEventListener('click',async()=>{
   catch(e){ errorOperacion(e); }
 });
 
-function descargarTablaPDF(titulo,columnas,filas,nombre){
+function descargarTablaPDF(titulo,columnas,filas,nombre,filasResumen=[]){
   if(!filas.length){brindis('No hay información para descargar');return;}
   const ventana=window.open('','_blank'); if(!ventana){brindis('Permite las ventanas emergentes para descargar el PDF');return;}
   const generado = fechaHora(new Date().toISOString());
   const encabezados=columnas.map(c=>`<th>${esc(c)}</th>`).join('');
-  const cuerpo=filas.map(f=>`<tr>${f.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('');
+  const cuerpo=filas.map(f=>`<tr>${f.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')+
+    filasResumen.map(f=>`<tr class="resumen">${f.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('');
   ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(nombre)}</title>
-    <style>@page{margin:10mm}body{font-family:Arial,sans-serif;color:#222;margin:24px;position:relative}.generado{position:absolute;top:0;right:0;font-size:10px;color:#666}h1{font-size:20px;margin:0 0 16px;padding-top:4px}table{border-collapse:collapse;width:100%;font-size:10px}th{background:#e7ddce;text-align:left}th,td{border:1px solid #bbb;padding:6px;vertical-align:top}tr:nth-child(even){background:#f7f5f1}@media print{body{margin:0}.generado{font-size:8px}h1{font-size:16px}table{font-size:8px}}</style></head>
+    <style>@page{margin:10mm}body{font-family:Arial,sans-serif;color:#222;margin:24px;position:relative}.generado{position:absolute;top:0;right:0;font-size:10px;color:#666}h1{font-size:20px;margin:0 0 16px;padding-top:4px}table{border-collapse:collapse;width:100%;font-size:10px}th{background:#e7ddce;text-align:left}th,td{border:1px solid #bbb;padding:6px;vertical-align:top}tr:nth-child(even){background:#f7f5f1}.resumen{font-weight:bold;background:#e2efeb!important}.resumen td{border-top:2px solid #557d73}@media print{body{margin:0}.generado{font-size:8px}h1{font-size:16px}table{font-size:8px}}</style></head>
     <body><div class="generado">Generado: ${esc(generado)}</div><h1>${esc(titulo)}</h1><table><thead><tr>${encabezados}</tr></thead><tbody>${cuerpo}</tbody></table>
     <script>window.onload=function(){window.print();};<\/script></body></html>`);
   ventana.document.close();
@@ -2695,15 +2696,25 @@ $('#btnPdfVentas').addEventListener('click',()=>{
   const ventas=ventasParaFiltro();
   descargarTablaPDF('Ventas', ['Fecha','Código','Producto','Cliente','Documento','Teléfono','Tipo','Cantidad','Precio unitario','Total','Prima','Saldo','Plazo','Vendedor','Sucursal'], ventas.map(v=>[
     v.fecha,v.sku,v.producto,v.cliente,v.documento||'',v.telefono||'',v.tipo,v.cantidad||1,money(v.precioUnitario),money(v.total),money(v.prima),money(v.saldo),v.plazo||'',v.vendedor||'',v.sucursal||''
-  ]),'ventas');
+  ]),'ventas', [['TOTAL GENERAL','','','','','','','','',money(ventas.reduce((s,v)=>s+(Number(v.total)||0),0)),'','','','','']]);
 });
 
 $('#btnPdfEntregas').addEventListener('click',()=>{
   const tipo=$('#filtroEntregasTipo').value, valor=$('#filtroEntregasFecha').value;
   const entregas=(DB.entregas||[]).filter(e=>coincidePeriodo(e.fecha,tipo,valor));
+  const ventasPorVendedor=new Map();
+  entregas.forEach(e=>{
+    const entregado=(e.entregados||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
+    const devuelto=(e.devueltos||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
+    ventasPorVendedor.set(e.vendor,(ventasPorVendedor.get(e.vendor)||0)+entregado-devuelto);
+  });
+  const resumenVendedores=[['VENTAS POR VENDEDOR','','','','','', '']];
+  ventasPorVendedor.forEach((total,vendedor)=>resumenVendedores.push([vendedor,'','','','','',money(total)]));
+  const totalVendedores=[...ventasPorVendedor.values()].reduce((s,total)=>s+total,0);
+  resumenVendedores.push(['TOTAL GENERAL VENDEDORES','','','','','',money(totalVendedores)]);
   descargarTablaPDF('Entregas y devoluciones', ['Fecha','Hora entrega','Hora devolución','Vendedor','Zona','Productos entregados','Productos devueltos'], entregas.map(e=>[
     e.fecha,hora(e.entregaCreado || e.creado || e.fecha),hora(e.devolucionCreado || ((e.devueltos||[]).length ? (e.creado || e.fecha) : null)),e.vendor,e.zona||'',(e.entregados||[]).map(i=>`${i.nombre} x${i.cantidad||1}`).join(', '),(e.devueltos||[]).map(i=>`${i.nombre} x${i.cantidad||1}`).join(', ')
-  ]),'entregas');
+  ]),'entregas',resumenVendedores);
 });
 
 $('#btnPdfCartera').addEventListener('click',()=>{
