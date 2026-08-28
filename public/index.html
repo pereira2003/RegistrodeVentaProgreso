@@ -711,10 +711,6 @@ const DB = {
     await this.migrarDatosLocales();
     f.onSnapshot(f.collection(bd,'productos'), s=>{
       this.productos = s.docs.map(d=>({id:d.id,...d.data()}));
-      if(!this.productos.length){
-        const locales = caja.leer('gp_productos', null);
-        this.sembrar(locales?.length ? locales : SEMILLA);
-      }
       pintarTodo();
       ocultarCargaInicial();
     });
@@ -750,7 +746,6 @@ const DB = {
         if(id && !existentes.has(id)) await f.setDoc(f.doc(bd,nombre,id), documento);
       }
     };
-    await migrarColeccion('productos', caja.leer('gp_productos', []), p=>String(p.sku||'').trim().toUpperCase());
     await migrarColeccion('ventas', caja.leer('gp_ventas', []), v=>String(v.id||'').trim());
     await migrarColeccion('entregas', caja.leer('gp_entregas', []), e=>String(e.creado||'').trim());
     await migrarColeccion('vendedores', caja.leer('gp_vendedores', CFG.vendedores.slice()), v=>v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'));
