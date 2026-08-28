@@ -2334,20 +2334,14 @@ function pintarEntregas(){
           <div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(216,194,164,.35); border-radius:8px; background:rgba(247,243,233,.6)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
               <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Devolución</div>
-              <div style="font-size:10px; color:var(--tinta-3);">${totalDev || 0} unidades</div>
+              <div style="font-size:10px; color:var(--tinta-3);">${fechaHora((e.devueltos && e.devueltos.length) ? (e.creado || e.fecha) : e.fecha)}</div>
             </div>
             <div class="meta">${devueltos || '—'}</div>
-            <div style="margin-top:6px; font-size:10px; color:var(--tinta-3); font-family:var(--dato);">${fechaHora((e.devueltos && e.devueltos.length) ? (e.creado || e.fecha) : e.fecha)}</div>
+            <div style="margin-top:6px; font-size:10px; color:var(--tinta-3); font-family:var(--dato);">${totalDev || 0} unidades</div>
           </div>
-          <div style="margin-top:14px; padding-top:10px; border-top:1px solid rgba(44,44,44,.12); display:flex; justify-content:space-between; align-items:center; gap:8px;">
-            <div>
-              <div style="font-family:var(--dato); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:4px">Zona</div>
-              <div class="meta">${esc(e.zona||'Sin zona')}</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-family:var(--dato); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:4px">Fecha</div>
-              <div class="meta">${fechaHora(e.creado || e.fecha)}</div>
-            </div>
+          <div style="margin-top:14px; padding-top:10px; border-top:1px solid rgba(44,44,44,.12);">
+            <div style="font-family:var(--dato); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:4px">Zona</div>
+            <div class="meta">${esc(e.zona||'Sin zona')}</div>
           </div>
         </div>
       </div>
