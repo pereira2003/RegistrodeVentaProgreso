@@ -396,6 +396,8 @@ button{cursor:pointer;border:none;background:none}
   <button class="btn plano chico" id="btnLimpiarEntregas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Vendedores</div>
   <button class="btn plano chico" id="btnGestionVendedores" style="width:100%;margin-bottom:14px">Gestionar vendedores</button>
+  <div class="rotulo">Zonas</div>
+  <button class="btn plano chico" id="btnGestionZonas" style="width:100%;margin-bottom:14px">Gestionar zonas</button>
   <div class="rotulo">Entregas y devoluciones</div>
   <button class="btn plano chico" id="btnPdfEntregas" style="width:100%;margin-bottom:10px">Descargar PDF</button>
   <div class="cifras" id="resumenEntregas"></div>
@@ -661,7 +663,7 @@ const SEMILLA = [
 ];
 
 const DB = {
-  modo:'local', productos:[], ventas:[], entregas:[], vendedores:[], fb:null,
+  modo:'local', productos:[], ventas:[], entregas:[], vendedores:[], zonas:[], fb:null,
 
   async iniciar(){
     if(CFG.firebase){
@@ -672,9 +674,11 @@ const DB = {
     this.ventas    = caja.leer('gp_ventas', []);
     this.entregas  = caja.leer('gp_entregas', []);
     this.vendedores = caja.leer('gp_vendedores', CFG.vendedores.slice());
+    this.zonas      = caja.leer('gp_zonas', CFG.zonas.slice());
     caja.guardar('gp_productos', this.productos);
     caja.guardar('gp_entregas', this.entregas);
     caja.guardar('gp_vendedores', this.vendedores);
+    caja.guardar('gp_zonas', this.zonas);
     sello('Modo prueba','local');
     pintarTodo();
     ocultarCargaInicial();
@@ -716,6 +720,11 @@ const DB = {
       if(!this.vendedores.length) this.sembrarVendedores();
       pintarTodo();
     });
+    f.onSnapshot(f.collection(bd,'zonas'), s=>{
+      this.zonas = s.docs.map(d=>d.data().nombre).filter(Boolean);
+      if(!this.zonas.length) this.sembrarZonas();
+      pintarTodo();
+    });
   },
 
   async migrarDatosLocales(){
@@ -733,6 +742,7 @@ const DB = {
     await migrarColeccion('ventas', caja.leer('gp_ventas', []), v=>String(v.id||'').trim());
     await migrarColeccion('entregas', caja.leer('gp_entregas', []), e=>String(e.creado||'').trim());
     await migrarColeccion('vendedores', caja.leer('gp_vendedores', CFG.vendedores.slice()), v=>v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'));
+    await migrarColeccion('zonas', caja.leer('gp_zonas', CFG.zonas.slice()), z=>z.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'));
   },
 
   async sembrar(lista=SEMILLA){ for(const p of lista) await this.agregarProducto(p); },
@@ -746,6 +756,8 @@ const DB = {
   },
 
   async sembrarVendedores(){ for(const nombre of CFG.vendedores) await this.guardarVendedor(nombre); },
+
+  async sembrarZonas(){ for(const nombre of CFG.zonas) await this.guardarZona(nombre); },
 
   async guardarVendedor(nombre, anterior=''){
     const id = nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-');
@@ -764,6 +776,25 @@ const DB = {
     if(this.modo==='firebase'){
       const {f,bd}=this.fb; const id=nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'); await f.deleteDoc(f.doc(bd,'vendedores',id));
     }else{ this.vendedores=this.vendedores.filter(v=>v!==nombre); caja.guardar('gp_vendedores',this.vendedores); pintarTodo(); }
+  },
+
+  async guardarZona(nombre, anterior=''){
+    const id = nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-');
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb;
+      if(anterior && anterior!==nombre) await f.deleteDoc(f.doc(bd,'zonas',anterior.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-')));
+      await f.setDoc(f.doc(bd,'zonas',id),{nombre});
+    }else{
+      const lista=this.zonas.length?this.zonas:CFG.zonas.slice();
+      const i=anterior?lista.indexOf(anterior):-1; if(i>=0) lista[i]=nombre; else lista.push(nombre);
+      this.zonas=lista; caja.guardar('gp_zonas',lista); pintarTodo();
+    }
+  },
+
+  async eliminarZona(nombre){
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; const id=nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'); await f.deleteDoc(f.doc(bd,'zonas',id));
+    }else{ this.zonas=this.zonas.filter(z=>z!==nombre); caja.guardar('gp_zonas',this.zonas); pintarTodo(); }
   },
 
   async guardarEntrega(e){
@@ -865,6 +896,9 @@ const DB = {
 
 function vendedoresActuales(){
   return DB.modo==='firebase' ? (DB.vendedores||[]) : caja.leer('gp_vendedores', CFG.vendedores.slice());
+}
+function zonasActuales(){
+  return DB.modo==='firebase' ? (DB.zonas||[]) : caja.leer('gp_zonas', CFG.zonas.slice());
 }
 
 function sello(txt,tipo){
@@ -1161,9 +1195,50 @@ async function eliminarVendedor(indice){
   await DB.eliminarVendedor(nombre); gestionarVendedores(); brindis('Vendedor eliminado');
 }
 
+function gestionarZonas(){
+  const zonas=zonasActuales();
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Gestionar zonas</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="tarjeta pad">
+      <div class="campo" style="margin-bottom:8px"><label>Nueva zona</label>
+        <input id="nuevaZona" placeholder="Nombre de la zona"></div>
+      <button class="btn ambar" onclick="agregarZona()">Agregar zona</button>
+    </div>
+    <div class="rotulo">Zonas registradas</div>
+    <div id="listaZonas">${zonas.length ? zonas.map((z,i)=>`
+      <div class="item" style="padding:10px 12px">
+        <div class="cont"><h4>${esc(z)}</h4></div>
+        <div style="display:flex;gap:6px"><button class="btn chico" onclick="editarZona(${i})">Actualizar</button>
+          <button class="btn plano chico" onclick="eliminarZona(${i})">Eliminar</button></div>
+      </div>`).join('') : '<div class="vacio"><b>No hay zonas</b>Agrega la primera.</div>'}</div>`);
+}
+
+async function agregarZona(){
+  const nombre=$('#nuevaZona').value.trim(); if(!nombre){brindis('Escribe el nombre de la zona');return;}
+  const lista=zonasActuales();
+  if(lista.some(z=>z.toLowerCase()===nombre.toLowerCase())){brindis('Esa zona ya existe');return;}
+  await DB.guardarZona(nombre); gestionarZonas(); brindis('Zona agregada');
+}
+
+async function editarZona(indice){
+  const lista=zonasActuales(), anterior=lista[indice]; if(!anterior)return;
+  const nombre=prompt('Nuevo nombre de la zona',anterior)?.trim(); if(!nombre||nombre===anterior)return;
+  if(lista.some((z,i)=>i!==indice&&z.toLowerCase()===nombre.toLowerCase())){brindis('Esa zona ya existe');return;}
+  if(entregaActual.zona===anterior) entregaActual.zona=nombre;
+  await DB.guardarZona(nombre,anterior); gestionarZonas(); brindis('Zona actualizada');
+}
+
+async function eliminarZona(indice){
+  const lista=zonasActuales(), nombre=lista[indice]; if(!nombre)return;
+  if(!confirm(`¿Eliminar la zona "${nombre}"?`))return;
+  lista.splice(indice,1); if(entregaActual.zona===nombre) entregaActual.zona=lista[0]||'';
+  await DB.eliminarZona(nombre); gestionarZonas(); brindis('Zona eliminada');
+}
+
 function mostrarHojaEntrega(){
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || '';
-  const zona = entregaActual.zona || CFG.zonas[0] || '';
+  const zonas = zonasActuales();
+  const zona = entregaActual.zona || zonas[0] || '';
   const items = entregaActual.items || [];
   const devueltos = entregaActual.devueltos || [];
   abrirHoja(`
@@ -1179,7 +1254,7 @@ function mostrarHojaEntrega(){
         <div class="campo" style="margin-bottom:0">
           <label>Zona</label>
           <select id="entregaZona" onchange="entregaActual.zona=this.value; mostrarHojaEntrega()">
-            ${CFG.zonas.map(z=>`<option value="${esc(z)}" ${z===zona?'selected':''}>${esc(z)}</option>`).join('')}
+            ${zonas.map(z=>`<option value="${esc(z)}" ${z===zona?'selected':''}>${esc(z)}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -1236,7 +1311,7 @@ function ajustarCantidadEntrega(tipo,indice,cambio){
 
 async function guardarEntrega(){
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
-  const zona = entregaActual.zona || CFG.zonas[0] || 'Sin zona';
+  const zona = entregaActual.zona || zonasActuales()[0] || 'Sin zona';
   const fechaEntrega = hoy();
   if(!entregaActual.items.length && !entregaActual.devueltos.length){ brindis('Escanea al menos un producto antes de guardar'); return; }
   const registradas = (DB.entregas||[]);
@@ -1296,7 +1371,7 @@ function editarEntrega(creado){
   if(!registro) return;
   entregaEditando=registro.creado;
   entregaActual.vendor=registro.vendor||vendedoresActuales()[0]||'';
-  entregaActual.zona=registro.zona||CFG.zonas[0]||'';
+  entregaActual.zona=registro.zona||zonasActuales()[0]||'';
   entregaActual.items=(registro.entregados||[]).map(item=>({...item}));
   entregaActual.devueltos=(registro.devueltos||[]).map(item=>({...item}));
   entregaActual.entregaCreado=registro.entregaCreado||registro.creado||null;
@@ -1315,7 +1390,7 @@ function procesarEscaneoEntrega(sku){
   const p = DB.buscar(sku);
   if(!p){ brindis('No hay ningún producto con el código '+sku); return; }
   if(!entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
-  if(!entregaActual.zona && CFG.zonas.length) entregaActual.zona = CFG.zonas[0];
+  if(!entregaActual.zona && zonasActuales().length) entregaActual.zona = zonasActuales()[0];
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
 
   const idxActual = entregaActual.items.findIndex(item=>item.sku===p.sku);
@@ -2331,6 +2406,7 @@ function configurarFiltroFecha(tipoId, fechaId, pintar){
 $('#filtroEntregasTipo').addEventListener('change',()=>configurarFiltroFecha('filtroEntregasTipo','filtroEntregasFecha',pintarEntregas));
 $('#filtroEntregasFecha').addEventListener('input',pintarEntregas);
 $('#btnGestionVendedores').addEventListener('click',gestionarVendedores);
+$('#btnGestionZonas').addEventListener('click',gestionarZonas);
 $('#filtroCarteraTipo').addEventListener('change',()=>configurarFiltroFecha('filtroCarteraTipo','filtroCarteraFecha',pintarCartera));
 $('#filtroCarteraFecha').addEventListener('input',pintarCartera);
 $('#btnLimpiarEntregas').addEventListener('click',async()=>{

@@ -42,6 +42,10 @@ service cloud.firestore {
       allow read, write: if autenticado();
     }
 
+    match /zonas/{id} {
+      allow read, write: if autenticado();
+    }
+
     match /entregas/{id} {
       allow read, write: if autenticado();
     }
