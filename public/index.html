@@ -823,6 +823,18 @@ const DB = {
     }
     else{ this.entregas=[]; caja.guardar('gp_entregas',this.entregas); pintarTodo(); }
   },
+    async eliminarEntrega(creado){
+      if(this.modo==='firebase'){
+        const {f,bd}=this.fb;
+        await f.deleteDoc(f.doc(bd,'entregas',creado));
+        this.entregas=(this.entregas||[]).filter(item=>item.creado!==creado);
+        pintarTodo();
+      }else{
+        this.entregas=(this.entregas||[]).filter(item=>item.creado!==creado);
+        caja.guardar('gp_entregas',this.entregas);
+        pintarTodo();
+      }
+    },
 
   async actualizarProducto(p, skuAnterior=''){
     if(this.modo==='firebase'){
@@ -961,7 +973,7 @@ $('#velo').addEventListener('click',cerrarHoja);
 /* ============================================================
    ESCÁNER
    ============================================================ */
-let flujo=null, leyendo=false, leyendoFrame=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo='credito';
+let flujo=null, leyendo=false, leyendoFrame=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo='credito', sesionEscaneo=0;
 let linternaActiva=false;
 const intervaloLectura=80, maxDimensionLectura=960;
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
@@ -1056,6 +1068,7 @@ function seleccionarFormaVenta(modo, tipo){
 }
 
 async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
+    const sesionActual=++sesionEscaneo;
   modoEscaneo = modo;
   tipoCodigo = tipo;
   tipoVentaEscaneo = tipoVenta;
@@ -1104,7 +1117,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     ultimo=0;
     if(tipoCodigo==='barra'){
       controlBarras=lectorBarras.decodeFromStream(flujo, v, (resultado, error) => {
-        if(resultado && leyendo) procesarCodigoLeido(resultado.getText());
+        if(resultado && leyendo && sesionActual===sesionEscaneo) procesarCodigoLeido(resultado.getText(),sesionActual);
       }).catch(()=>{
         if(leyendo) brindis('No se pudo iniciar el lector de barras. Mantén el código dentro del marco.');
       });
@@ -1168,6 +1181,7 @@ async function alternarLinterna(btn){
   }
 }
 function apagarCamara(){
+  sesionEscaneo++;
   leyendo=false;
   leyendoFrame=false;
   linternaActiva=false;
@@ -1215,6 +1229,7 @@ function leerQR(cx,ancho,alto){
 }
 function cicloLectura(){
   if(!leyendo) return;
+  const sesionActual=sesionEscaneo;
   const v=$('#video'), c=$('#lienzo');
   const ahora=performance.now();
   if(ahora-ultimo<intervaloLectura){ requestAnimationFrame(cicloLectura); return; }
@@ -1229,12 +1244,12 @@ function cicloLectura(){
     const leer = (async()=>{
       return leerQR(cx,c.width,c.height);
     })();
-    leer.then(procesarCodigoLeido).catch(()=>{}).finally(()=>{leyendoFrame=false;});
+    leer.then(valor=>procesarCodigoLeido(valor,sesionActual)).catch(()=>{}).finally(()=>{leyendoFrame=false;});
   }
   requestAnimationFrame(cicloLectura);
 }
-function procesarCodigoLeido(valor){
-  if(!leyendo || !valor) return;
+function procesarCodigoLeido(valor,sesionActual=sesionEscaneo){
+  if(!leyendo || sesionActual!==sesionEscaneo || !valor) return;
   if(navigator.vibrate) navigator.vibrate(60);
   const sku = normalizarCodigo(valor);
   apagarCamara();
@@ -1405,7 +1420,7 @@ function mostrarHojaEntrega(){
         </div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin devoluciones</b>Si escaneas el mismo producto otra vez, queda aquí.</div>`}
     <button class="btn ambar" style="margin-top:14px" onclick="guardarEntrega()">Guardar</button>
-    <button class="btn plano" style="margin-top:8px" onclick="cerrarHoja(); iniciarEscaneo('entrega')">Escaneo otro producto</button>
+    <button class="btn plano" style="margin-top:8px" onclick="cerrarHoja(); iniciarEscaneo('entrega', tipoCodigo)">Escaneo otro producto</button>
   `);
   $('#hojaCont').querySelectorAll('.entrega-item-swipe').forEach(bindSwipeEntrega);
 }
