@@ -374,9 +374,15 @@ button{cursor:pointer;border:none;background:none}
     <select id="selVendedor" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;font-family:var(--dato)"></select>
   </div>
 
-  <div style="margin-top:10px" class="fila">
-    <button class="btn ambar" id="btnCam">Escanear crédito</button>
-    <button class="btn plano" id="btnCamEntrega">Escanear entrega y devolución</button>
+  <div class="rotulo" style="margin-top:22px">Registrar venta</div>
+  <div class="fila">
+    <button class="btn ambar" id="btnCamCreditoQr">Escanear QR</button>
+    <button class="btn plano" id="btnCamCreditoBarra">Escanear barras</button>
+  </div>
+  <div class="rotulo" style="margin-top:18px">Entrega y devolución</div>
+  <div class="fila">
+    <button class="btn ambar" id="btnCamEntregaQr">Escanear QR</button>
+    <button class="btn plano" id="btnCamEntregaBarra">Escanear barras</button>
   </div>
 
   <div class="rotulo">Buscar sin escanear</div>
@@ -999,8 +1005,10 @@ function inicializarVendedorActual(){
 }
 
 $('#selVendedor').addEventListener('change', (e)=>aplicarVendedorActual(e.target.value));
-$('#btnCam').addEventListener('click', async ()=>{ iniciarEscaneo('credito'); });
-$('#btnCamEntrega').addEventListener('click', async ()=>{ iniciarEscaneo('entrega'); });
+$('#btnCamCreditoQr').addEventListener('click', ()=>iniciarEscaneo('credito','qr'));
+$('#btnCamCreditoBarra').addEventListener('click', ()=>iniciarEscaneo('credito','barra'));
+$('#btnCamEntregaQr').addEventListener('click', ()=>iniciarEscaneo('entrega','qr'));
+$('#btnCamEntregaBarra').addEventListener('click', ()=>iniciarEscaneo('entrega','barra'));
 document.addEventListener('click', e=>{
   if(e.target.matches('.btn-linterna')) alternarLinterna(e.target);
 });
@@ -1096,12 +1104,9 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     v.play().catch(()=>{});
     $('#visor').classList.add('encendida');
     $('#apagado').hidden=true; $('#reticula').hidden=false;
-    const btn = modo === 'producto' ? null : modo === 'entrega' ? $('#btnCamEntrega') : $('#btnCam');
-    const otro = modo === 'producto' ? null : modo === 'entrega' ? $('#btnCam') : $('#btnCamEntrega');
+    const btn = modo === 'producto' ? null : botonEscaneo(modo,tipoCodigo);
     if(btn){
       btn.textContent='Detener escaneo'; btn.classList.remove('ambar'); btn.classList.add('plano');
-      otro.textContent = otro.id === 'btnCam' ? 'Escanear crédito' : 'Escanear entrega y devolución';
-      otro.classList.add('ambar'); otro.classList.remove('plano');
     }
     leyendo=true;
     ultimo=0;
@@ -1132,6 +1137,10 @@ function esperarVideoParaLeer(video){
     return;
   }
   setTimeout(()=>esperarVideoParaLeer(video),100);
+}
+function botonEscaneo(modo,tipo){
+  if(modo==='credito') return $(tipo==='qr'?'#btnCamCreditoQr':'#btnCamCreditoBarra');
+  return $(tipo==='qr'?'#btnCamEntregaQr':'#btnCamEntregaBarra');
 }
 async function abrirCamaraCompatible(){
   if(!navigator.mediaDevices?.getUserMedia) throw new Error('Cámara no disponible');
@@ -1181,8 +1190,11 @@ function apagarCamara(){
   if($('#videoProducto')){ $('#videoProducto').pause(); $('#videoProducto').srcObject=null; }
   actualizarControlLinterna(false);
   $('#reticula').hidden=true; $('#apagado').hidden=false;
-  $('#btnCam').textContent='Escanear crédito'; $('#btnCam').classList.add('ambar'); $('#btnCam').classList.remove('plano');
-  $('#btnCamEntrega').textContent='Escanear entrega y devolución'; $('#btnCamEntrega').classList.add('ambar'); $('#btnCamEntrega').classList.remove('plano');
+  $$('#btnCamCreditoQr,#btnCamCreditoBarra,#btnCamEntregaQr,#btnCamEntregaBarra').forEach(btn=>{
+    btn.textContent='Escanear '+(btn.id.includes('Barra')?'barras':'QR');
+    btn.classList.toggle('ambar',btn.id.includes('Qr'));
+    btn.classList.toggle('plano',btn.id.includes('Barra'));
+  });
 }
 function leerQR(cx,ancho,alto){
   if(typeof jsQR!=='function') return '';
