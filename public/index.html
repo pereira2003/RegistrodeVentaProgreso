@@ -2817,12 +2817,13 @@ function descargarTablaPDF({documento,periodo='',resumen=[],columnas,grupos,tota
   const total=totalGeneral?fila(totalGeneral,' class="total-fila"'):'';
   const bandas=resumen.map(([k,v])=>`<span><strong>${esc(k)}</strong>${esc(v)}</span>`).join('');
   ventana.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(EMPRESA.nombre)} · ${esc(documento)}</title>
 <style>
   *{box-sizing:border-box}
   @page{margin:13mm 11mm}
-  html,body{margin:0;padding:0}
-  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#2B2723;font-size:10px;line-height:1.45;padding-bottom:14mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html,body{margin:0;padding:0;overflow-x:hidden;-webkit-text-size-adjust:100%}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#2B2723;font-size:10px;line-height:1.45;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .enc{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding-bottom:11px;border-bottom:2px solid #6B4A39}
   .enc .marca{display:flex;gap:11px;align-items:center}
   .enc .logo{width:40px;height:40px;flex:0 0 40px}
@@ -2834,6 +2835,7 @@ function descargarTablaPDF({documento,periodo='',resumen=[],columnas,grupos,tota
   .resumen-doc{display:flex;flex-wrap:wrap;gap:6px;margin:11px 0 14px}
   .resumen-doc span{display:inline-flex;flex-direction:column;gap:2px;background:#F4EEE5;border:1px solid #E3D6C3;border-radius:5px;padding:5px 10px;font-size:9px;font-weight:600;color:#2B2723}
   .resumen-doc strong{font-weight:700;font-size:7px;letter-spacing:.09em;text-transform:uppercase;color:#8A7F73}
+  .tabla-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
   table{width:100%;border-collapse:collapse}
   thead{display:table-header-group}
   thead th{background:#2B2723;color:#fff;font-size:7px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:7px 8px;text-align:left}
@@ -2846,9 +2848,27 @@ function descargarTablaPDF({documento,periodo='',resumen=[],columnas,grupos,tota
   .grupo-fila{break-after:avoid}
   .subtotal-fila td{background:#F6EFE4!important;font-weight:700;border-top:1.5px solid #C59B6D;border-bottom:1.5px solid #C59B6D}
   .total-fila td{background:#2B2723!important;color:#fff;font-weight:700;font-size:9px;border:none}
-  .pie{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:7px;color:#9A9088;border-top:1px solid #EAE4DC;background:#fff}
+  .acciones{display:none}
+  .pie{display:none}
+  @media screen{
+    body{padding:12px 12px 40px}
+    .acciones{position:sticky;top:0;z-index:5;display:flex;gap:8px;padding:10px 0;margin-bottom:6px;background:#fff}
+    .acciones button{flex:1;padding:12px 14px;border:none;border-radius:8px;background:#2B2723;color:#fff;font-size:12px;font-weight:700;cursor:pointer}
+    .acciones button.sec{background:#EFE7DB;color:#5A3F30}
+    .tabla-scroll{border:1px solid #EAE4DC;border-radius:6px}
+    table{min-width:${Math.max(560, columnas.length*90)}px}
+  }
+  @media print{
+    .tabla-scroll{overflow:visible}
+    body{padding-bottom:14mm}
+    .pie{display:flex;position:fixed;left:0;right:0;bottom:0;justify-content:space-between;gap:12px;padding:5px 0;font-size:7px;color:#9A9088;border-top:1px solid #EAE4DC;background:#fff}
+  }
 </style></head>
 <body>
+  <div class="acciones">
+    <button type="button" onclick="window.print()">Imprimir o guardar PDF</button>
+    <button type="button" class="sec" onclick="window.close()">Cerrar</button>
+  </div>
   <header class="enc">
     <div class="marca"><span class="logo">${LOGO_PDF}</span><span><span class="empresa">${esc(EMPRESA.nombre)}</span><br><span class="lema">${esc(EMPRESA.lema)}</span></span></div>
     <div class="meta">
@@ -2858,9 +2878,17 @@ function descargarTablaPDF({documento,periodo='',resumen=[],columnas,grupos,tota
     </div>
   </header>
   ${bandas?`<div class="resumen-doc">${bandas}</div>`:''}
-  <table><thead>${thead}</thead><tbody>${cuerpo}${total}</tbody></table>
+  <div class="tabla-scroll"><table><thead>${thead}</thead><tbody>${cuerpo}${total}</tbody></table></div>
   <footer class="pie"><span>${esc(EMPRESA.nombre)} — ${esc(EMPRESA.lema)}</span><span>${esc(generado)}</span></footer>
-  <script>window.onload=function(){window.print();};<\/script>
+  <script>
+    window.onload=function(){
+      try{
+        if(window.matchMedia && window.matchMedia('(hover:hover) and (pointer:fine)').matches){
+          setTimeout(function(){ window.print(); }, 400);
+        }
+      }catch(e){}
+    };
+  <\/script>
 </body></html>`);
   ventana.document.close();
 }
