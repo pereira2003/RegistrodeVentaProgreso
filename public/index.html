@@ -285,8 +285,9 @@ button{cursor:pointer;border:none;background:none}
 .velo.abierto{display:block}
 .hoja{
   position:fixed;left:0;right:0;bottom:0;z-index:61;background:var(--fondo);
-  border-top:1px solid var(--suave);max-height:92vh;overflow-y:auto;display:none;
-  overflow-x:hidden;
+  border-top:1px solid var(--suave);max-height:92vh;max-height:92dvh;
+  overflow-y:auto;overflow-x:hidden;display:none;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
   padding:0 14px calc(22px + env(safe-area-inset-bottom));
   animation:sube .2s cubic-bezier(.2,.8,.3,1);
 }
@@ -327,7 +328,7 @@ button{cursor:pointer;border:none;background:none}
 .barra button.on{color:var(--tinta);background:var(--rojo-claro)}
 
 /* ---------- Etiquetas imprimibles ---------- */
-.sel-lista{max-height:280px;overflow-y:auto;margin:0 -4px}
+.sel-lista{max-height:280px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin:0 -4px}
 .sel-fila{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--suave)}
 .sel-fila:last-child{border-bottom:0}
 .sel-fila input{width:20px;height:20px;flex:0 0 auto;accent-color:var(--rojo)}
@@ -1546,11 +1547,20 @@ function cambiarVendedorEntrega(vendedor){
 }
 
 function bindSwipeEntrega(card){
-  const cont=card.querySelector('.swipe-content'); let inicio=0,actual=0,arrastrando=false,frame=0,pendiente=0;
+  const cont=card.querySelector('.swipe-content'); let inicio=0,inicioY=0,actual=0,arrastrando=false,intencion=0,frame=0,pendiente=0;
   const mover=x=>{pendiente=x;if(frame)return;frame=requestAnimationFrame(()=>{frame=0;const offset=Math.max(Math.min(pendiente,0),-174);cont.style.transform=`translate3d(${offset}px,0,0)`;card.classList.toggle('open',offset<=-60);cont.classList.toggle('open',offset<=-60);});};
-  cont.addEventListener('pointerdown',e=>{inicio=actual=e.clientX;arrastrando=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);});
-  cont.addEventListener('pointermove',e=>{if(arrastrando&&e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}}, {passive:true});
-  const terminar=()=>{if(!arrastrando)return;mover(actual-inicio<=-60?-174:0);arrastrando=false;cont.classList.remove('arrastrando');};
+  cont.addEventListener('pointerdown',e=>{inicio=actual=e.clientX;inicioY=e.clientY;arrastrando=false;intencion=0;});
+  cont.addEventListener('pointermove',e=>{
+    if(intencion===-1)return;
+    const dx=e.clientX-inicio, dy=e.clientY-inicioY;
+    if(intencion===0){
+      if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
+      if(Math.abs(dx)>Math.abs(dy)+2){intencion=1;arrastrando=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);}
+      else{intencion=-1;return;}
+    }
+    if(arrastrando&&e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}
+  }, {passive:true});
+  const terminar=()=>{if(!arrastrando){intencion=0;return;}mover(actual-inicio<=-60?-174:0);arrastrando=false;intencion=0;cont.classList.remove('arrastrando');};
   cont.addEventListener('pointerup',terminar);cont.addEventListener('pointercancel',terminar);
   cont.addEventListener('click',e=>{if(cont.classList.contains('open')){mover(0);e.preventDefault();}});
 }
@@ -2093,20 +2103,33 @@ function bindSwipeVenta(card){
     });
   };
 
+  let intent = 0; // 0 = sin decidir, 1 = swipe horizontal, -1 = scroll vertical
+
   cont.addEventListener('pointerdown', e => {
     startX = e.clientX;
     startY = e.clientY;
     currentX = e.clientX;
-    dragging = true;
-    cont.classList.add('arrastrando');
-    cont.setPointerCapture?.(e.pointerId);
+    dragging = false;
+    intent = 0;
   });
 
   cont.addEventListener('pointermove', e => {
-    if(!dragging) return;
+    if(intent === -1) return;
     const dx = e.clientX - startX;
-    const dy = Math.abs(e.clientY - startY);
-    if(dy > 18) return;
+    const dy = e.clientY - startY;
+    if(intent === 0){
+      if(Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if(Math.abs(dx) > Math.abs(dy) + 2){
+        intent = 1;
+        dragging = true;
+        cont.classList.add('arrastrando');
+        cont.setPointerCapture?.(e.pointerId);
+      }else{
+        intent = -1; // deja que el navegador haga scroll vertical
+        return;
+      }
+    }
+    if(!dragging) return;
     if(dx < 0){
       setOffset(dx);
       currentX = e.clientX;
@@ -2114,6 +2137,7 @@ function bindSwipeVenta(card){
   }, {passive:true});
 
   const finishSwipe = () => {
+    if(!dragging){ intent = 0; return; }
     const dx = currentX - startX;
     const open = dx <= -60;
     if(open){
@@ -2123,6 +2147,7 @@ function bindSwipeVenta(card){
       card.classList.remove('open');
     }
     dragging = false;
+    intent = 0;
     cont.classList.remove('arrastrando');
   };
 
@@ -2347,7 +2372,7 @@ function pintarCartera(){
 
 function bindSwipeCartera(card){
   const cont = card.querySelector('.swipe-content');
-  let startX=0, currentX=0, dragging=false;
+  let startX=0, startY=0, currentX=0, dragging=false, intent=0;
   let frame=0, pendingOffset=0;
   const setOffset = x => {
     const offset=Math.max(Math.min(x,0),-174);
@@ -2355,9 +2380,18 @@ function bindSwipeCartera(card){
     if(frame)return;
     frame=requestAnimationFrame(()=>{frame=0;cont.style.transform=`translate3d(${pendingOffset}px,0,0)`;card.classList.toggle('open',pendingOffset<=-60);cont.classList.toggle('open',pendingOffset<=-60);});
   };
-  cont.addEventListener('pointerdown',e=>{startX=currentX=e.clientX; dragging=true; cont.classList.add('arrastrando'); cont.setPointerCapture?.(e.pointerId);});
-  cont.addEventListener('pointermove',e=>{if(dragging && e.clientX<startX) {currentX=e.clientX; setOffset(currentX-startX);}}, {passive:true});
-  const finish=()=>{if(!dragging)return; setOffset(currentX-startX<=-60?-174:0); dragging=false; cont.classList.remove('arrastrando');};
+  cont.addEventListener('pointerdown',e=>{startX=currentX=e.clientX; startY=e.clientY; dragging=false; intent=0;});
+  cont.addEventListener('pointermove',e=>{
+    if(intent===-1)return;
+    const dx=e.clientX-startX, dy=e.clientY-startY;
+    if(intent===0){
+      if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
+      if(Math.abs(dx)>Math.abs(dy)+2){intent=1;dragging=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);}
+      else{intent=-1;return;}
+    }
+    if(dragging && e.clientX<startX){currentX=e.clientX; setOffset(currentX-startX);}
+  }, {passive:true});
+  const finish=()=>{if(!dragging){intent=0;return;} setOffset(currentX-startX<=-60?-174:0); dragging=false; intent=0; cont.classList.remove('arrastrando');};
   cont.addEventListener('pointerup',finish); cont.addEventListener('pointercancel',finish);
   cont.addEventListener('click',e=>{if(cont.classList.contains('open')){setOffset(0);e.preventDefault();return;} formAbono(card.dataset.id);});
 }
@@ -2996,7 +3030,7 @@ function pintarEntregas(){
 function bindSwipeEntregaLista(card){
   const cont = card.querySelector('.swipe-content');
   if(!cont) return;
-  let startX=0, currentX=0, dragging=false;
+  let startX=0, startY=0, currentX=0, dragging=false, intent=0;
   let frame=0, pendingOffset=0;
   const setOffset = x => {
     const offset = Math.max(Math.min(x, 0), -174);
@@ -3006,19 +3040,35 @@ function bindSwipeEntregaLista(card){
   };
   cont.addEventListener('pointerdown', e => {
     startX = currentX = e.clientX;
-    dragging = true;
-    cont.classList.add('arrastrando');
-    cont.setPointerCapture?.(e.pointerId);
+    startY = e.clientY;
+    dragging = false;
+    intent = 0;
   });
   cont.addEventListener('pointermove', e => {
+    if(intent === -1) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if(intent === 0){
+      if(Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if(Math.abs(dx) > Math.abs(dy) + 2){
+        intent = 1;
+        dragging = true;
+        cont.classList.add('arrastrando');
+        cont.setPointerCapture?.(e.pointerId);
+      }else{
+        intent = -1;
+        return;
+      }
+    }
     if(!dragging || e.clientX > startX) return;
     currentX = e.clientX;
     setOffset(currentX - startX);
   }, {passive:true});
   const finish = () => {
-    if(!dragging) return;
+    if(!dragging){ intent = 0; return; }
     setOffset(currentX - startX <= -60 ? -174 : 0);
     dragging = false;
+    intent = 0;
     cont.classList.remove('arrastrando');
   };
   cont.addEventListener('pointerup', finish);
