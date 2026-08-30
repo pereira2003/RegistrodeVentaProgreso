@@ -2737,17 +2737,97 @@ $('#btnLimpiarCartera').addEventListener('click',async()=>{
   catch(e){ errorOperacion(e); }
 });
 
-function descargarTablaPDF(titulo,columnas,filas,nombre,filasResumen=[]){
-  if(!filas.length){brindis('No hay información para descargar');return;}
-  const ventana=window.open('','_blank'); if(!ventana){brindis('Permite las ventanas emergentes para descargar el PDF');return;}
-  const generado = fechaHora(new Date().toISOString());
-  const encabezados=columnas.map(c=>`<th>${esc(c)}</th>`).join('');
-  const cuerpo=filas.map(f=>`<tr>${f.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')+
-    filasResumen.map(f=>`<tr class="resumen">${f.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('');
-  ventana.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(nombre)}</title>
-    <style>@page{margin:10mm}body{font-family:Arial,sans-serif;color:#222;margin:24px;position:relative}.generado{position:absolute;top:0;right:0;font-size:10px;color:#666}h1{font-size:20px;margin:0 0 16px;padding-top:4px}table{border-collapse:collapse;width:100%;font-size:10px}th{background:#e7ddce;text-align:left}th,td{border:1px solid #bbb;padding:6px;vertical-align:top}tr:nth-child(even){background:#f7f5f1}.resumen{font-weight:bold;background:#e2efeb!important}.resumen td{border-top:2px solid #557d73}@media print{body{margin:0}.generado{font-size:8px}h1{font-size:16px}table{font-size:8px}}</style></head>
-    <body><div class="generado">Generado: ${esc(generado)}</div><h1>${esc(titulo)}</h1><table><thead><tr>${encabezados}</tr></thead><tbody>${cuerpo}</tbody></table>
-    <script>window.onload=function(){window.print();};<\/script></body></html>`);
+const EMPRESA = { nombre:'Grupo Progreso', lema:'Registro de ventas' };
+const LOGO_PDF = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="40" height="40" role="img" aria-label="Grupo Progreso"><rect width="512" height="512" rx="112" fill="#FCFAF8"/><g fill="none" stroke="#6B4A39" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"><path d="M92 238 256 112l164 126"/><path d="M108 226v104h296V226"/><path d="M143 330h226"/><path d="M151 284h54v46h-54z"/><path d="M237 190h54v140h-54z"/><path d="M315 249h55v81h-55z"/><circle cx="342" cy="270" r="11" fill="#C59B6D" stroke="none"/><path d="M327 296h31" stroke="#C59B6D"/></g></svg>`;
+
+function describirPeriodo(tipo,valor){
+  if(!valor) return 'Todos los registros';
+  if(tipo==='año') return 'Año '+valor;
+  if(tipo==='dia') return 'Día '+fechaCompleta(valor);
+  const [a,m]=String(valor).split('-');
+  if(a&&m){
+    const txt=new Date(Number(a),Number(m)-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+    return txt.charAt(0).toUpperCase()+txt.slice(1);
+  }
+  return String(valor);
+}
+
+// Agrupa registros por una clave (categoría, vendedor…) y arma cada bloque
+// con sus filas y su subtotal para el PDF.
+function agruparParaPDF(items, grupoDe, filaDe, subtotalDe){
+  const mapa=new Map();
+  items.forEach(it=>{
+    const clave=String(grupoDe(it)||'').trim() || 'Sin clasificar';
+    if(!mapa.has(clave)) mapa.set(clave,[]);
+    mapa.get(clave).push(it);
+  });
+  return [...mapa.entries()]
+    .sort((a,b)=> a[0]==='Sin clasificar' ? 1 : b[0]==='Sin clasificar' ? -1 : a[0].localeCompare(b[0],'es'))
+    .map(([titulo,its])=>({ titulo, filas: its.map(filaDe), subtotal: subtotalDe ? subtotalDe(its) : null }));
+}
+
+function descargarTablaPDF({documento,periodo='',resumen=[],columnas,grupos,totalGeneral,archivo='reporte'}){
+  const totalFilas=grupos.reduce((s,g)=>s+g.filas.length,0);
+  if(!totalFilas){brindis('No hay información para descargar');return;}
+  const ventana=window.open('','_blank');
+  if(!ventana){brindis('Permite las ventanas emergentes para descargar el PDF');return;}
+  const generado=fechaHora(new Date().toISOString());
+  const cl=i=>columnas[i]&&columnas[i].num?' class="num"':'';
+  const thead=`<tr>${columnas.map((c,i)=>`<th${cl(i)}>${esc(c.t)}</th>`).join('')}</tr>`;
+  const fila=(f,extra='')=>`<tr${extra}>${f.map((v,i)=>`<td${cl(i)}>${esc(v)}</td>`).join('')}</tr>`;
+  const cuerpo=grupos.map(g=>{
+    const cab=g.titulo?`<tr class="grupo-fila"><td colspan="${columnas.length}">${esc(g.titulo)} · ${g.filas.length} ${g.filas.length===1?'registro':'registros'}</td></tr>`:'';
+    const sub=g.subtotal?fila(g.subtotal,' class="subtotal-fila"'):'';
+    return cab+g.filas.map(f=>fila(f)).join('')+sub;
+  }).join('');
+  const total=totalGeneral?fila(totalGeneral,' class="total-fila"'):'';
+  const bandas=resumen.map(([k,v])=>`<span><strong>${esc(k)}</strong>${esc(v)}</span>`).join('');
+  ventana.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>${esc(EMPRESA.nombre)} · ${esc(documento)}</title>
+<style>
+  *{box-sizing:border-box}
+  @page{margin:13mm 11mm}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#2B2723;font-size:10px;line-height:1.45;padding-bottom:14mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .enc{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding-bottom:11px;border-bottom:2px solid #6B4A39}
+  .enc .marca{display:flex;gap:11px;align-items:center}
+  .enc .logo{width:40px;height:40px;flex:0 0 40px}
+  .enc .empresa{font-size:17px;font-weight:800;letter-spacing:-.01em}
+  .enc .lema{font-size:7.5px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:#8A7F73;margin-top:3px}
+  .enc .meta{text-align:right}
+  .enc .doc-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6B4A39}
+  .enc .doc-linea{font-size:8px;color:#8A817C;margin-top:3px}
+  .resumen-doc{display:flex;flex-wrap:wrap;gap:6px;margin:11px 0 14px}
+  .resumen-doc span{display:inline-flex;flex-direction:column;gap:2px;background:#F4EEE5;border:1px solid #E3D6C3;border-radius:5px;padding:5px 10px;font-size:9px;font-weight:600;color:#2B2723}
+  .resumen-doc strong{font-weight:700;font-size:7px;letter-spacing:.09em;text-transform:uppercase;color:#8A7F73}
+  table{width:100%;border-collapse:collapse}
+  thead{display:table-header-group}
+  thead th{background:#2B2723;color:#fff;font-size:7px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:7px 8px;text-align:left}
+  thead th.num{text-align:right}
+  tbody td{padding:5.5px 8px;border-bottom:1px solid #EAE4DC;vertical-align:top;font-size:8.5px;word-break:break-word}
+  tbody td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  tbody tr{break-inside:avoid}
+  tbody tr:nth-child(even) td{background:#FAF7F2}
+  .grupo-fila td{background:#EFE7DB!important;color:#5A3F30;font-weight:700;text-transform:uppercase;letter-spacing:.07em;font-size:8px;padding:7px 8px;border-top:1px solid #C59B6D;border-bottom:1px solid #C59B6D}
+  .grupo-fila{break-after:avoid}
+  .subtotal-fila td{background:#F6EFE4!important;font-weight:700;border-top:1.5px solid #C59B6D;border-bottom:1.5px solid #C59B6D}
+  .total-fila td{background:#2B2723!important;color:#fff;font-weight:700;font-size:9px;border:none}
+  .pie{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:7px;color:#9A9088;border-top:1px solid #EAE4DC;background:#fff}
+</style></head>
+<body>
+  <header class="enc">
+    <div class="marca"><span class="logo">${LOGO_PDF}</span><span><span class="empresa">${esc(EMPRESA.nombre)}</span><br><span class="lema">${esc(EMPRESA.lema)}</span></span></div>
+    <div class="meta">
+      <div class="doc-titulo">${esc(documento)}</div>
+      ${periodo?`<div class="doc-linea">${esc(periodo)}</div>`:''}
+      <div class="doc-linea">Generado el ${esc(generado)}</div>
+    </div>
+  </header>
+  ${bandas?`<div class="resumen-doc">${bandas}</div>`:''}
+  <table><thead>${thead}</thead><tbody>${cuerpo}${total}</tbody></table>
+  <footer class="pie"><span>${esc(EMPRESA.nombre)} — ${esc(EMPRESA.lema)}</span><span>${esc(generado)}</span></footer>
+  <script>window.onload=function(){window.print();};<\/script>
+</body></html>`);
   ventana.document.close();
 }
 
@@ -2756,48 +2836,90 @@ function ventasParaFiltro(){
   return DB.ventas.filter(v=>coincidePeriodo(v.fecha,tipo,valor));
 }
 
+function categoriaDeSku(sku){
+  const p=DB.productos.find(p=>String(p.sku||'').toUpperCase()===String(sku||'').toUpperCase());
+  return p&&p.categoria ? p.categoria : 'Sin categoría';
+}
+
 $('#btnPdfProductos').addEventListener('click',()=>{
   const q=$('#filtroProd').value.toLowerCase().trim();
-  const productos=DB.productos.filter(p=>!q||(p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q));
-  const existenciaTotal=productos.reduce((s,p)=>s+(Number(p.stock)||0),0);
-  const sumaContado=productos.reduce((s,p)=>s+(Number(p.contado)||0),0);
-  const sumaCredito=productos.reduce((s,p)=>s+(Number(p.credito)||0),0);
-  descargarTablaPDF('Productos', ['SKU','Código de barras','Nombre','Color','Marca','Categoría','Contado','Crédito','Existencia'], productos.map(p=>[
-    p.sku,p.codigoBarras||'',p.nombre,p.color||'',p.marca||'',p.categoria||'',money(p.contado),money(p.credito),p.stock||0
-  ]),'productos', [['SUMA ACTUAL ('+productos.length+' PRODUCTOS)','','','','','',money(sumaContado),money(sumaCredito),existenciaTotal]]);
+  const productos=DB.productos.filter(p=>!q||(p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q))
+    .slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
+  const columnas=[{t:'SKU'},{t:'Código de barras'},{t:'Nombre'},{t:'Color'},{t:'Marca'},{t:'Contado',num:true},{t:'Crédito',num:true},{t:'Existencia',num:true}];
+  const suma=(arr,k)=>arr.reduce((s,p)=>s+(Number(p[k])||0),0);
+  const grupos=agruparParaPDF(productos,
+    p=>p.categoria||'Sin categoría',
+    p=>[p.sku||'—',p.codigoBarras||'—',p.nombre||'—',p.color||'—',p.marca||'—',money(p.contado),money(p.credito),p.stock||0],
+    its=>['Subtotal',' ',' ',' ',' ',money(suma(its,'contado')),money(suma(its,'credito')),suma(its,'stock')]);
+  const total=['Total general',' ',' ',' ',' ',money(suma(productos,'contado')),money(suma(productos,'credito')),suma(productos,'stock')];
+  descargarTablaPDF({
+    documento:'Reporte de productos',
+    periodo: q ? `Filtro: "${q}"` : 'Catálogo completo',
+    resumen:[['Productos',productos.length],['Categorías',grupos.length],['Valor contado',money(suma(productos,'contado'))],['Valor crédito',money(suma(productos,'credito'))],['Existencia total',suma(productos,'stock')]],
+    columnas, grupos, totalGeneral:total, archivo:'productos'
+  });
 });
 
 $('#btnPdfVentas').addEventListener('click',()=>{
-  const ventas=ventasParaFiltro();
-  descargarTablaPDF('Ventas', ['Fecha','Código','Producto','Cliente','Documento','Teléfono','Tipo','Cantidad','Precio unitario','Total','Prima','Saldo','Plazo','Vendedor','Sucursal'], ventas.map(v=>[
-    v.fecha,v.sku,v.producto,v.cliente,v.documento||'',v.telefono||'',v.tipo,v.cantidad||1,money(v.precioUnitario),money(v.total),money(v.prima),money(v.saldo),v.plazo||'',v.vendedor||'',v.sucursal||''
-  ]),'ventas', [['TOTAL GENERAL','','','','','','','','',money(ventas.reduce((s,v)=>s+(Number(v.total)||0),0)),'','','','','']]);
+  const tipo=$('#filtroVentasTipo').value, valor=$('#filtroVentasFecha').value;
+  const ventas=ventasParaFiltro().slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+  const columnas=[{t:'Fecha'},{t:'Código'},{t:'Producto'},{t:'Categoría'},{t:'Cliente'},{t:'Documento'},{t:'Teléfono'},{t:'Tipo'},{t:'Cant.',num:true},{t:'P. unitario',num:true},{t:'Total',num:true},{t:'Prima',num:true},{t:'Saldo',num:true},{t:'Plazo'}];
+  const suma=(arr,k)=>arr.reduce((s,v)=>s+(Number(v[k])||0),0);
+  const unidades=arr=>arr.reduce((s,v)=>s+(Number(v.cantidad)||1),0);
+  const grupos=agruparParaPDF(ventas,
+    v=>v.vendedor||'Sin vendedor',
+    v=>[fecha(v.fecha),v.sku||'—',v.producto||'—',categoriaDeSku(v.sku),v.cliente||'—',v.documento||'—',v.telefono||'—',v.tipo==='credito'?'Crédito':'Contado',v.cantidad||1,money(v.precioUnitario),money(v.total),money(v.prima),money(v.saldo),v.plazo||'—'],
+    its=>['Subtotal',' ',' ',' ',' ',' ',' ',' ',unidades(its),' ',money(suma(its,'total')),money(suma(its,'prima')),money(suma(its,'saldo')),' ']);
+  const total=['Total general',' ',' ',' ',' ',' ',' ',' ',unidades(ventas),' ',money(suma(ventas,'total')),money(suma(ventas,'prima')),money(suma(ventas,'saldo')),' '];
+  descargarTablaPDF({
+    documento:'Reporte de ventas',
+    periodo:describirPeriodo(tipo,valor),
+    resumen:[['Ventas',ventas.length],['Unidades',unidades(ventas)],['Total vendido',money(suma(ventas,'total'))],['Primas',money(suma(ventas,'prima'))],['Saldo por cobrar',money(suma(ventas,'saldo'))]],
+    columnas, grupos, totalGeneral:total, archivo:'ventas'
+  });
 });
 
 $('#btnPdfEntregas').addEventListener('click',()=>{
   const tipo=$('#filtroEntregasTipo').value, valor=$('#filtroEntregasFecha').value;
-  const entregas=(DB.entregas||[]).filter(e=>coincidePeriodo(e.fecha,tipo,valor));
-  const ventasPorVendedor=new Map();
-  entregas.forEach(e=>{
-    const entregado=(e.entregados||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
-    const devuelto=(e.devueltos||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
-    ventasPorVendedor.set(e.vendor,(ventasPorVendedor.get(e.vendor)||0)+entregado-devuelto);
+  const entregas=(DB.entregas||[]).filter(e=>coincidePeriodo(e.fecha,tipo,valor)).slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+  const neto=e=>{
+    const ent=(e.entregados||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
+    const dev=(e.devueltos||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
+    return ent-dev;
+  };
+  const listar=arr=>(arr||[]).map(i=>`${i.nombre} ×${i.cantidad||1}`).join(', ')||'—';
+  const columnas=[{t:'Fecha'},{t:'Hora entrega'},{t:'Hora devolución'},{t:'Zona'},{t:'Productos entregados'},{t:'Productos devueltos'},{t:'Neto',num:true}];
+  const grupos=agruparParaPDF(entregas,
+    e=>e.vendor||'Sin vendedor',
+    e=>[fecha(e.fecha),hora(e.entregaCreado||e.creado||e.fecha),hora(e.devolucionCreado||((e.devueltos||[]).length?(e.creado||e.fecha):null)),e.zona||'—',listar(e.entregados),listar(e.devueltos),money(neto(e))],
+    its=>['Subtotal',' ',' ',' ',' ',' ',money(its.reduce((s,e)=>s+neto(e),0))]);
+  const totalNeto=entregas.reduce((s,e)=>s+neto(e),0);
+  descargarTablaPDF({
+    documento:'Reporte de entregas y devoluciones',
+    periodo:describirPeriodo(tipo,valor),
+    resumen:[['Entregas',entregas.length],['Vendedores',grupos.length],['Neto entregado',money(totalNeto)]],
+    columnas, grupos,
+    totalGeneral:['Total general',' ',' ',' ',' ',' ',money(totalNeto)],
+    archivo:'entregas'
   });
-  const resumenVendedores=[['VENTAS POR VENDEDOR','','','','','', '']];
-  ventasPorVendedor.forEach((total,vendedor)=>resumenVendedores.push([vendedor,'','','','','',money(total)]));
-  const totalVendedores=[...ventasPorVendedor.values()].reduce((s,total)=>s+total,0);
-  resumenVendedores.push(['TOTAL GENERAL VENDEDORES','','','','','',money(totalVendedores)]);
-  descargarTablaPDF('Entregas y devoluciones', ['Fecha','Hora entrega','Hora devolución','Vendedor','Zona','Productos entregados','Productos devueltos'], entregas.map(e=>[
-    e.fecha,hora(e.entregaCreado || e.creado || e.fecha),hora(e.devolucionCreado || ((e.devueltos||[]).length ? (e.creado || e.fecha) : null)),e.vendor,e.zona||'',(e.entregados||[]).map(i=>`${i.nombre} x${i.cantidad||1}`).join(', '),(e.devueltos||[]).map(i=>`${i.nombre} x${i.cantidad||1}`).join(', ')
-  ]),'entregas',resumenVendedores);
 });
 
 $('#btnPdfCartera').addEventListener('click',()=>{
   const tipo=$('#filtroCarteraTipo').value, valor=$('#filtroCarteraFecha').value;
-  const creditos=DB.ventas.filter(v=>v.tipo==='credito'&&coincidePeriodo(v.fecha,tipo,valor));
-  descargarTablaPDF('Cartera', ['Fecha','Cliente','Documento','Producto','Total','Prima','Saldo','Estado','Cuota mensual','Plazo','Vendedor'], creditos.map(v=>[
-    v.fecha,v.cliente,v.documento||'',v.producto,money(v.total),money(v.prima),money(v.saldo),v.estado||'',money(v.cuotaMensual),v.plazo||'',v.vendedor||''
-  ]),'cartera');
+  const creditos=DB.ventas.filter(v=>v.tipo==='credito'&&coincidePeriodo(v.fecha,tipo,valor)).slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+  const columnas=[{t:'Fecha'},{t:'Cliente'},{t:'Documento'},{t:'Producto'},{t:'Categoría'},{t:'Total',num:true},{t:'Prima',num:true},{t:'Saldo',num:true},{t:'Estado'},{t:'Cuota mensual',num:true},{t:'Plazo'}];
+  const suma=(arr,k)=>arr.reduce((s,v)=>s+(Number(v[k])||0),0);
+  const grupos=agruparParaPDF(creditos,
+    v=>v.vendedor||'Sin vendedor',
+    v=>[fecha(v.fecha),v.cliente||'—',v.documento||'—',v.producto||'—',categoriaDeSku(v.sku),money(v.total),money(v.prima),money(v.saldo),v.estado||'Activo',money(v.cuotaMensual),v.plazo||'—'],
+    its=>['Subtotal',' ',' ',' ',' ',money(suma(its,'total')),money(suma(its,'prima')),money(suma(its,'saldo')),' ',money(suma(its,'cuotaMensual')),' ']);
+  const total=['Total general',' ',' ',' ',' ',money(suma(creditos,'total')),money(suma(creditos,'prima')),money(suma(creditos,'saldo')),' ',money(suma(creditos,'cuotaMensual')),' '];
+  descargarTablaPDF({
+    documento:'Reporte de cartera',
+    periodo:describirPeriodo(tipo,valor),
+    resumen:[['Créditos',creditos.length],['Total financiado',money(suma(creditos,'total'))],['Primas recibidas',money(suma(creditos,'prima'))],['Saldo por cobrar',money(suma(creditos,'saldo'))]],
+    columnas, grupos, totalGeneral:total, archivo:'cartera'
+  });
 });
 
 /* ============================================================
