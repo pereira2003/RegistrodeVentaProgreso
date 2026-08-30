@@ -2706,6 +2706,20 @@ $('#btnGestionVendedores').addEventListener('click',gestionarVendedores);
 $('#btnGestionZonas').addEventListener('click',gestionarZonas);
 $('#filtroCarteraTipo').addEventListener('change',()=>configurarFiltroFecha('filtroCarteraTipo','filtroCarteraFecha',pintarCartera));
 $('#filtroCarteraFecha').addEventListener('input',pintarCartera);
+
+// La etiqueta "Seleccione fecha" es solo un marcador: se oculta al enfocar el
+// campo o cuando ya tiene un valor, para que no quede encima de la fecha elegida.
+function sincronizarEtiquetaFecha(campo){
+  const etiqueta=$('#etiqueta'+campo.id.charAt(0).toUpperCase()+campo.id.slice(1));
+  if(!etiqueta) return;
+  etiqueta.classList.toggle('oculta', campo.value!=='' || document.activeElement===campo);
+}
+['filtroEntregasFecha','filtroVentasFecha','filtroCarteraFecha'].forEach(id=>{
+  const campo=$('#'+id);
+  if(!campo) return;
+  ['input','change','focus','blur'].forEach(ev=>campo.addEventListener(ev,()=>sincronizarEtiquetaFecha(campo)));
+  sincronizarEtiquetaFecha(campo);
+});
 $('#btnLimpiarEntregas').addEventListener('click',async()=>{
   if(!DB.entregas?.length){brindis('No hay registros para limpiar');return;}
   if(!confirm('¿Deseas eliminar todos los registros de entregas? Esta acción no se puede deshacer.'))return;
