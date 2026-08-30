@@ -1058,12 +1058,14 @@ const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona:
 let entregaEditando=null;
 
 function vendedorOptions(selected=''){
-  if(!CFG.vendedores.length) return '';
-  return CFG.vendedores.map(v=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(v)}</option>`).join('');
+  const lista=vendedoresActuales();
+  if(!lista.length) return '';
+  return lista.map(v=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(v)}</option>`).join('');
 }
 
 function aplicarVendedorActual(vendedor){
-  const value = CFG.vendedores.includes(vendedor) ? vendedor : (CFG.vendedores[0] || '');
+  const lista=vendedoresActuales();
+  const value = lista.includes(vendedor) ? vendedor : (lista[0] || '');
   vendedorActual = value;
   entregaActual.vendor = value;
   caja.guardar('gp_vendedor_actual', value);
@@ -1076,9 +1078,10 @@ function aplicarVendedorActual(vendedor){
 }
 
 function inicializarVendedorActual(){
-  if(!CFG.vendedores.length) return;
-  if(!vendedorActual || !CFG.vendedores.includes(vendedorActual)){
-    vendedorActual = CFG.vendedores[0];
+  const lista=vendedoresActuales();
+  if(!lista.length) return;
+  if(!vendedorActual || !lista.includes(vendedorActual)){
+    vendedorActual = lista[0];
   }
   entregaActual.vendor = vendedorActual;
   aplicarVendedorActual(vendedorActual);
@@ -2916,6 +2919,7 @@ function pintarTodo(){
   repintadoPendiente = true;
   requestAnimationFrame(()=>{
     repintadoPendiente = false;
+    inicializarVendedorActual();
     pintarProductos(); pintarVentas(); pintarCartera(); pintarEntregas(); pintarRecientes();
   });
 }
