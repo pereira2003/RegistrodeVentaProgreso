@@ -221,6 +221,16 @@ button{cursor:pointer;border:none;background:none}
 .precio b{font-family:var(--display);font-size:23px;font-weight:800;display:block;margin-top:3px;letter-spacing:-.035em}
 .precio.destaca{background:var(--rojo-claro);border-color:var(--rojo)}
 .precio.destaca b{color:var(--rojo)}
+.panel-producto{
+  background:var(--papel);border:1px solid var(--verde);border-radius:var(--r);
+  box-shadow:var(--duro);padding:14px;margin-bottom:16px;
+}
+.panel-producto .pp-tope{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
+.panel-producto .pp-tope>div{flex:1;min-width:0}
+.pp-titulo{font-family:var(--dato);font-size:9.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--verde)}
+.pp-nombre{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.02em;margin-top:4px;line-height:1.15}
+.pp-meta{font-family:var(--dato);font-size:10.5px;color:var(--tinta-3);letter-spacing:.03em;margin-top:4px}
+.panel-producto .cerrar{flex:0 0 auto}
 .menu-acciones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .opcion-menu{
   display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
@@ -429,6 +439,7 @@ button{cursor:pointer;border:none;background:none}
 <!-- ================= ESCANEAR ================= -->
 <section class="vista activa" data-vista="escanear">
   <div class="datos-cargando activo" id="datosCargando" aria-live="polite"><i></i>Sincronizando datos</div>
+  <div id="menuProductoActivo" hidden></div>
   <div class="visor" id="visor">
     <video id="video" playsinline muted></video>
     <canvas id="lienzo"></canvas>
@@ -1675,8 +1686,22 @@ function procesarCodigoLeido(valor,sesionActual=sesionEscaneo,formato=''){
     abrirProducto(sku, tipoVentaEscaneo);
   }
 }
-$('#btnBuscar').addEventListener('click',()=>abrirProducto($('#skuManual').value));
-$('#skuManual').addEventListener('keydown',e=>{ if(e.key==='Enter') abrirProducto(e.target.value); });
+$('#btnBuscar').addEventListener('click',()=>filtrarProducto($('#skuManual').value));
+$('#skuManual').addEventListener('keydown',e=>{ if(e.key==='Enter') filtrarProducto(e.target.value); });
+
+function filtrarProducto(termino){
+  const q=String(termino||'').trim();
+  if(!q) return;
+  let p=DB.buscar(q);
+  if(!p){
+    const t=q.toLowerCase();
+    p=(DB.productos||[]).find(x=>((x.nombre||'')+' '+(x.marca||'')+' '+(x.sku||'')).toLowerCase().includes(t));
+  }
+  if(!p){ brindis('No se encontró ningún producto con "'+q+'"'); return; }
+  if(!recientes.find(r=>r.sku===p.sku)) recientes.unshift(p);
+  recientes.splice(6); pintarRecientes();
+  mostrarMenuProductoActivo(p);
+}
 
 function abrirProducto(sku, tipoVenta=null){
   const p = DB.buscar(sku);
@@ -1690,7 +1715,7 @@ function abrirProducto(sku, tipoVenta=null){
   if(tipoVenta) {
     setTimeout(()=>formVenta(p.sku, tipoVenta), 450);
   } else {
-    setTimeout(()=>menuProducto(p), 450);
+    mostrarMenuProductoActivo(p);
   }
 }
 
@@ -2133,37 +2158,45 @@ function statsProductoEntregas(sku){
   return { entregado, vendido, devuelto, enRuta, entregasEnRuta };
 }
 
-function menuProducto(p){
+let productoActivoSku = null;
+
+function mostrarMenuProductoActivo(p){
+  const cont = $('#menuProductoActivo');
+  if(!cont) return;
+  if(!p){ productoActivoSku=null; cont.hidden=true; cont.innerHTML=''; return; }
+  productoActivoSku = p.sku;
   const s = statsProductoEntregas(p.sku);
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'sin vendedor';
-  abrirHoja(`
-    <div class="hoja-tope"><h2>¿Qué deseas hacer?</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
-    <div class="ficha">
-      <div class="banda"><code>${esc(p.sku)}</code><em>${esc(p.categoria||'')}</em></div>
-      <div class="cuerpo">
-        <h3>${esc(p.nombre)}</h3>
-        <div class="marca-p">${esc((p.marca||'').toUpperCase())} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}</div>
+  cont.innerHTML = `
+    <div class="panel-producto">
+      <div class="pp-tope">
+        <div>
+          <div class="pp-titulo">¿Qué deseas hacer con este producto?</div>
+          <div class="pp-nombre">${esc(p.nombre)}</div>
+          <div class="pp-meta">${esc(p.sku)}${p.marca?' · '+esc((p.marca||'').toUpperCase()):''} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}</div>
+        </div>
+        <button class="cerrar" type="button" onclick="mostrarMenuProductoActivo(null)">✕</button>
       </div>
-    </div>
-    <div class="menu-acciones">
-      <button class="opcion-menu destacada" type="button" onclick="agregarRecienteAEntrega('${p.sku}')">
-        <span>Agregar a entrega</span><small>Súmalo a la entrega activa de ${esc(vendedor)}</small></button>
-      <button class="opcion-menu" type="button" onclick="formVenta('${p.sku}','contado')">
-        <span>Cotizar al contado</span><small>${money(p.contado)}</small></button>
-      <button class="opcion-menu" type="button" onclick="formVenta('${p.sku}','credito')">
-        <span>Cotizar a crédito</span><small>${money(p.credito)}</small></button>
-      <button class="opcion-menu" type="button" onclick="fichaProducto(DB.buscar('${p.sku}'))">
-        <span>Ver detalle del producto</span><small>Precios, existencia y piezas</small></button>
-    </div>
-    <div class="rotulo">Movimiento en entregas</div>
-    <div class="mini-cifras">
-      <div class="cifra"><em>En ruta ahora</em><b>${s.enRuta}</b></div>
-      <div class="cifra"><em>En entregas</em><b>${s.entregasEnRuta}</b></div>
-      <div class="cifra bien"><em>Vendidos</em><b>${s.vendido}</b></div>
-      <div class="cifra"><em>Devueltos</em><b>${s.devuelto}</b></div>
-      <div class="cifra" style="grid-column:1/-1"><em>Entregado histórico</em><b>${s.entregado}</b></div>
-    </div>
-  `);
+      <div class="menu-acciones">
+        <button class="opcion-menu destacada" type="button" onclick="agregarRecienteAEntrega('${p.sku}')">
+          <span>Agregar a entrega</span><small>Entrega activa de ${esc(vendedor)}</small></button>
+        <button class="opcion-menu" type="button" onclick="formVenta('${p.sku}','contado')">
+          <span>Cotizar al contado</span><small>${money(p.contado)}</small></button>
+        <button class="opcion-menu" type="button" onclick="formVenta('${p.sku}','credito')">
+          <span>Cotizar a crédito</span><small>${money(p.credito)}</small></button>
+        <button class="opcion-menu" type="button" onclick="fichaProducto(DB.buscar('${p.sku}'))">
+          <span>Ver detalle del producto</span><small>Precios, existencia y piezas</small></button>
+      </div>
+      <div class="mini-cifras">
+        <div class="cifra"><em>En ruta ahora</em><b>${s.enRuta}</b></div>
+        <div class="cifra"><em>En entregas</em><b>${s.entregasEnRuta}</b></div>
+        <div class="cifra bien"><em>Vendidos</em><b>${s.vendido}</b></div>
+        <div class="cifra"><em>Devueltos</em><b>${s.devuelto}</b></div>
+        <div class="cifra" style="grid-column:1/-1"><em>Entregado histórico</em><b>${s.entregado}</b></div>
+      </div>
+    </div>`;
+  cont.hidden = false;
+  cont.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function fichaProducto(p){
@@ -2235,7 +2268,7 @@ function bindSwipeReciente(card){
   cont.addEventListener('click',e=>{
     if(cont.classList.contains('open')){mover(0);e.preventDefault();return;}
     if(movido){e.preventDefault();return;}
-    const p=DB.buscar(card.dataset.sku); if(p) menuProducto(p);
+    const p=DB.buscar(card.dataset.sku); if(p) mostrarMenuProductoActivo(p);
   });
 }
 
