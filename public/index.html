@@ -366,9 +366,10 @@ button{cursor:pointer;border:none;background:none}
 }
 .hoja.abierta{display:block}
 @keyframes sube{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.asa{width:40px;height:4px;background:var(--suave);border-radius:100px;margin:9px auto 2px}
+.asa{width:44px;height:5px;background:var(--suave);border-radius:100px;margin:8px auto 2px;
+  padding:9px 22px;background-clip:content-box;box-sizing:content-box;touch-action:none;cursor:grab}
 .hoja-tope{position:sticky;top:0;background:var(--fondo);padding:8px 0 13px;z-index:2;
-  display:flex;align-items:center;gap:10px}
+  display:flex;align-items:center;gap:10px;touch-action:none}
 .hoja-tope h2{font-size:19px;flex:1;letter-spacing:-.03em}
 .cerrar{width:34px;height:34px;border-radius:50%;background:var(--papel);
   border:1px solid var(--borde);font-size:17px;line-height:1;color:var(--tinta)}
@@ -1169,10 +1170,47 @@ $$('.barra button').forEach(b=>b.addEventListener('click',()=>{
 
 function abrirHoja(html){
   $('#hojaCont').innerHTML = html;
-  $('#hoja').classList.add('abierta'); $('#velo').classList.add('abierto');
+  const h=$('#hoja');
+  h.style.transform=''; h.style.transition='';
+  h.classList.add('abierta'); $('#velo').classList.add('abierto');
+  h.scrollTop=0;
 }
 function cerrarHoja(){ $('#hoja').classList.remove('abierta'); $('#velo').classList.remove('abierto'); }
 $('#velo').addEventListener('click',cerrarHoja);
+
+(function arrastreHoja(){
+  const hoja=$('#hoja'), velo=$('#velo');
+  let y0=0, dy=0, arrastrando=false;
+  const agarre=t=>t && (t.closest('.asa') || (t.closest('.hoja-tope') && !t.closest('button')));
+  hoja.addEventListener('pointerdown',e=>{
+    if(hoja.scrollTop>0 || !agarre(e.target)) return;
+    arrastrando=true; y0=e.clientY; dy=0;
+    hoja.style.transition='none';
+    hoja.setPointerCapture?.(e.pointerId);
+  });
+  hoja.addEventListener('pointermove',e=>{
+    if(!arrastrando) return;
+    dy=Math.max(0, e.clientY-y0);
+    if(dy>0) e.preventDefault();
+    hoja.style.transform=`translateY(${dy}px)`;
+    velo.style.opacity=String(Math.max(0, 1-dy/380));
+  }, {passive:false});
+  const fin=()=>{
+    if(!arrastrando) return;
+    arrastrando=false;
+    hoja.style.transition='transform .2s ease';
+    velo.style.opacity='';
+    if(dy>110){
+      hoja.style.transform='translateY(100%)';
+      setTimeout(()=>{ cerrarHoja(); hoja.style.transform=''; hoja.style.transition=''; }, 180);
+    }else{
+      hoja.style.transform='translateY(0)';
+      setTimeout(()=>{ hoja.style.transform=''; hoja.style.transition=''; }, 210);
+    }
+  };
+  hoja.addEventListener('pointerup',fin);
+  hoja.addEventListener('pointercancel',fin);
+})();
 
 /* ============================================================
    ESCÁNER
