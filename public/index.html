@@ -459,7 +459,7 @@ button{cursor:pointer;border:none;background:none}
   <button class="btn plano" id="btnNuevoProd" style="margin-bottom:14px">+ Agregar producto</button>
   <div class="fila" style="margin-bottom:10px">
     <button class="btn plano chico" id="btnPdfProductos" style="flex:1">Descargar PDF</button>
-    <button class="btn plano chico" id="btnLimpiarProd" style="flex:1" hidden>Limpiar búsqueda</button>
+    <button class="btn plano chico" id="btnLimpiarProd" style="flex:1">Limpiar búsqueda</button>
   </div>
   <div id="listaProd"></div>
 </section>
@@ -2468,7 +2468,11 @@ function pintarProductos(){
       (p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q));
   }
   const btnLimpiar = $('#btnLimpiarProd');
-  if(btnLimpiar) btnLimpiar.hidden = !(skuBuscado || q);
+  if(btnLimpiar){
+    const activo = !!(skuBuscado || q);
+    btnLimpiar.disabled = !activo;
+    btnLimpiar.style.opacity = activo ? '1' : '.5';
+  }
   $('#listaProd').innerHTML = lista.length ? lista.map(p=>`
     <div class="product-swipe" data-sku="${esc(p.sku)}">
       <div class="swipe-actions">
@@ -3439,7 +3443,20 @@ DB.iniciar();
 setInterval(()=>cerrarEntregasVencidas().catch(errorOperacion),60000);
 setTimeout(ocultarCargaInicial, 9000);
 if('serviceWorker' in navigator && location.protocol==='https:'){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.register('sw.js').then(reg=>{
+    // Si hay una versión nueva esperando, actívala en cuanto pueda
+    setInterval(()=>reg.update().catch(()=>{}), 60*60*1000);
+  }).catch(()=>{});
+  // Si la página ya estaba bajo un service worker y entra uno nuevo, recargar
+  // una sola vez para mostrar la última versión sin reabrir la app dos veces.
+  if(navigator.serviceWorker.controller){
+    let recargado=false;
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      if(recargado) return;
+      recargado=true;
+      location.reload();
+    });
+  }
 }
 </script>
 </body>
