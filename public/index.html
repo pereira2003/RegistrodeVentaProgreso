@@ -1804,6 +1804,15 @@ function cambiarVendedorEntrega(vendedor){
   mostrarHojaEntrega();
 }
 
+function cerrarOtrosSwipes(actual){
+  document.querySelectorAll('.product-swipe.open').forEach(el=>{
+    if(el===actual) return;
+    el.classList.remove('open');
+    const c=el.querySelector('.swipe-content');
+    if(c){ c.classList.remove('open'); c.style.transform=''; }
+  });
+}
+
 function bindSwipeEntrega(card){
   const cont=card.querySelector('.swipe-content'); let inicio=0,inicioY=0,actual=0,arrastrando=false,intencion=0,frame=0,pendiente=0;
   const mover=x=>{pendiente=x;if(frame)return;frame=requestAnimationFrame(()=>{frame=0;const offset=Math.max(Math.min(pendiente,0),-132);cont.style.transform=`translate3d(${offset}px,0,0)`;card.classList.toggle('open',offset<=-60);cont.classList.toggle('open',offset<=-60);});};
@@ -1818,7 +1827,7 @@ function bindSwipeEntrega(card){
     }
     if(arrastrando&&e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}
   }, {passive:true});
-  const terminar=()=>{if(!arrastrando){intencion=0;return;}mover(actual-inicio<=-60?-132:0);arrastrando=false;intencion=0;cont.classList.remove('arrastrando');};
+  const terminar=()=>{if(!arrastrando){intencion=0;return;}const abrir=actual-inicio<=-60;if(abrir)cerrarOtrosSwipes(card);mover(abrir?-132:0);arrastrando=false;intencion=0;cont.classList.remove('arrastrando');};
   cont.addEventListener('pointerup',terminar);cont.addEventListener('pointercancel',terminar);
   cont.addEventListener('click',e=>{if(cont.classList.contains('open')){mover(0);e.preventDefault();}});
 }
@@ -2471,6 +2480,7 @@ function bindSwipeVenta(card){
     const dx = currentX - startX;
     const open = dx <= -60;
     if(open){
+      cerrarOtrosSwipes(card);
       setOffset(-maxX);
     }else{
       setOffset(0);
@@ -2737,7 +2747,7 @@ function bindSwipeCartera(card){
     }
     if(dragging && e.clientX<startX){currentX=e.clientX; setOffset(currentX-startX);}
   }, {passive:true});
-  const finish=()=>{if(!dragging){intent=0;return;} setOffset(currentX-startX<=-60?-132:0); dragging=false; intent=0; cont.classList.remove('arrastrando');};
+  const finish=()=>{if(!dragging){intent=0;return;} const abrir=currentX-startX<=-60; if(abrir)cerrarOtrosSwipes(card); setOffset(abrir?-132:0); dragging=false; intent=0; cont.classList.remove('arrastrando');};
   cont.addEventListener('pointerup',finish); cont.addEventListener('pointercancel',finish);
   cont.addEventListener('click',e=>{if(cont.classList.contains('open')){setOffset(0);e.preventDefault();return;} formAbono(card.dataset.id);});
 }
@@ -3442,7 +3452,9 @@ function bindSwipeEntregaLista(card){
   }, {passive:true});
   const finish = () => {
     if(!dragging){ intent = 0; return; }
-    setOffset(currentX - startX <= -60 ? -132 : 0);
+    const abrir = currentX - startX <= -60;
+    if(abrir) cerrarOtrosSwipes(card);
+    setOffset(abrir ? -132 : 0);
     dragging = false;
     intent = 0;
     cont.classList.remove('arrastrando');
