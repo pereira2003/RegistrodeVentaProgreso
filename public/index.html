@@ -274,6 +274,15 @@ button{cursor:pointer;border:none;background:none}
   padding:5px 11px;border-radius:999px;cursor:pointer;flex:0 0 auto;
 }
 .entrega-item-swipe .swipe-actions .btn-vendido{background:linear-gradient(180deg,#4A6E8C,#3f6076);}
+.rotulo-accion .acciones-rotulo{display:flex;gap:6px;flex:0 0 auto}
+.mini-accion.activa{background:#4A6E8C;color:#fff;border-color:#4A6E8C}
+.sel-todos{
+  display:flex;align-items:center;gap:8px;margin:0 2px 10px;cursor:pointer;
+  font-family:var(--dato);font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#3f6076;
+}
+.sel-todos input,.chk-item{width:20px;height:20px;flex:0 0 auto;accent-color:#4A6E8C;margin:0}
+.entrega-item-swipe .chk-item{align-self:center;margin-right:4px}
+.entrega-item-swipe.elegido .swipe-content{border-color:#4A6E8C;background:rgba(214,230,242,.4)}
 .cantidad-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:6px}
 .cantidad-control button{width:28px;height:28px;padding:0;border:1px solid var(--linea);border-radius:7px;background:#fff;color:var(--tinta);font-size:18px;line-height:1;cursor:pointer}
 .cantidad-control b{min-width:18px;text-align:center;font-family:var(--dato);font-size:13px}
@@ -1143,6 +1152,8 @@ const recientes = [];
 let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
 const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [], vendidos: [], entregaCreado: null, devolucionCreado: null };
 let entregaEditando=null;
+let entregaSeleccionando=false;
+let entregaSeleccion=new Set();
 
 function vendedorOptions(selected=''){
   const lista=vendedoresActuales();
@@ -1783,16 +1794,21 @@ function mostrarHojaEntrega(){
       </div>
     </div>
     <div class="rotulo rotulo-accion">Productos que lleva
-      ${items.length ? `<button type="button" class="mini-accion" onclick="marcarTodoVendido()">Marcar todo</button>` : ''}
+      ${items.length ? `<span class="acciones-rotulo">
+        <button type="button" class="mini-accion ${entregaSeleccionando?'activa':''}" onclick="alternarSeleccionEntrega()">${entregaSeleccionando?'Cancelar':'Seleccionar'}</button>
+        <button type="button" class="mini-accion" onclick="${entregaSeleccionando?'marcarSeleccionVendido()':'marcarTodoVendido()'}">${entregaSeleccionando?`Marcar (${entregaSeleccion.size})`:'Marcar todo'}</button>
+      </span>` : ''}
     </div>
+    ${entregaSeleccionando && items.length ? `<label class="sel-todos"><input type="checkbox" ${items.every(it=>entregaSeleccion.has(it.sku))?'checked':''} onchange="alternarSeleccionarTodo()"> Seleccionar todos</label>` : ''}
     ${items.length ? `<div>${items.map((item,i)=>`
-      <div class="product-swipe entrega-item-swipe" data-tipo="entregados" data-indice="${i}">
+      <div class="product-swipe entrega-item-swipe ${entregaSeleccionando&&entregaSeleccion.has(item.sku)?'elegido':''}" data-tipo="entregados" data-indice="${i}">
         <div class="swipe-vender">✓ Vendido</div>
         <div class="swipe-actions">
           <button class="btn-vendido" type="button" onclick="marcarVendidoEntrega(${i})">Vendido</button>
           <button class="btn-credito" type="button" onclick="borrarItemEntrega('items',${i})">Borrar</button>
         </div>
         <div class="swipe-content item" style="padding:10px 12px">
+          ${entregaSeleccionando ? `<input type="checkbox" class="chk-item" ${entregaSeleccion.has(item.sku)?'checked':''} onclick="event.stopPropagation()" onchange="alternarItemSeleccion('${item.sku}')">` : ''}
           <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
           <div class="val">${money(item.precio||0)}
             <div class="cantidad-control"><button type="button" onclick="ajustarCantidadEntrega('items',${i},-1)">-</button><b>${item.cantidad||1}</b><button type="button" onclick="ajustarCantidadEntrega('items',${i},1)">+</button></div>
@@ -1838,6 +1854,7 @@ function cambiarVendedorEntrega(vendedor){
     entregaActual.vendidos=[];
     entregaActual.entregaCreado=null;
     entregaActual.devolucionCreado=null;
+    entregaSeleccionando=false; entregaSeleccion.clear();
     brindis('Nueva entrega para '+vendedor);
   }
   mostrarHojaEntrega();
@@ -1935,6 +1952,38 @@ function quitarVendidoEntrega(indice){
   brindis(`${item.nombre}: regresó a "productos que lleva"`);
 }
 
+function alternarSeleccionEntrega(){
+  entregaSeleccionando=!entregaSeleccionando;
+  entregaSeleccion.clear();
+  mostrarHojaEntrega();
+}
+
+function alternarItemSeleccion(sku){
+  if(entregaSeleccion.has(sku)) entregaSeleccion.delete(sku);
+  else entregaSeleccion.add(sku);
+  mostrarHojaEntrega();
+}
+
+function alternarSeleccionarTodo(){
+  const skus=(entregaActual.items||[]).map(it=>it.sku);
+  const todos=skus.every(s=>entregaSeleccion.has(s));
+  entregaSeleccion.clear();
+  if(!todos) skus.forEach(s=>entregaSeleccion.add(s));
+  mostrarHojaEntrega();
+}
+
+function marcarSeleccionVendido(){
+  const elegidos=(entregaActual.items||[]).filter(it=>entregaSeleccion.has(it.sku));
+  if(!elegidos.length){ brindis('Selecciona al menos un producto'); return; }
+  entregaActual.vendidos=entregaActual.vendidos||[];
+  elegidos.forEach(item=>fusionarEnLista(entregaActual.vendidos,item,item.cantidad||1));
+  entregaActual.items=(entregaActual.items||[]).filter(it=>!entregaSeleccion.has(it.sku));
+  entregaSeleccion.clear();
+  entregaSeleccionando=false;
+  mostrarHojaEntrega();
+  brindis(`${elegidos.length} producto(s) marcados como vendidos`);
+}
+
 async function guardarEntrega(){
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
   const zona = entregaActual.zona || zonasActuales()[0] || 'Sin zona';
@@ -1974,6 +2023,7 @@ async function guardarEntrega(){
   entregaActual.entregaCreado = null;
   entregaActual.devolucionCreado = null;
   entregaEditando=null;
+  entregaSeleccionando=false; entregaSeleccion.clear();
   cerrarHoja();
   pintarEntregas();
 }
@@ -1982,6 +2032,7 @@ function editarEntrega(creado){
   const registro=(DB.entregas||[]).find(x=>x.creado===creado);
   if(!registro) return;
   entregaEditando=registro.creado;
+  entregaSeleccionando=false; entregaSeleccion.clear();
   entregaActual.vendor=registro.vendor||vendedoresActuales()[0]||'';
   entregaActual.zona=registro.zona||zonasActuales()[0]||'';
   entregaActual.items=(registro.entregados||[]).map(item=>({...item}));
