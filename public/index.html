@@ -2135,9 +2135,9 @@ function agregarRecienteAEntrega(sku){
   const ex = entregaActual.items.find(i=>i.sku===p.sku);
   if(ex){ ex.cantidad = (ex.cantidad||1)+1; }
   else { entregaActual.items.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado||0, cantidad:1 }); }
-  const total = entregaActual.items.reduce((s,i)=>s+(i.cantidad||1),0);
-  brindis(`${p.nombre} agregado a la entrega (${total})`);
+  brindis(`${p.nombre} agregado a la entrega`);
   pintarRecientes();
+  mostrarHojaEntrega();
 }
 
 /* ============================================================
