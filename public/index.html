@@ -2298,8 +2298,9 @@ function abrirFormularioProducto(p = null){
     <div class="tarjeta pad">
       ${editando ? `<div class="campo"><label>Código interno (SKU)</label><input id="pSku" value="${esc(p.sku)}" readonly
         style="font-family:var(--dato);text-transform:uppercase;background:var(--suave)"></div>` : '<input id="pSku" type="hidden" value="">'}
-      <div class="campo"><label>Código de barras del producto</label><input id="pBarras" value="${esc(p ? p.codigoBarras || '' : '')}" placeholder="Ej. 7501234567890"
-        inputmode="numeric" style="font-family:var(--dato);letter-spacing:.08em"></div>
+      <div class="campo"><label>Código de barras del producto</label><input id="pBarras" value="${esc(p ? p.codigoBarras || '' : '')}" placeholder="Ej. 7501234567890 o PTSCA043"
+        inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false"
+        style="font-family:var(--dato);letter-spacing:.08em;text-transform:uppercase"></div>
       <button class="btn plano chico" type="button" onclick="escanearBarrasProducto()">Leer código con cámara</button>
       <div class="campo"><label>Nombre</label><input id="pNombre" value="${esc(p ? p.nombre : '')}" placeholder="Refrigeradora No Frost 14 pies"></div>
       <div class="campo"><label>Color</label><input id="pColor" value="${esc(p ? p.color || '' : '')}" placeholder="Ej. Negro"></div>
