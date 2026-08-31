@@ -476,7 +476,7 @@ button{cursor:pointer;border:none;background:none}
     <button class="btn plano" style="flex:0 0 96px" id="btnBuscar">Buscar</button>
   </div>
 
-  <div class="rotulo">Últimos escaneos</div>
+  <div class="rotulo" id="rotuloRecientes">Últimos escaneos</div>
   <div id="recientes"></div>
 </section>
 
@@ -1692,21 +1692,14 @@ function procesarCodigoLeido(valor,sesionActual=sesionEscaneo,formato=''){
     abrirProducto(sku, tipoVentaEscaneo);
   }
 }
+let filtroReciente='';
 $('#btnBuscar').addEventListener('click',()=>filtrarProducto($('#skuManual').value));
+$('#skuManual').addEventListener('input',e=>filtrarProducto(e.target.value));
 $('#skuManual').addEventListener('keydown',e=>{ if(e.key==='Enter') filtrarProducto(e.target.value); });
 
 function filtrarProducto(termino){
-  const q=String(termino||'').trim();
-  if(!q) return;
-  let p=DB.buscar(q);
-  if(!p){
-    const t=q.toLowerCase();
-    p=(DB.productos||[]).find(x=>((x.nombre||'')+' '+(x.marca||'')+' '+(x.sku||'')).toLowerCase().includes(t));
-  }
-  if(!p){ brindis('No se encontró ningún producto con "'+q+'"'); return; }
-  if(!recientes.find(r=>r.sku===p.sku)) recientes.unshift(p);
-  recientes.splice(6); pintarRecientes();
-  mostrarMenuProductoActivo(p);
+  filtroReciente = String(termino||'').trim();
+  pintarRecientes();
 }
 
 function abrirProducto(sku, tipoVenta=null){
@@ -2261,7 +2254,13 @@ function formEditarProducto(sku){
 
 function pintarRecientes(){
   const cont = $('#recientes');
-  cont.innerHTML = recientes.length ? recientes.map(p=>`
+  const q = (filtroReciente||'').toLowerCase();
+  const lista = q
+    ? (DB.productos||[]).filter(p=>((p.nombre||'')+' '+(p.marca||'')+' '+(p.sku||'')+' '+(p.codigoBarras||'')).toLowerCase().includes(q)).slice(0,20)
+    : recientes;
+  const rot = $('#rotuloRecientes');
+  if(rot) rot.textContent = q ? `Resultados (${lista.length})` : 'Últimos escaneos';
+  cont.innerHTML = lista.length ? lista.map(p=>`
     <div class="product-swipe reciente-swipe" data-sku="${esc(p.sku)}">
       <div class="swipe-actions"><button class="btn-contado" type="button" onclick="event.stopPropagation(); agregarRecienteAEntrega('${p.sku}')">Agregar</button></div>
       <div class="swipe-content item" style="padding:12px">
@@ -2269,7 +2268,9 @@ function pintarRecientes(){
         <div class="val">${money(p.contado)}<small>Contado</small></div>
       </div>
     </div>`).join('')
-  : `<div class="vacio"><b>Aún no has escaneado</b>Los productos que leas aparecerán aquí.</div>`;
+  : (q
+      ? `<div class="vacio"><b>Sin resultados</b>Prueba con otro nombre o código.</div>`
+      : `<div class="vacio"><b>Aún no has escaneado</b>Los productos que leas aparecerán aquí.</div>`);
   cont.querySelectorAll('.reciente-swipe').forEach(bindSwipeReciente);
 }
 
