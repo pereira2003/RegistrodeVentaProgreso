@@ -261,7 +261,7 @@ button{cursor:pointer;border:none;background:none}
 .product-swipe .swipe-content.open{transform:translateX(-132px)}
 .entrega-item-swipe .swipe-vender{
   position:absolute;inset:0;border-radius:18px;z-index:1;opacity:0;
-  background:linear-gradient(90deg,#4d7e74,#5e8b82);
+  background:linear-gradient(90deg,#3f6076,#4A6E8C);
   display:flex;align-items:center;padding-left:22px;color:#fff;
   font-family:var(--dato);font-weight:800;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
   transition:opacity .15s ease;pointer-events:none;
@@ -269,11 +269,11 @@ button{cursor:pointer;border:none;background:none}
 .entrega-item-swipe.vender .swipe-vender{opacity:1}
 .rotulo-accion{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .mini-accion{
-  border:1px solid var(--verde);background:var(--verde-claro);color:var(--verde);
+  border:1px solid #4A6E8C;background:var(--azul-claro);color:#3f6076;
   font-family:var(--dato);font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
   padding:5px 11px;border-radius:999px;cursor:pointer;flex:0 0 auto;
 }
-.entrega-item-swipe .swipe-actions .btn-vendido{background:linear-gradient(180deg,#5e8b82,#4d7e74);}
+.entrega-item-swipe .swipe-actions .btn-vendido{background:linear-gradient(180deg,#4A6E8C,#3f6076);}
 .cantidad-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:6px}
 .cantidad-control button{width:28px;height:28px;padding:0;border:1px solid var(--linea);border-radius:7px;background:#fff;color:var(--tinta);font-size:18px;line-height:1;cursor:pointer}
 .cantidad-control b{min-width:18px;text-align:center;font-family:var(--dato);font-size:13px}
@@ -295,6 +295,8 @@ button{cursor:pointer;border:none;background:none}
 .cifra.alerta{border-color:var(--rojo)}
 .cifra.alerta b{color:var(--rojo)}
 .cifra.bien b{color:var(--verde)}
+.cifra.vendido{border-color:rgba(74,110,140,.35)}
+.cifra.vendido b{color:#4A6E8C}
 
 /* ---------- Hoja inferior ---------- */
 .velo{position:fixed;inset:0;background:rgba(23,19,15,.5);z-index:60;display:none}
@@ -1801,7 +1803,7 @@ function mostrarHojaEntrega(){
     <div>${vendidos.map((item,i)=>`
       <div class="product-swipe entrega-item-swipe" data-tipo="vendidos" data-indice="${i}">
         <div class="swipe-actions"><button class="btn-credito" type="button" onclick="quitarVendidoEntrega(${i})">Devolver</button></div>
-        <div class="swipe-content item" style="padding:10px 12px; border-color:rgba(85,125,115,.5)">
+        <div class="swipe-content item" style="padding:10px 12px; border-color:rgba(74,110,140,.45)">
           <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
           <div class="val">${money(item.precio||0)}
             <div class="cantidad-control"><button type="button" onclick="ajustarCantidadEntrega('vendidos',${i},-1)">-</button><b>${item.cantidad||1}</b><button type="button" onclick="ajustarCantidadEntrega('vendidos',${i},1)">+</button></div>
@@ -3450,7 +3452,7 @@ function pintarEntregas(){
   $('#resumenEntregas').innerHTML = `
     <div class="cifra"><em>Registros</em><b>${entregas.length}</b></div>
     <div class="cifra bien"><em>Productos entregados</em><b>${totalEntregados}</b></div>
-    <div class="cifra bien"><em>Productos vendidos</em><b>${totalVendidos}</b></div>
+    <div class="cifra vendido"><em>Productos vendidos</em><b>${totalVendidos}</b></div>
     <div class="cifra"><em>Productos devueltos</em><b>${totalDevueltos}</b></div>
     <div class="cifra"><em>Vendedores</em><b>${vendedores.size}</b></div>`;
 
@@ -3485,9 +3487,9 @@ function pintarEntregas(){
             </div>
             <div class="meta">${entregados || '—'}</div>
           </div>
-          ${totalVen ? `<div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(85,125,115,.28); border-radius:8px; background:rgba(226,239,235,.55)">
+          ${totalVen ? `<div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(74,110,140,.32); border-radius:8px; background:rgba(214,230,242,.45)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
-              <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Vendidos</div>
+              <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#4A6E8C;">Vendidos</div>
               <div style="font-size:10px; color:var(--tinta-3);">${totalVen}</div>
             </div>
             <div class="meta">${vendidos}</div>
