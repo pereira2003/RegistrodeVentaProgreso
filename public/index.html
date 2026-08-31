@@ -225,11 +225,17 @@ button{cursor:pointer;border:none;background:none}
   background:var(--papel);border:1px solid var(--verde);border-radius:var(--r);
   box-shadow:var(--duro);padding:14px;margin-bottom:16px;
 }
+.panel-producto.sin-producto{border-color:var(--borde)}
 .panel-producto .pp-tope{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
-.panel-producto .pp-tope>div{flex:1;min-width:0}
+.panel-producto .pp-tope>.pp-info{flex:1;min-width:0}
+.pp-chispa{
+  flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--verde-claro);font-size:17px;line-height:1;
+}
 .pp-titulo{font-family:var(--dato);font-size:9.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--verde)}
 .pp-nombre{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.02em;margin-top:4px;line-height:1.15}
 .pp-meta{font-family:var(--dato);font-size:10.5px;color:var(--tinta-3);letter-spacing:.03em;margin-top:4px}
+.pp-vacio-txt{font-size:12.5px;color:var(--tinta-3);line-height:1.5;margin-top:5px}
 .panel-producto .cerrar{flex:0 0 auto}
 .menu-acciones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .opcion-menu{
@@ -439,7 +445,7 @@ button{cursor:pointer;border:none;background:none}
 <!-- ================= ESCANEAR ================= -->
 <section class="vista activa" data-vista="escanear">
   <div class="datos-cargando activo" id="datosCargando" aria-live="polite"><i></i>Sincronizando datos</div>
-  <div id="menuProductoActivo" hidden></div>
+  <div id="menuProductoActivo"></div>
   <div class="visor" id="visor">
     <video id="video" playsinline muted></video>
     <canvas id="lienzo"></canvas>
@@ -2160,17 +2166,30 @@ function statsProductoEntregas(sku){
 
 let productoActivoSku = null;
 
-function mostrarMenuProductoActivo(p){
+function pintarMenuProductoActivo(){
   const cont = $('#menuProductoActivo');
   if(!cont) return;
-  if(!p){ productoActivoSku=null; cont.hidden=true; cont.innerHTML=''; return; }
-  productoActivoSku = p.sku;
+  const p = productoActivoSku ? DB.buscar(productoActivoSku) : null;
+  if(!p){
+    cont.innerHTML = `
+      <div class="panel-producto sin-producto">
+        <div class="pp-tope">
+          <div class="pp-chispa">✨</div>
+          <div class="pp-info">
+            <div class="pp-titulo">¿Qué deseas hacer con este producto?</div>
+            <div class="pp-vacio-txt">Escanea o busca un producto y aquí eliges: agregarlo a la entrega, cotizar al contado o a crédito, o ver su movimiento en ruta.</div>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
   const s = statsProductoEntregas(p.sku);
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'sin vendedor';
   cont.innerHTML = `
     <div class="panel-producto">
       <div class="pp-tope">
-        <div>
+        <div class="pp-chispa">✨</div>
+        <div class="pp-info">
           <div class="pp-titulo">¿Qué deseas hacer con este producto?</div>
           <div class="pp-nombre">${esc(p.nombre)}</div>
           <div class="pp-meta">${esc(p.sku)}${p.marca?' · '+esc((p.marca||'').toUpperCase()):''} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}</div>
@@ -2195,9 +2214,15 @@ function mostrarMenuProductoActivo(p){
         <div class="cifra" style="grid-column:1/-1"><em>Entregado histórico</em><b>${s.entregado}</b></div>
       </div>
     </div>`;
-  cont.hidden = false;
-  cont.scrollIntoView({behavior:'smooth', block:'start'});
 }
+
+function mostrarMenuProductoActivo(p){
+  productoActivoSku = p ? p.sku : null;
+  pintarMenuProductoActivo();
+  const cont = $('#menuProductoActivo');
+  if(p && cont) cont.scrollIntoView({behavior:'smooth', block:'start'});
+}
+pintarMenuProductoActivo();
 
 function fichaProducto(p){
   abrirHoja(`
@@ -3772,7 +3797,7 @@ function pintarTodo(){
   requestAnimationFrame(()=>{
     repintadoPendiente = false;
     inicializarVendedorActual();
-    pintarProductos(); pintarVentas(); pintarCartera(); pintarEntregas(); pintarRecientes();
+    pintarProductos(); pintarVentas(); pintarCartera(); pintarEntregas(); pintarRecientes(); pintarMenuProductoActivo();
   });
 }
 
