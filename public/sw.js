@@ -1,6 +1,6 @@
 /* Service worker: guarda la app en el teléfono para que abra sin internet.
    Sube el número de versión cada vez que cambies index.html. */
-const VERSION = 'gp-ventas-v41';
+const VERSION = 'gp-ventas-v42';
 const BASICOS = [
   './',
   './index.html',
@@ -26,19 +26,39 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  const url = e.request.url;
+  const req = e.request;
+  const url = req.url;
   // Firestore y Google manejan su propio almacenamiento sin conexión: no interceptar.
-  if (e.request.method !== 'GET' ||
+  if (req.method !== 'GET' ||
       url.includes('firestore.googleapis.com') ||
       url.includes('googleapis.com/identitytoolkit') ||
       url.includes('firebaseinstallations')) return;
 
-  e.respondWith(
-    caches.match(e.request).then(guardado => {
-      const red = fetch(e.request).then(r => {
+  // El HTML, el JS y el CSS se piden a la red primero, así una versión nueva
+  // llega en la primera recarga (antes tardaba dos). Si no hay red, se usa la copia.
+  const esCodigo = req.mode === 'navigate' ||
+    /\.(?:html|js|css)(?:\?|$)/.test(url);
+
+  if (esCodigo) {
+    e.respondWith(
+      fetch(req).then(r => {
         if (r && r.status === 200) {
           const copia = r.clone();
-          caches.open(VERSION).then(c => c.put(e.request, copia));
+          caches.open(VERSION).then(c => c.put(req, copia));
+        }
+        return r;
+      }).catch(() => caches.match(req).then(g => g || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // El resto (iconos, imágenes, fuentes): copia primero, y se actualiza de fondo.
+  e.respondWith(
+    caches.match(req).then(guardado => {
+      const red = fetch(req).then(r => {
+        if (r && r.status === 200) {
+          const copia = r.clone();
+          caches.open(VERSION).then(c => c.put(req, copia));
         }
         return r;
       }).catch(() => guardado);

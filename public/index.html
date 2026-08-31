@@ -1107,14 +1107,13 @@ const intervaloLectura=80, maxDimensionLectura=960;
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let detectorNativoListo=null, fallosDetector=0;
 let lecturaPrevia={valor:'',formato:'',veces:0,tiempo:0};
+let oneDReader=null, multiReaderBarras=null, hintsBarras=null, lienzoBarras=null, inicioBarras=0;
 
 /* Simbologías soportadas: numéricas (EAN/UPC/ITF/DataBar) y alfanuméricas (Code 128/39/93, Codabar, QR, Data Matrix, PDF417, Aztec) */
 const FORMATOS_ZXING = ['QR_CODE','DATA_MATRIX','AZTEC','PDF_417','CODE_128','CODE_39','CODE_93','CODABAR','ITF',
-  'EAN_13','EAN_8','UPC_A','UPC_E','UPC_EAN_EXTENSION','RSS_14','RSS_EXPANDED'];
+  'EAN_13','EAN_8','UPC_A','UPC_E','UPC_EAN_EXTENSION','RSS_14'];
 const FORMATOS_NATIVOS = ['qr_code','data_matrix','aztec','pdf417','code_128','code_39','code_93','codabar','itf',
   'ean_13','ean_8','upc_a','upc_e'];
-/* Estas no llevan dígito verificador obligatorio: se exige leerlas dos veces igual antes de aceptarlas */
-const FORMATOS_SIN_VERIFICADOR = new Set(['CODE_39','CODABAR','ITF']);
 const NOMBRE_FORMATO = {QR_CODE:'QR', DATA_MATRIX:'Data Matrix', AZTEC:'Aztec', PDF_417:'PDF417',
   CODE_128:'Code 128', CODE_39:'Code 39', CODE_93:'Code 93', CODABAR:'Codabar', ITF:'ITF',
   EAN_13:'EAN-13', EAN_8:'EAN-8', UPC_A:'UPC-A', UPC_E:'UPC-E',
@@ -1270,52 +1269,123 @@ function nombreFormatoZXing(valor){
   return typeof n==='string' ? n : '';
 }
 
-async function iniciarLectorZXing(video, sesionActual){
-  await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
-  await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
-  if(!window.ZXingBrowser?.BrowserMultiFormatReader) throw new Error('Lector de barras no disponible');
-  if(!leyendo || sesionActual!==sesionEscaneo || !flujo) return;
-  lectorBarras = new ZXingBrowser.BrowserMultiFormatReader(pistasZXing(),
-    {delayBetweenScanAttempts:80, delayBetweenScanSuccess:300});
-  controlBarras = await lectorBarras.decodeFromStream(flujo, video, (resultado)=>{
-    if(!resultado) return;
-    confirmarLectura(resultado.getText(), nombreFormatoZXing(resultado.getBarcodeFormat?.()), sesionActual);
-  });
+/* Lector ZXing manual: decodifica cuadro por cuadro sobre un recorte central
+   ampliado y con más contraste. En iPhone (sin BarcodeDetector) es el único
+   camino, y con barras impresas sobre plástico brilloso funciona mucho mejor
+   que dejar que ZXing procese el cuadro completo. */
+function prepararLectorZXingManual(){
+  const Z = window.ZXing;
+  if(!Z || !Z.MultiFormatOneDReader) return false;
+  hintsBarras = pistasZXing();
+  try{
+    oneDReader = new Z.MultiFormatOneDReader(hintsBarras);
+    multiReaderBarras = new Z.MultiFormatReader();
+    multiReaderBarras.setHints(hintsBarras);
+  }catch(e){ return false; }
+  lienzoBarras = lienzoBarras || document.createElement('canvas');
+  return true;
 }
 
-function cicloDetectorNativo(video, sesionActual){
-  if(!leyendo || sesionActual!==sesionEscaneo || !detectorBarras) return;
-  const seguir = ()=>{
-    if(leyendo && sesionActual===sesionEscaneo) setTimeout(()=>cicloDetectorNativo(video,sesionActual), 90);
-  };
-  if(video.readyState < video.HAVE_CURRENT_DATA || !video.videoWidth){ seguir(); return; }
-  detectorBarras.detect(video).then(codigos=>{
-    fallosDetector=0;
-    const leido = codigos && codigos[0];
-    if(leido) confirmarLectura(leido.rawValue, leido.format, sesionActual);
-    seguir();
-  }).catch(()=>{
-    if(++fallosDetector>=5){          // el detector nativo falla en este equipo: pasar a ZXing
-      detectorBarras=null;
-      iniciarLectorZXing(video, sesionActual).catch(()=>{
-        if(leyendo) brindis('No se pudo iniciar el lector de barras. Mantén el código dentro del marco.');
-      });
-      return;
+function intentarDecodeCanvas(canvas, incluir2D=false){
+  const Z = window.ZXing;
+  if(!Z) return null;
+  let bitmap;
+  try{
+    bitmap = new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(canvas)));
+  }catch(e){ return null; }
+  const lectores = incluir2D ? [oneDReader, multiReaderBarras] : [oneDReader];
+  for(const lector of lectores){
+    if(!lector) continue;
+    try{
+      const res = lector.decode(bitmap, hintsBarras);
+      if(res && res.getText()) return {valor:res.getText(), formato:nombreFormatoZXing(res.getBarcodeFormat())};
+    }catch(e){ /* NotFoundException: sigue con el próximo recorte */ }
+    finally{ if(lector.reset) lector.reset(); }
+  }
+  return null;
+}
+
+/* Prueba varias franjas horizontales; el código de barras casi siempre queda
+   centrado dentro del marco. Amplía el recorte y sube un poco el contraste. */
+function decodificarBarrasFrame(video){
+  if(!window.ZXing || !oneDReader) return null;
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if(!vw || !vh) return null;
+  const cv = lienzoBarras;
+  const cx = cv.getContext('2d', {willReadFrequently:true});
+  const franjas = [ [0.50,0.34], [0.50,0.60], [0.38,0.30], [0.62,0.30] ];
+  const anchoDestino = Math.min(1440, Math.max(vw, 900));
+  const escala = anchoDestino / vw;
+  for(let f=0; f<franjas.length; f++){
+    const [cy, ch] = franjas[f];
+    const sh = Math.max(1, Math.round(vh*ch));
+    const sy = Math.min(vh-sh, Math.max(0, Math.round(vh*cy - sh/2)));
+    cv.width  = anchoDestino;
+    cv.height = Math.max(1, Math.round(sh*escala));
+    cx.imageSmoothingEnabled = true;
+    cx.imageSmoothingQuality = 'high';
+    cx.drawImage(video, 0, sy, vw, sh, 0, 0, cv.width, cv.height);
+    // Realce suave de contraste; el umbralado fino lo hace el binarizador de ZXing
+    const img = cx.getImageData(0, 0, cv.width, cv.height);
+    const d = img.data;
+    for(let i=0;i<d.length;i+=4){
+      const t = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      const v = Math.max(0, Math.min(255, (t-128)*1.5 + 128));
+      d[i]=d[i+1]=d[i+2]=v;
     }
-    seguir();
-  });
+    cx.putImageData(img, 0, 0);
+    // Los códigos 2D (Data Matrix/PDF417) solo se buscan en la franja ancha central
+    const r = intentarDecodeCanvas(cv, f===1);
+    if(r) return r;
+  }
+  return null;
 }
 
-/* Las simbologías sin verificador se aceptan sólo tras dos lecturas idénticas seguidas */
+/* Un único bucle para el modo barras: usa el detector nativo si existe y,
+   en el mismo cuadro, recurre a ZXing manual cuando el nativo no ve nada
+   (o no está disponible). */
+function cicloLecturaBarras(video, sesionActual){
+  if(!leyendo || sesionActual!==sesionEscaneo) return;
+  const seguir = ()=>{ if(leyendo && sesionActual===sesionEscaneo) requestAnimationFrame(()=>cicloLecturaBarras(video, sesionActual)); };
+  const ahora = performance.now();
+  if(ahora - ultimo < 110 || leyendoFrame || video.readyState < video.HAVE_CURRENT_DATA || !video.videoWidth){
+    seguir(); return;
+  }
+  leyendoFrame = true;
+  ultimo = ahora;
+  (async()=>{
+    let nativoRespondio = false;
+    if(detectorBarras){
+      try{
+        const codigos = await detectorBarras.detect(video);
+        fallosDetector = 0;
+        nativoRespondio = true;
+        if(codigos && codigos[0]) return {valor:codigos[0].rawValue, formato:codigos[0].format};
+      }catch(e){ if(++fallosDetector>=4) detectorBarras=null; }
+    }
+    // Con detector nativo funcionando, ZXing manual solo entra de refuerzo tras
+    // 2 s sin lectura (evita recalentar el equipo cuando el nativo basta).
+    if(!nativoRespondio || ahora - inicioBarras > 2000) return decodificarBarrasFrame(video);
+    return null;
+  })().then(r=>{
+    if(r) confirmarLectura(r.valor, r.formato, sesionActual);
+  }).catch(()=>{}).finally(()=>{ leyendoFrame=false; seguir(); });
+}
+
+/* ITF no tiene marcas de inicio/fin ni verificador: cualquier tira de dígitos
+   par decodifica, así que se exige leerlo dos veces igual (salvo que ya sea un
+   producto conocido). El resto de simbologías se aceptan de inmediato. */
 function confirmarLectura(valor, formato='', sesionActual=sesionEscaneo){
   if(!valor || !leyendo || sesionActual!==sesionEscaneo) return;
   const fmt = String(formato||'').toUpperCase().replace(/^PDF417$/,'PDF_417');
-  const necesarias = FORMATOS_SIN_VERIFICADOR.has(fmt) ? 2 : 1;
+  if(normalizarCodigo(valor).length < 3) return;               // lectura demasiado corta: descartar
+  const dudoso = (fmt==='ITF' || fmt==='I2/5' || fmt==='ITF_14') && !DB.buscar(valor);
+  if(!dudoso){ procesarCodigoLeido(valor, sesionActual, fmt); return; }
   const ahora = Date.now();
   if(lecturaPrevia.valor===valor && ahora-lecturaPrevia.tiempo<2500) lecturaPrevia.veces++;
   else lecturaPrevia={valor, formato:fmt, veces:1, tiempo:0};
   lecturaPrevia.tiempo=ahora;
-  if(lecturaPrevia.veces>=necesarias) procesarCodigoLeido(valor, sesionActual, fmt);
+  if(lecturaPrevia.veces>=2) procesarCodigoLeido(valor, sesionActual, fmt);
 }
 
 async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
@@ -1328,9 +1398,11 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
   detectorBarras = await prepararDetectorNativo();
   try{
     if(tipoCodigo === 'qr') await cargarBiblioteca('jsQR','lib/jsQR.js');
-    if(tipoCodigo === 'barra' && !detectorBarras){
+    if(tipoCodigo === 'barra'){
+      // La librería ZXing se carga siempre: es el lector JS de respaldo (y el
+      // único en iPhone). El módulo de navegador solo si hay que recurrir a él.
       await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
-      await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
+      prepararLectorZXingManual();
     }
   }catch(e){
     $('#apagado').innerHTML = '<b>Lectura de barras no disponible</b>Usa Chrome o Edge actualizado en el celular, o escribe el código manualmente.';
@@ -1363,14 +1435,12 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     }
     leyendo=true;
     ultimo=0;
+    inicioBarras=performance.now();
     if(tipoCodigo==='barra'){
-      if(detectorBarras){
-        cicloDetectorNativo(v, sesionActual);
-      }else{
-        iniciarLectorZXing(v, sesionActual).catch(()=>{
-          if(leyendo) brindis('No se pudo iniciar el lector de barras. Mantén el código dentro del marco.');
-        });
+      if(!detectorBarras && !oneDReader){
+        brindis('No se pudo iniciar el lector de barras. Escribe el código a mano.');
       }
+      cicloLecturaBarras(v, sesionActual);
     }else{
       esperarVideoParaLeer(v);
     }
@@ -1398,16 +1468,25 @@ function botonEscaneo(modo,tipo){
 }
 async function abrirCamaraCompatible(alta=false){
   if(!navigator.mediaDevices?.getUserMedia) throw new Error('Cámara no disponible');
-  try{
-    // Las barras finas (Code 128, ITF) necesitan más resolución que un QR
-    return await navigator.mediaDevices.getUserMedia({video:{
-      facingMode:{ideal:'environment'},
-      width:{ideal: alta?1920:1280}, height:{ideal: alta?1080:720},
-      focusMode:{ideal:'continuous'}
-    }});
-  }catch(e){
-    return navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+  // Las barras finas (Code 128, ITF) necesitan más resolución que un QR.
+  // Se prueban varias configuraciones de mayor a menor exigencia.
+  const intentos = alta ? [
+    {facingMode:{ideal:'environment'}, width:{ideal:2560}, height:{ideal:1440}},
+    {facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080}},
+    {facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}},
+    {facingMode:'environment'},
+    true
+  ] : [
+    {facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}},
+    {facingMode:'environment'},
+    true
+  ];
+  let ultimoError;
+  for(const video of intentos){
+    try{ return await navigator.mediaDevices.getUserMedia({video}); }
+    catch(e){ ultimoError = e; }
   }
+  throw ultimoError || new Error('Cámara no disponible');
 }
 function actualizarControlLinterna(disponible){
   $$('.btn-linterna').forEach(btn=>{
@@ -1439,8 +1518,12 @@ function apagarCamara(){
   linternaActiva=false;
   if(controlBarras?.stop) controlBarras.stop();
   if(lectorBarras?.reset) lectorBarras.reset();
+  if(oneDReader?.reset) oneDReader.reset();
+  if(multiReaderBarras?.reset) multiReaderBarras.reset();
   controlBarras=null;
   lectorBarras=null;
+  oneDReader=null;
+  multiReaderBarras=null;
   detectorBarras=null;
   fallosDetector=0;
   lecturaPrevia={valor:'',formato:'',veces:0,tiempo:0};
