@@ -1709,6 +1709,16 @@ $('#skuManual').addEventListener('keydown',e=>{ if(e.key==='Enter') filtrarProdu
 function filtrarProducto(termino){
   filtroReciente = String(termino||'').trim();
   pintarRecientes();
+  if(filtroReciente){
+    const q = filtroReciente.toLowerCase();
+    const matches = (DB.productos||[]).filter(p=>((p.nombre||'')+' '+(p.marca||'')+' '+(p.sku||'')+' '+(p.codigoBarras||'')).toLowerCase().includes(q));
+    const elegido = DB.buscar(filtroReciente) || (matches.length===1 ? matches[0] : null);
+    productoActivoSku = elegido ? elegido.sku : null;
+    menuProductoAbierto = true;
+  }else{
+    menuProductoAbierto = false;
+  }
+  pintarMenuProductoActivo();
 }
 
 function abrirProducto(sku, tipoVenta=null){
@@ -2185,7 +2195,7 @@ function pintarMenuProductoActivo(){
           <div class="pp-chispa">✨</div>
           <div class="pp-info">
             <div class="pp-titulo">¿Qué deseas hacer con este producto?</div>
-            <div class="pp-vacio-txt">Escanea o busca un producto y aquí eliges: agregarlo a la entrega, cotizar al contado o a crédito, o ver su movimiento en ruta.</div>
+            <div class="pp-vacio-txt">Escanea, busca o toca un resultado para elegir: agregarlo a la entrega, cotizar al contado o a crédito, o ver su movimiento en ruta.</div>
           </div>
           <button class="cerrar" type="button" onclick="toggleMenuProducto()">✕</button>
         </div>
