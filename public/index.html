@@ -259,6 +259,21 @@ button{cursor:pointer;border:none;background:none}
 }
 .product-swipe .swipe-content.arrastrando{transition:none;cursor:grabbing;will-change:transform}
 .product-swipe .swipe-content.open{transform:translateX(-132px)}
+.entrega-item-swipe .swipe-vender{
+  position:absolute;inset:0;border-radius:18px;z-index:1;opacity:0;
+  background:linear-gradient(90deg,#4d7e74,#5e8b82);
+  display:flex;align-items:center;padding-left:22px;color:#fff;
+  font-family:var(--dato);font-weight:800;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  transition:opacity .15s ease;pointer-events:none;
+}
+.entrega-item-swipe.vender .swipe-vender{opacity:1}
+.rotulo-accion{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mini-accion{
+  border:1px solid var(--verde);background:var(--verde-claro);color:var(--verde);
+  font-family:var(--dato);font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  padding:5px 11px;border-radius:999px;cursor:pointer;flex:0 0 auto;
+}
+.entrega-item-swipe .swipe-actions .btn-vendido{background:linear-gradient(180deg,#5e8b82,#4d7e74);}
 .cantidad-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:6px}
 .cantidad-control button{width:28px;height:28px;padding:0;border:1px solid var(--linea);border-radius:7px;background:#fff;color:var(--tinta);font-size:18px;line-height:1;cursor:pointer}
 .cantidad-control b{min-width:18px;text-align:center;font-family:var(--dato);font-size:13px}
@@ -1038,11 +1053,14 @@ async function cerrarEntregasVencidas(){
   for(const entrega of (DB.entregas||[])){
     if(entrega.ventaGenerada) continue;
     const inicio=Date.parse(entrega.entregaCreado||entrega.creado||'');
-    if(!inicio || ahora-inicio < 24*60*60*1000 || !(entrega.entregados||[]).length) continue;
+    const marcadosVendidos=(entrega.vendidos||[]);
+    if(!inicio || ahora-inicio < 24*60*60*1000 || (!(entrega.entregados||[]).length && !marcadosVendidos.length)) continue;
     const devueltos=new Map((entrega.devueltos||[]).map(item=>[item.sku,(item.cantidad||1)]));
-    const vendidos=(entrega.entregados||[]).map(item=>({
-      ...item, cantidad:Math.max(0,(item.cantidad||1)-(devueltos.get(item.sku)||0))
-    })).filter(item=>item.cantidad>0);
+    const vendidos=marcadosVendidos.length
+      ? marcadosVendidos.map(item=>({ ...item, cantidad:Math.max(0,item.cantidad||1) })).filter(item=>item.cantidad>0)
+      : (entrega.entregados||[]).map(item=>({
+          ...item, cantidad:Math.max(0,(item.cantidad||1)-(devueltos.get(item.sku)||0))
+        })).filter(item=>item.cantidad>0);
     entrega.ventaGenerada=true;
     for(const item of vendidos){
       const id=`entrega-${encodeURIComponent(entrega.creado)}-${encodeURIComponent(item.sku)}`;
@@ -1121,7 +1139,7 @@ const NOMBRE_FORMATO = {QR_CODE:'QR', DATA_MATRIX:'Data Matrix', AZTEC:'Aztec', 
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
 let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
-const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [], entregaCreado: null, devolucionCreado: null };
+const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [], vendidos: [], entregaCreado: null, devolucionCreado: null };
 let entregaEditando=null;
 
 function vendedorOptions(selected=''){
@@ -1743,6 +1761,7 @@ function mostrarHojaEntrega(){
   const zona = entregaActual.zona || zonas[0] || '';
   const items = entregaActual.items || [];
   const devueltos = entregaActual.devueltos || [];
+  const vendidos = entregaActual.vendidos || [];
   abrirHoja(`
     <div class="hoja-tope"><h2>Entrega y devolución</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="tarjeta pad">
@@ -1761,10 +1780,16 @@ function mostrarHojaEntrega(){
         </div>
       </div>
     </div>
-    <div class="rotulo">Productos que lleva</div>
+    <div class="rotulo rotulo-accion">Productos que lleva
+      ${items.length ? `<button type="button" class="mini-accion" onclick="marcarTodoVendido()">Marcar todo</button>` : ''}
+    </div>
     ${items.length ? `<div>${items.map((item,i)=>`
       <div class="product-swipe entrega-item-swipe" data-tipo="entregados" data-indice="${i}">
-        <div class="swipe-actions"><button class="btn-credito" type="button" onclick="borrarItemEntrega('items',${i})">Borrar</button></div>
+        <div class="swipe-vender">✓ Vendido</div>
+        <div class="swipe-actions">
+          <button class="btn-vendido" type="button" onclick="marcarVendidoEntrega(${i})">Vendido</button>
+          <button class="btn-credito" type="button" onclick="borrarItemEntrega('items',${i})">Borrar</button>
+        </div>
         <div class="swipe-content item" style="padding:10px 12px">
           <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
           <div class="val">${money(item.precio||0)}
@@ -1772,6 +1797,17 @@ function mostrarHojaEntrega(){
           </div>
         </div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin productos</b>Escanea uno para agregarlo a la entrega.</div>`}
+    ${vendidos.length ? `<div class="rotulo">Productos vendidos</div>
+    <div>${vendidos.map((item,i)=>`
+      <div class="product-swipe entrega-item-swipe" data-tipo="vendidos" data-indice="${i}">
+        <div class="swipe-actions"><button class="btn-credito" type="button" onclick="quitarVendidoEntrega(${i})">Devolver</button></div>
+        <div class="swipe-content item" style="padding:10px 12px; border-color:rgba(85,125,115,.5)">
+          <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
+          <div class="val">${money(item.precio||0)}
+            <div class="cantidad-control"><button type="button" onclick="ajustarCantidadEntrega('vendidos',${i},-1)">-</button><b>${item.cantidad||1}</b><button type="button" onclick="ajustarCantidadEntrega('vendidos',${i},1)">+</button></div>
+          </div>
+        </div>
+      </div>`).join('')}</div>` : ''}
     <div class="rotulo">Productos que regresan</div>
     ${devueltos.length ? `<div>${devueltos.map((item,i)=>`
       <div class="product-swipe entrega-item-swipe" data-tipo="devueltos" data-indice="${i}">
@@ -1791,12 +1827,13 @@ function mostrarHojaEntrega(){
 
 function cambiarVendedorEntrega(vendedor){
   if(vendedor===entregaActual.vendor){ mostrarHojaEntrega(); return; }
-  const teniaPendientes=entregaActual.items.length || entregaActual.devueltos.length;
+  const teniaPendientes=entregaActual.items.length || entregaActual.devueltos.length || (entregaActual.vendidos||[]).length;
   entregaActual.vendor=vendedor;
   aplicarVendedorActual(vendedor);
   if(teniaPendientes){
     entregaActual.items=[];
     entregaActual.devueltos=[];
+    entregaActual.vendidos=[];
     entregaActual.entregaCreado=null;
     entregaActual.devolucionCreado=null;
     brindis('Nueva entrega para '+vendedor);
@@ -1813,9 +1850,12 @@ function cerrarOtrosSwipes(actual){
   });
 }
 
+const UMBRAL_VENDER=100;
+
 function bindSwipeEntrega(card){
   const cont=card.querySelector('.swipe-content'); let inicio=0,inicioY=0,actual=0,arrastrando=false,intencion=0,frame=0,pendiente=0;
-  const mover=x=>{pendiente=x;if(frame)return;frame=requestAnimationFrame(()=>{frame=0;const offset=Math.max(Math.min(pendiente,0),-132);cont.style.transform=`translate3d(${offset}px,0,0)`;card.classList.toggle('open',offset<=-60);cont.classList.toggle('open',offset<=-60);});};
+  const permiteVender=card.dataset.tipo==='entregados';
+  const mover=x=>{pendiente=x;if(frame)return;frame=requestAnimationFrame(()=>{frame=0;const max=permiteVender?150:0;const offset=Math.max(Math.min(pendiente,max),-132);cont.style.transform=`translate3d(${offset}px,0,0)`;card.classList.toggle('open',offset<=-60);cont.classList.toggle('open',offset<=-60);card.classList.toggle('vender',offset>=UMBRAL_VENDER);});};
   cont.addEventListener('pointerdown',e=>{inicio=actual=e.clientX;inicioY=e.clientY;arrastrando=false;intencion=0;});
   cont.addEventListener('pointermove',e=>{
     if(intencion===-1)return;
@@ -1825,9 +1865,26 @@ function bindSwipeEntrega(card){
       if(Math.abs(dx)>Math.abs(dy)+2){intencion=1;arrastrando=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);}
       else{intencion=-1;return;}
     }
-    if(arrastrando&&e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}
+    if(!arrastrando)return;
+    if(e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}
+    else if(permiteVender){actual=e.clientX;mover(actual-inicio);}
   }, {passive:true});
-  const terminar=()=>{if(!arrastrando){intencion=0;return;}const abrir=actual-inicio<=-60;if(abrir)cerrarOtrosSwipes(card);mover(abrir?-132:0);arrastrando=false;intencion=0;cont.classList.remove('arrastrando');};
+  const terminar=()=>{
+    if(!arrastrando){intencion=0;return;}
+    const rec=actual-inicio;
+    arrastrando=false;intencion=0;cont.classList.remove('arrastrando');
+    if(permiteVender && rec>=UMBRAL_VENDER){
+      card.classList.remove('vender');
+      mover(0);
+      const idx=Number(card.dataset.indice);
+      marcarVendidoEntrega(idx);
+      return;
+    }
+    const abrir=rec<=-60;
+    if(abrir)cerrarOtrosSwipes(card);
+    card.classList.remove('vender');
+    mover(abrir?-132:0);
+  };
   cont.addEventListener('pointerup',terminar);cont.addEventListener('pointercancel',terminar);
   cont.addEventListener('click',e=>{if(cont.classList.contains('open')){mover(0);e.preventDefault();}});
 }
@@ -1844,17 +1901,50 @@ function ajustarCantidadEntrega(tipo,indice,cambio){
   mostrarHojaEntrega();
 }
 
+function fusionarEnLista(lista,item,cantidad){
+  const existente=lista.find(x=>x.sku===item.sku);
+  if(existente){ existente.cantidad=(existente.cantidad||1)+cantidad; }
+  else{ lista.push({...item, cantidad}); }
+}
+
+function marcarVendidoEntrega(indice){
+  const item=entregaActual.items[indice]; if(!item) return;
+  entregaActual.vendidos=entregaActual.vendidos||[];
+  fusionarEnLista(entregaActual.vendidos,item,item.cantidad||1);
+  entregaActual.items.splice(indice,1);
+  mostrarHojaEntrega();
+  brindis(`${item.nombre}: marcado como vendido`);
+}
+
+function marcarTodoVendido(){
+  if(!entregaActual.items.length) return;
+  entregaActual.vendidos=entregaActual.vendidos||[];
+  entregaActual.items.forEach(item=>fusionarEnLista(entregaActual.vendidos,item,item.cantidad||1));
+  entregaActual.items=[];
+  mostrarHojaEntrega();
+  brindis('Todos los productos marcados como vendidos');
+}
+
+function quitarVendidoEntrega(indice){
+  const item=entregaActual.vendidos[indice]; if(!item) return;
+  fusionarEnLista(entregaActual.items,item,item.cantidad||1);
+  entregaActual.vendidos.splice(indice,1);
+  mostrarHojaEntrega();
+  brindis(`${item.nombre}: regresó a "productos que lleva"`);
+}
+
 async function guardarEntrega(){
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
   const zona = entregaActual.zona || zonasActuales()[0] || 'Sin zona';
   const fechaEntrega = hoy();
-  if(!entregaActual.items.length && !entregaActual.devueltos.length){ brindis('Escanea al menos un producto antes de guardar'); return; }
+  if(!entregaActual.items.length && !entregaActual.devueltos.length && !(entregaActual.vendidos||[]).length){ brindis('Escanea al menos un producto antes de guardar'); return; }
   const registradas = (DB.entregas||[]);
   const agregado = {
     vendor: vendedor,
     zona: zona,
     entregados: (entregaActual.items||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     devueltos: (entregaActual.devueltos||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
+    vendidos: (entregaActual.vendidos||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     fecha: fechaEntrega,
     creado: entregaEditando || entregaActual.entregaCreado || new Date().toISOString(),
     entregaCreado: entregaActual.entregaCreado || new Date().toISOString(),
@@ -1878,6 +1968,7 @@ async function guardarEntrega(){
   brindis(`Entrega guardada para ${vendedor}`);
   entregaActual.items = [];
   entregaActual.devueltos = [];
+  entregaActual.vendidos = [];
   entregaActual.entregaCreado = null;
   entregaActual.devolucionCreado = null;
   entregaEditando=null;
@@ -1893,6 +1984,7 @@ function editarEntrega(creado){
   entregaActual.zona=registro.zona||zonasActuales()[0]||'';
   entregaActual.items=(registro.entregados||[]).map(item=>({...item}));
   entregaActual.devueltos=(registro.devueltos||[]).map(item=>({...item}));
+  entregaActual.vendidos=(registro.vendidos||[]).map(item=>({...item}));
   entregaActual.entregaCreado=registro.entregaCreado||registro.creado||null;
   entregaActual.devolucionCreado=registro.devolucionCreado||((registro.devueltos||[]).length ? registro.creado : null);
   mostrarHojaEntrega();
@@ -3302,24 +3394,24 @@ $('#btnPdfVentas').addEventListener('click',()=>{
 $('#btnPdfEntregas').addEventListener('click',()=>{
   const tipo=$('#filtroEntregasTipo').value, valor=$('#filtroEntregasFecha').value;
   const entregas=(DB.entregas||[]).filter(e=>coincidePeriodo(e.fecha,tipo,valor)).slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+  const valor_=arr=>(arr||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
   const neto=e=>{
-    const ent=(e.entregados||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
-    const dev=(e.devueltos||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
-    return ent-dev;
+    if((e.vendidos||[]).length) return valor_(e.vendidos);
+    return valor_(e.entregados)-valor_(e.devueltos);
   };
   const listar=arr=>(arr||[]).map(i=>`${i.nombre} ×${i.cantidad||1}`).join(', ')||'—';
-  const columnas=[{t:'Fecha'},{t:'Hora entrega'},{t:'Hora devolución'},{t:'Zona'},{t:'Productos entregados'},{t:'Productos devueltos'},{t:'Neto',num:true}];
+  const columnas=[{t:'Fecha'},{t:'Hora entrega'},{t:'Hora devolución'},{t:'Zona'},{t:'Productos entregados'},{t:'Productos vendidos'},{t:'Productos devueltos'},{t:'Neto',num:true}];
   const grupos=agruparParaPDF(entregas,
     e=>e.vendor||'Sin vendedor',
-    e=>[fecha(e.fecha),hora(e.entregaCreado||e.creado||e.fecha),hora(e.devolucionCreado||((e.devueltos||[]).length?(e.creado||e.fecha):null)),e.zona||'—',listar(e.entregados),listar(e.devueltos),money(neto(e))],
-    its=>['Subtotal',' ',' ',' ',' ',' ',money(its.reduce((s,e)=>s+neto(e),0))]);
+    e=>[fecha(e.fecha),hora(e.entregaCreado||e.creado||e.fecha),hora(e.devolucionCreado||((e.devueltos||[]).length?(e.creado||e.fecha):null)),e.zona||'—',listar(e.entregados),listar(e.vendidos),listar(e.devueltos),money(neto(e))],
+    its=>['Subtotal',' ',' ',' ',' ',' ',' ',money(its.reduce((s,e)=>s+neto(e),0))]);
   const totalNeto=entregas.reduce((s,e)=>s+neto(e),0);
   descargarTablaPDF({
     documento:'Reporte de entregas y devoluciones',
     periodo:describirPeriodo(tipo,valor),
     resumen:[['Entregas',entregas.length],['Vendedores',grupos.length],['Neto entregado',money(totalNeto)]],
     columnas, grupos,
-    totalGeneral:['Total general',' ',' ',' ',' ',' ',money(totalNeto)],
+    totalGeneral:['Total general',' ',' ',' ',' ',' ',' ',money(totalNeto)],
     archivo:'entregas'
   });
 });
@@ -3349,21 +3441,28 @@ function pintarEntregas(){
   const tipoFiltro = $('#filtroEntregasTipo')?.value || 'mes';
   const fechaFiltro = $('#filtroEntregasFecha')?.value || hoy().slice(0,7);
   const entregas = (DB.entregas || []).filter(e=>coincidePeriodo(e.fecha,tipoFiltro,fechaFiltro));
-  const totalEntregados = entregas.reduce((s,e)=>s + (e.entregados||[]).reduce((t,i)=>t+(i.cantidad||1),0),0);
-  const totalDevueltos = entregas.reduce((s,e)=>s + (e.devueltos||[]).reduce((t,i)=>t+(i.cantidad||1),0),0);
+  const contar = arr => (arr||[]).reduce((t,i)=>t+(i.cantidad||1),0);
+  const totalEntregados = entregas.reduce((s,e)=>s + contar(e.entregados) + contar(e.vendidos),0);
+  const totalVendidos = entregas.reduce((s,e)=>s + contar(e.vendidos),0);
+  const totalDevueltos = entregas.reduce((s,e)=>s + contar(e.devueltos),0);
   const vendedores = new Set(entregas.map(e=>e.vendor));
 
   $('#resumenEntregas').innerHTML = `
     <div class="cifra"><em>Registros</em><b>${entregas.length}</b></div>
     <div class="cifra bien"><em>Productos entregados</em><b>${totalEntregados}</b></div>
+    <div class="cifra bien"><em>Productos vendidos</em><b>${totalVendidos}</b></div>
     <div class="cifra"><em>Productos devueltos</em><b>${totalDevueltos}</b></div>
     <div class="cifra"><em>Vendedores</em><b>${vendedores.size}</b></div>`;
 
   $('#listaEntregas').innerHTML = entregas.length ? entregas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||'')).map(e=>{
-    const entregados = (e.entregados||[]).map(i=>`${esc(i.nombre)} × ${i.cantidad||1}`).join(', ');
-    const devueltos = (e.devueltos||[]).map(i=>`${esc(i.nombre)} × ${i.cantidad||1}`).join(', ');
-    const totalEnt = (e.entregados||[]).reduce((t,i)=>t+(i.cantidad||1),0);
-    const totalDev = (e.devueltos||[]).reduce((t,i)=>t+(i.cantidad||1),0);
+    const listaTxt = arr => (arr||[]).map(i=>`${esc(i.nombre)} × ${i.cantidad||1}`).join(', ');
+    const entregados = listaTxt(e.entregados);
+    const vendidos = listaTxt(e.vendidos);
+    const devueltos = listaTxt(e.devueltos);
+    const cuenta = arr => (arr||[]).reduce((t,i)=>t+(i.cantidad||1),0);
+    const totalEnt = cuenta(e.entregados) + cuenta(e.vendidos);
+    const totalVen = cuenta(e.vendidos);
+    const totalDev = cuenta(e.devueltos);
     const creado = String(e.creado || '');
     return `<div class="product-swipe entrega-list-swipe" data-creado="${esc(creado)}">
       <div class="swipe-actions">
@@ -3386,6 +3485,13 @@ function pintarEntregas(){
             </div>
             <div class="meta">${entregados || '—'}</div>
           </div>
+          ${totalVen ? `<div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(85,125,115,.28); border-radius:8px; background:rgba(226,239,235,.55)">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
+              <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Vendidos</div>
+              <div style="font-size:10px; color:var(--tinta-3);">${totalVen}</div>
+            </div>
+            <div class="meta">${vendidos}</div>
+          </div>` : ''}
           <div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(216,194,164,.35); border-radius:8px; background:rgba(247,243,233,.6)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
               <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Devolución</div>
