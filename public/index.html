@@ -1958,7 +1958,7 @@ function fichaProducto(p){
       <div class="banda"><code>${esc(p.sku)}</code><em>${esc(p.categoria||'')}</em></div>
       <div class="cuerpo">
         <h3>${esc(p.nombre)}</h3>
-        <div class="marca-p">${esc(p.marca||'')} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}${p.piezas>1?' · '+p.piezas+' piezas por paquete':''}</div>
+        <div class="marca-p">${esc((p.marca||'').toUpperCase())} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}${p.piezas>1?' · '+p.piezas+' piezas por paquete':''}</div>
         <div class="precios">
           <div class="precio"><em>Contado</em><b>${money(p.contado)}</b></div>
           <div class="precio destaca"><em>Crédito</em><b>${money(p.credito)}</b></div>
@@ -1989,7 +1989,7 @@ function formEditarProducto(sku){
 function pintarRecientes(){
   $('#recientes').innerHTML = recientes.length ? recientes.map(p=>`
     <div class="item" onclick="fichaProducto(DB.buscar('${p.sku}'))">
-      <div class="cont"><h4>${esc(p.nombre)}</h4><div class="meta">${esc(p.sku)} · ${esc(p.marca||'')}</div></div>
+      <div class="cont"><h4>${esc(p.nombre)}</h4><div class="meta">${esc(p.sku)} · ${esc((p.marca||'').toUpperCase())}</div></div>
       <div class="val">${money(p.contado)}<small>Contado</small></div>
     </div>`).join('')
   : `<div class="vacio"><b>Aún no has escaneado</b>Los productos que leas aparecerán aquí.</div>`;
@@ -2291,6 +2291,43 @@ function opcionesCategoria(actual=''){
   return lista.map(cat=>`<option ${actual===cat ? 'selected' : ''}>${esc(cat)}</option>`).join('');
 }
 
+const sinAcentos = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+
+/* Palabras clave por categoría (sin acentos). Se revisa de la más específica
+   a la más general: "cubrecama" antes que "cama", "colchón" antes que "cama". */
+const REGLAS_CATEGORIA = [
+  ['Colchones', ['colchon','box spring','boxspring','box-spring','semiortopedic','ortopedic']],
+  ['Cubrecamas', ['cubrecama','cubre cama','sobrecama','colcha','edredon','duvet','plumon','quilt']],
+  ['Blancos y textiles', ['set/cama','set cama','juego de cama','juego de sabana','sabana','funda de almohada','fundas de almohada','almohada','toalla','cobija','frazada','manta polar','cobertor','protector de colchon','forro de colchon','microbrush','microfibra cama']],
+  ['Línea blanca', ['refrigerad','nevera','congelador','frigobar','lavadora','secadora','estufa','cocina de gas','cocina electrica','horno empotr','campana extractora','lavavajilla','lavaplato','aire acondicionado','minisplit','mini split','enfriador de agua','dispensador de agua','oasis de agua']],
+  ['Electrónica', ['televisor','pantalla led','smart tv',' tv ','tv ','parlante','bocina','bafle','barra de sonido','soundbar','audifono','auricular','laptop','computador','tablet','celular','smartphone','consola','playstation','xbox','nintendo','proyector','camara de seguridad','router','decodificador','blu-ray','dvd']],
+  ['Cocina y mesa', ['bateria de cocina','juego de olla',' olla','sarten','juego de cuchillo','cuchillo de cocina','vajilla','juego de platos','set de vasos','cubiertos','licuadora','batidora','cafetera','tostador','freidora de aire','air fryer','sanduchera','wafflera','arrocera','olla de presion','olla arrocera','contenedor hermetico','hervidor','extractor de jugo','plancha de sandwich']],
+  ['Baño', ['cortina de bano','juego de bano','set de bano','tapete de bano','toallero','porta cepillo','dispensador de jabon','organizador de bano','alfombra de bano']],
+  ['Decoración de hogar', ['cuadro decorativo','adorno','florero','jarron','espejo decorativo','reloj de pared','portarretrato','vela aromatica','centro de mesa','planta artificial','cortina decorativa','panel de cortina','tapiz','figura decorativa']],
+  ['Muebles', ['sofa','sillon','juego de sala','sala modular','comedor','juego de comedor',' silla','mesa de','ropero','closet','gavetero','comoda','escritorio','librero','mueble','litera','cama matrimonial','cama full','cama queen','cama king','cama individual','base de cama','cabecera','peinadora','zapatera','banco','taburete','mecedora','poltrona','rack de tv','centro de entretenimiento']],
+];
+
+function categoriaSegunNombre(nombre){
+  const n = ' ' + sinAcentos(nombre).replace(/[\/]/g,' / ') + ' ';
+  for(const [cat, claves] of REGLAS_CATEGORIA){
+    if(!(CFG.categorias||[]).includes(cat)) continue;
+    if(claves.some(k => n.includes(sinAcentos(k)))) return cat;
+  }
+  return '';
+}
+
+/* Sugiere la categoría a partir del nombre, salvo que el vendedor ya la haya
+   elegido a mano (el select queda "tocado"). */
+function sugerirCategoria(nombre){
+  const sel = $('#pCat');
+  if(!sel || sel.dataset.tocado) return;
+  const cat = categoriaSegunNombre(nombre);
+  if(cat && [...sel.options].some(o => o.value === cat)){
+    sel.value = cat;
+    sel.dataset.sugerida = '1';
+  }
+}
+
 function abrirFormularioProducto(p = null){
   const editando = !!(p && DB.buscar(p.sku));
   abrirHoja(`
@@ -2302,12 +2339,14 @@ function abrirFormularioProducto(p = null){
         inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false"
         style="font-family:var(--dato);letter-spacing:.08em;text-transform:uppercase"></div>
       <button class="btn plano chico" type="button" onclick="escanearBarrasProducto()">Leer código con cámara</button>
-      <div class="campo"><label>Nombre</label><input id="pNombre" value="${esc(p ? p.nombre : '')}" placeholder="Refrigeradora No Frost 14 pies"></div>
+      <div class="campo"><label>Nombre</label><input id="pNombre" value="${esc(p ? p.nombre : '')}" placeholder="Refrigeradora No Frost 14 pies"
+        oninput="sugerirCategoria(this.value)"></div>
       <div class="campo"><label>Color</label><input id="pColor" value="${esc(p ? p.color || '' : '')}" placeholder="Ej. Negro"></div>
       <div class="dosc">
-        <div class="campo"><label>Marca</label><input id="pMarca" value="${esc(p ? p.marca || '' : '')}"></div>
+        <div class="campo"><label>Marca</label><input id="pMarca" value="${esc(p ? (p.marca||'').toUpperCase() : '')}"
+          autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-transform:uppercase"></div>
         <div class="campo"><label>Categoría</label>
-          <select id="pCat">
+          <select id="pCat" onchange="this.dataset.tocado='1'">
             ${opcionesCategoria(p ? p.categoria : '')}
           </select></div>
       </div>
@@ -2325,6 +2364,10 @@ function abrirFormularioProducto(p = null){
     </div>
     <button class="btn ambar" style="margin-top:14px" onclick="guardarProducto('${editando ? p.sku : ''}')">${editando ? 'Actualizar producto' : 'Guardar producto'}</button>
   `);
+  // Al editar, o si ya trae categoría, no se sobrescribe automáticamente
+  if(editando || (p && p.categoria)) { const s=$('#pCat'); if(s) s.dataset.tocado='1'; }
+  // Producto nuevo con nombre ya escrito (p. ej. viene de un escaneo): sugerir ya
+  else if(p && p.nombre) sugerirCategoria(p.nombre);
 }
 
 async function guardarProducto(skuOriginal = ''){
@@ -2334,7 +2377,10 @@ async function guardarProducto(skuOriginal = ''){
   if(!sku || !nombre){ brindis('El código y el nombre son obligatorios'); return; }
 
   const producto = {
-    sku, codigoBarras, nombre, color:$('#pColor').value.trim(), marca:$('#pMarca').value.trim(), categoria:$('#pCat').value,
+    sku, codigoBarras, nombre,
+    color:$('#pColor').value.trim(),
+    marca:$('#pMarca').value.trim().toUpperCase(),
+    categoria:$('#pCat').value || categoriaSegunNombre(nombre) || 'Otros',
     contado:+$('#pContado').value||0, credito:+$('#pCredito').value||0, stock:+$('#pStock').value||0,
     piezas:Math.max(1, Math.round(+$('#pPiezas').value||1))
   };
@@ -2491,7 +2537,7 @@ function pintarProductos(){
             <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase;">${esc(p.categoria||'Sin categoría')}</div>
             <div style="font-size:10px; color:var(--tinta-3); white-space:nowrap;">${fechaCompleta(p.fecha || hoy())}</div>
           </div>
-          <div class="meta" style="line-height:1.5;">Código: ${esc(p.sku)}<br>${esc(p.marca||'Sin marca')}${p.piezas>1?'<br>'+p.piezas+' piezas por paquete':''}</div>
+          <div class="meta" style="line-height:1.5;">Código: ${esc(p.sku)}<br>${esc((p.marca||'Sin marca').toUpperCase())}${p.piezas>1?'<br>'+p.piezas+' piezas por paquete':''}</div>
           <span class="marbete ${p.stock>3?'m-verde':p.stock>0?'m-ambar':'m-rojo'}">
             ${p.stock>0?p.stock+' en existencia':'Agotado'}</span>
         </div>
@@ -3213,7 +3259,7 @@ $('#btnPdfProductos').addEventListener('click',()=>{
   const suma=(arr,k)=>arr.reduce((s,p)=>s+(Number(p[k])||0),0);
   const grupos=agruparParaPDF(productos,
     p=>p.categoria||'Sin categoría',
-    p=>[p.sku||'—',p.codigoBarras||'—',p.nombre||'—',p.color||'—',p.marca||'—',p.piezas||1,money(p.contado),money(p.credito),p.stock||0],
+    p=>[p.sku||'—',p.codigoBarras||'—',p.nombre||'—',p.color||'—',(p.marca||'—').toUpperCase(),p.piezas||1,money(p.contado),money(p.credito),p.stock||0],
     its=>['Subtotal',' ',' ',' ',' ',' ',money(suma(its,'contado')),money(suma(its,'credito')),suma(its,'stock')]);
   const total=['Total general',' ',' ',' ',' ',' ',money(suma(productos,'contado')),money(suma(productos,'credito')),suma(productos,'stock')];
   descargarTablaPDF({
