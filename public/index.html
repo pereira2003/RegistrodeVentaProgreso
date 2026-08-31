@@ -230,9 +230,15 @@ button{cursor:pointer;border:none;background:none}
 }
 .chip-asistente svg{width:17px;height:17px;flex:0 0 auto;color:var(--verde)}
 .chip-asistente.activo{border-color:var(--verde);background:var(--verde-claro);color:var(--verde)}
+.pp-wrap{
+  overflow:hidden;max-height:0;opacity:0;margin-bottom:0;
+  transition:max-height .3s cubic-bezier(.4,0,.2,1), opacity .22s ease, margin-bottom .3s cubic-bezier(.4,0,.2,1);
+}
+.pp-wrap.abierto{opacity:1;margin-bottom:14px}
+@media (prefers-reduced-motion:reduce){ .pp-wrap{transition:none} }
 .panel-producto{
   background:var(--papel);border:1px solid var(--verde);border-radius:var(--r);
-  box-shadow:var(--duro);padding:12px;margin-bottom:14px;animation:sube .18s ease;
+  box-shadow:var(--duro);padding:12px;
 }
 .panel-producto.sin-producto{border-color:var(--borde)}
 .panel-producto .pp-tope{display:flex;align-items:flex-start;gap:8px;margin-bottom:2px}
@@ -2231,9 +2237,28 @@ const ICONO_ASISTENTE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 function pintarMenuProductoActivo(){
   const cont = $('#menuProductoActivo');
   if(!cont) return;
+  if(!cont.querySelector('.pp-wrap')){
+    cont.innerHTML = `<div class="pp-chip-slot"></div><div class="pp-wrap"></div>`;
+  }
+  const chipSlot = cont.querySelector('.pp-chip-slot');
+  const wrap = cont.querySelector('.pp-wrap');
   const p = productoActivoSku ? DB.buscar(productoActivoSku) : null;
-  const chip = `<button class="chip-asistente ${menuProductoAbierto&&!menuColapsadoScroll?'activo':''}" type="button" onclick="toggleMenuProducto()">${ICONO_ASISTENTE}<span>Asistente de producto</span></button>`;
-  if(!menuProductoAbierto || menuColapsadoScroll){ cont.innerHTML = chip; return; }
+  const abierto = menuProductoAbierto && !menuColapsadoScroll;
+  chipSlot.innerHTML = `<button class="chip-asistente ${abierto?'activo':''}" type="button" onclick="toggleMenuProducto()">${ICONO_ASISTENTE}<span>Asistente de producto</span></button>`;
+
+  if(!abierto){
+    if(wrap.classList.contains('abierto')){
+      wrap.style.maxHeight = wrap.scrollHeight + 'px';
+      requestAnimationFrame(()=>{
+        wrap.classList.remove('abierto');
+        wrap.style.maxHeight = '0px';
+      });
+      clearTimeout(wrap._t);
+      wrap._t = setTimeout(()=>{ if(!wrap.classList.contains('abierto')){ wrap.innerHTML=''; wrap.style.maxHeight=''; } }, 340);
+    }
+    return;
+  }
+
   let panel;
   if(!p){
     panel = `
@@ -2280,7 +2305,16 @@ function pintarMenuProductoActivo(){
         </div>
       </div>`;
   }
-  cont.innerHTML = chip + panel;
+  wrap.innerHTML = panel;
+  const yaAbierto = wrap.classList.contains('abierto');
+  wrap.classList.add('abierto');
+  clearTimeout(wrap._t);
+  if(yaAbierto){
+    wrap.style.maxHeight = 'none';
+  }else{
+    wrap.style.maxHeight = wrap.scrollHeight + 'px';
+    wrap._t = setTimeout(()=>{ if(wrap.classList.contains('abierto')) wrap.style.maxHeight = 'none'; }, 340);
+  }
 }
 
 function toggleMenuProducto(){
