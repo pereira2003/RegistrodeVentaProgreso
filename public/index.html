@@ -222,42 +222,46 @@ button{cursor:pointer;border:none;background:none}
 .precio.destaca{background:var(--rojo-claro);border-color:var(--rojo)}
 .precio.destaca b{color:var(--rojo)}
 .chip-asistente{
-  display:inline-flex;align-items:center;gap:8px;
+  display:inline-flex;align-items:center;gap:7px;
   border:1px solid var(--borde);background:var(--papel);border-radius:999px;
-  padding:9px 15px 9px 11px;box-shadow:var(--duro);cursor:pointer;
-  font-family:var(--dato);font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--tinta-2);
-  margin-bottom:12px;
+  padding:7px 13px 7px 9px;box-shadow:var(--duro);cursor:pointer;
+  font-family:var(--dato);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tinta-2);
+  margin-bottom:10px;
 }
-.chip-asistente svg{width:20px;height:20px;flex:0 0 auto;color:var(--verde)}
+.chip-asistente svg{width:17px;height:17px;flex:0 0 auto;color:var(--verde)}
 .chip-asistente.activo{border-color:var(--verde);background:var(--verde-claro);color:var(--verde)}
 .panel-producto{
   background:var(--papel);border:1px solid var(--verde);border-radius:var(--r);
-  box-shadow:var(--duro);padding:14px;margin-bottom:16px;animation:sube .18s ease;
+  box-shadow:var(--duro);padding:12px;margin-bottom:14px;animation:sube .18s ease;
 }
 .panel-producto.sin-producto{border-color:var(--borde)}
-.panel-producto .pp-tope{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
+.panel-producto .pp-tope{display:flex;align-items:flex-start;gap:8px;margin-bottom:2px}
 .panel-producto .pp-tope>.pp-info{flex:1;min-width:0}
 .pp-chispa{
-  flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  background:var(--verde-claro);font-size:17px;line-height:1;
+  flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--verde-claro);font-size:13px;line-height:1;
 }
-.pp-titulo{font-family:var(--dato);font-size:9.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--verde)}
-.pp-nombre{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.02em;margin-top:4px;line-height:1.15}
-.pp-meta{font-family:var(--dato);font-size:10.5px;color:var(--tinta-3);letter-spacing:.03em;margin-top:4px}
-.pp-vacio-txt{font-size:12.5px;color:var(--tinta-3);line-height:1.5;margin-top:5px}
-.panel-producto .cerrar{flex:0 0 auto}
-.menu-acciones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.pp-titulo{font-family:var(--dato);font-size:8.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--verde)}
+.pp-nombre{font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:-.02em;margin-top:3px;line-height:1.2}
+.pp-meta{font-family:var(--dato);font-size:9.5px;color:var(--tinta-3);letter-spacing:.02em;margin-top:3px}
+.pp-vacio-txt{font-size:11.5px;color:var(--tinta-3);line-height:1.45;margin-top:4px}
+.panel-producto .cerrar{flex:0 0 auto;width:28px;height:28px;font-size:14px}
+.menu-acciones{display:flex;flex-direction:column;gap:5px;margin-top:10px}
 .opcion-menu{
-  display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;width:100%;
   border:1px solid var(--borde);border-radius:var(--r);background:var(--papel);
-  padding:13px 14px;cursor:pointer;text-align:left;box-shadow:var(--duro);
+  padding:9px 11px;cursor:pointer;text-align:left;
 }
-.opcion-menu span{font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:-.01em}
-.opcion-menu small{font-family:var(--dato);font-size:10.5px;color:var(--tinta-3);letter-spacing:.02em}
+.opcion-menu span{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:-.01em}
+.opcion-menu small{font-family:var(--dato);font-size:9.5px;color:var(--tinta-3);letter-spacing:.02em;flex:0 0 auto;white-space:nowrap}
 .opcion-menu.destacada{border-color:var(--verde);background:var(--verde-claro)}
 .opcion-menu.destacada span{color:var(--verde)}
-.mini-cifras{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px}
-.mini-cifras .cifra b{font-size:20px}
+.pp-stats{margin-top:10px;border:1px solid var(--suave);border-radius:var(--r);overflow:hidden}
+.pp-stats>div{display:flex;justify-content:space-between;align-items:center;padding:6px 11px;border-top:1px solid var(--suave)}
+.pp-stats>div:first-child{border-top:none}
+.pp-stats span{font-family:var(--dato);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-3)}
+.pp-stats b{font-family:var(--display);font-size:14px;font-weight:800;letter-spacing:-.02em}
+.pp-stats b.ok{color:var(--verde)}
 
 /* ---------- Listas ---------- */
 .item{
@@ -2224,12 +2228,12 @@ function pintarMenuProductoActivo(){
           <button class="opcion-menu" type="button" onclick="fichaProducto(DB.buscar('${p.sku}'))">
             <span>Ver detalle del producto</span><small>Precios, existencia y piezas</small></button>
         </div>
-        <div class="mini-cifras">
-          <div class="cifra"><em>En ruta ahora</em><b>${s.enRuta}</b></div>
-          <div class="cifra"><em>En entregas</em><b>${s.entregasEnRuta}</b></div>
-          <div class="cifra bien"><em>Vendidos</em><b>${s.vendido}</b></div>
-          <div class="cifra"><em>Devueltos</em><b>${s.devuelto}</b></div>
-          <div class="cifra" style="grid-column:1/-1"><em>Entregado histórico</em><b>${s.entregado}</b></div>
+        <div class="pp-stats">
+          <div><span>En ruta ahora</span><b>${s.enRuta}</b></div>
+          <div><span>En entregas</span><b>${s.entregasEnRuta}</b></div>
+          <div><span>Vendidos</span><b class="ok">${s.vendido}</b></div>
+          <div><span>Devueltos</span><b>${s.devuelto}</b></div>
+          <div><span>Entregado histórico</span><b>${s.entregado}</b></div>
         </div>
       </div>`;
   }
