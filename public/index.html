@@ -262,6 +262,11 @@ button{cursor:pointer;border:none;background:none}
 .pp-stats span{font-family:var(--dato);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-3)}
 .pp-stats b{font-family:var(--display);font-size:14px;font-weight:800;letter-spacing:-.02em}
 .pp-stats b.ok{color:var(--verde)}
+.det-lista{border:1px solid var(--suave);border-radius:var(--r);overflow:hidden;background:var(--papel)}
+.det-fila{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 12px;border-top:1px solid var(--suave)}
+.det-fila:first-child{border-top:none}
+.det-fila span{font-family:var(--dato);font-size:10px;letter-spacing:.05em;color:var(--tinta-3);flex:0 0 auto}
+.det-fila b{font-family:var(--display);font-weight:700;font-size:13px;text-align:right;letter-spacing:-.01em;word-break:break-word}
 
 /* ---------- Listas ---------- */
 .item{
@@ -2255,23 +2260,54 @@ function mostrarMenuProductoActivo(p){
 pintarMenuProductoActivo();
 
 function fichaProducto(p){
+  const s = statsProductoEntregas(p.sku);
+  const ventasProd = (DB.ventas||[]).filter(v=>v.sku===p.sku);
+  const unidadesVendidas = ventasProd.reduce((t,v)=>t+(Number(v.cantidad)||1),0);
+  const fila = (etiqueta,valor)=>`<div class="det-fila"><span>${etiqueta}</span><b>${valor}</b></div>`;
   abrirHoja(`
-    <div class="hoja-tope"><h2>Producto</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="hoja-tope"><h2>Detalle del producto</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="ficha">
-      <div class="banda"><code>${esc(p.sku)}</code><em>${esc(p.categoria||'')}</em></div>
+      <div class="banda"><code>${esc(p.sku)}</code><em>${esc(p.categoria||'Sin categoría')}</em></div>
       <div class="cuerpo">
         <h3>${esc(p.nombre)}</h3>
-        <div class="marca-p">${esc((p.marca||'').toUpperCase())} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}${p.piezas>1?' · '+p.piezas+' piezas por paquete':''}</div>
+        <div class="marca-p">${esc((p.marca||'—').toUpperCase())}</div>
         <div class="precios">
           <div class="precio"><em>Contado</em><b>${money(p.contado)}</b></div>
           <div class="precio destaca"><em>Crédito</em><b>${money(p.credito)}</b></div>
         </div>
       </div>
     </div>
-    <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+
+    <div class="rotulo">Ficha</div>
+    <div class="det-lista">
+      ${fila('Código interno (SKU)', esc(p.sku))}
+      ${fila('Código de barras', esc(p.codigoBarras||'—'))}
+      ${fila('Nombre', esc(p.nombre))}
+      ${fila('Marca', esc((p.marca||'—').toUpperCase()))}
+      ${fila('Categoría', esc(p.categoria||'—'))}
+      ${fila('Color', esc(p.color||'—'))}
+      ${fila('Precio contado', money(p.contado))}
+      ${fila('Precio crédito', money(p.credito))}
+      ${fila('Existencia', (p.stock ?? 0)+(p.stock===1?' unidad':' unidades'))}
+      ${fila('Piezas por paquete', (p.piezas ?? 1))}
+      ${p.creado ? fila('Registrado', fechaCompleta(p.creado)) : ''}
+    </div>
+
+    <div class="rotulo">Movimiento</div>
+    <div class="det-lista">
+      ${fila('En ruta ahora', s.enRuta)}
+      ${fila('En entregas abiertas', s.entregasEnRuta)}
+      ${fila('Vendidos en entregas', s.vendido)}
+      ${fila('Devueltos en entregas', s.devuelto)}
+      ${fila('Entregado histórico', s.entregado)}
+      ${fila('Ventas registradas', ventasProd.length+' · '+unidadesVendidas+' u.')}
+    </div>
+
+    <div style="margin-top:14px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
       <button class="btn" onclick="formVenta('${p.sku}','contado')">Al contado</button>
       <button class="btn ambar" onclick="formVenta('${p.sku}','credito')">A crédito</button>
     </div>
+    <button class="btn plano" style="margin-top:8px" onclick="formEditarProducto('${p.sku}')">Editar producto</button>
   `);
 }
 
