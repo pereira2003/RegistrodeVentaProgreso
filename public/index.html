@@ -3487,10 +3487,6 @@ function pintarEntregas(){
             </div>
             <div class="meta">${entregados || '—'}</div>
           </div>
-          ${totalVen ? `<div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(74,110,140,.32); border-radius:8px; background:rgba(214,230,242,.45)">
-            <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#4A6E8C; margin-bottom:6px;">Vendidos</div>
-            <div class="meta">${vendidos}</div>
-          </div>` : ''}
           <div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(216,194,164,.35); border-radius:8px; background:rgba(247,243,233,.6)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
               <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Devolución</div>
@@ -3498,6 +3494,10 @@ function pintarEntregas(){
             </div>
             <div class="meta">${devueltos || '—'}</div>
           </div>
+          ${totalVen ? `<div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(74,110,140,.32); border-radius:8px; background:rgba(214,230,242,.45)">
+            <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#4A6E8C; margin-bottom:6px;">Vendidos</div>
+            <div class="meta">${vendidos}</div>
+          </div>` : ''}
           <div style="margin-top:14px; padding-top:10px; border-top:1px solid rgba(44,44,44,.12);">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
               <div>
