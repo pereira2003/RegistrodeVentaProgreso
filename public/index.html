@@ -235,15 +235,11 @@ button{cursor:pointer;border:none;background:none}
 }
 .chip-asistente svg{width:17px;height:17px;flex:0 0 auto;color:var(--verde)}
 .chip-asistente.activo{border-color:var(--verde);background:var(--verde-claro);color:var(--verde)}
-.pp-wrap{
-  overflow:hidden;max-height:0;opacity:0;margin-bottom:0;
-  transition:max-height .3s cubic-bezier(.4,0,.2,1), opacity .22s ease, margin-bottom .3s cubic-bezier(.4,0,.2,1);
-}
-.pp-wrap.abierto{opacity:1;margin-bottom:14px}
-@media (prefers-reduced-motion:reduce){ .pp-wrap{transition:none} }
+.pp-wrap{overflow:hidden;max-height:0;opacity:0;margin-bottom:0;will-change:max-height,opacity}
+@media (prefers-reduced-motion:reduce){ .pp-wrap{transition:none!important} }
 .panel-producto{
   background:var(--papel);border:1px solid var(--verde);border-radius:var(--r);
-  box-shadow:var(--duro);padding:12px;
+  box-shadow:var(--duro);padding:12px;transform-origin:top center;will-change:transform;
 }
 .panel-producto.sin-producto{border-color:var(--borde)}
 .panel-producto .pp-tope{display:flex;align-items:flex-start;gap:8px;margin-bottom:2px}
@@ -2236,8 +2232,28 @@ function statsProductoEntregas(sku){
 let productoActivoSku = null;
 
 let menuProductoAbierto = false;
-let menuColapsadoScroll = false;
+let menuAnimando = false;
+const MENU_COLAPSO_DIST = 150;
+const MENU_EASE = 'cubic-bezier(.33,0,.15,1)';
 const ICONO_ASISTENTE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H6a2 2 0 0 1-2-2z"/><path d="M19 2.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="currentColor" stroke="none"/></svg>`;
+
+// Colapso ligado al scroll: al bajar se cierra progresivamente, al subir se abre.
+function aplicarColapsoMenu(){
+  const cont = $('#menuProductoActivo'); if(!cont) return;
+  const wrap = cont.querySelector('.pp-wrap');
+  const panel = wrap && wrap.firstElementChild;
+  if(!wrap || !wrap.classList.contains('abierto') || !panel || menuAnimando) return;
+  const t = Math.min(1, Math.max(0, window.scrollY / MENU_COLAPSO_DIST));
+  const e = t*t*(3-2*t); // smoothstep, suave en ambos extremos
+  const full = panel.offsetHeight;
+  wrap.style.transition = 'none';
+  wrap.style.maxHeight = (full * (1-e)).toFixed(1) + 'px';
+  wrap.style.opacity = (1-e).toFixed(3);
+  wrap.style.marginBottom = (14 * (1-e)).toFixed(1) + 'px';
+  panel.style.transform = `translateY(${(-6*e).toFixed(1)}px) scale(${(1-0.02*e).toFixed(3)})`;
+  const chip = cont.querySelector('.chip-asistente');
+  if(chip) chip.classList.toggle('activo', e < 0.5);
+}
 
 function pintarMenuProductoActivo(){
   const cont = $('#menuProductoActivo');
@@ -2248,21 +2264,37 @@ function pintarMenuProductoActivo(){
   const chipSlot = cont.querySelector('.pp-chip-slot');
   const wrap = cont.querySelector('.pp-wrap');
   const p = productoActivoSku ? DB.buscar(productoActivoSku) : null;
-  const abierto = menuProductoAbierto && !menuColapsadoScroll;
-  chipSlot.innerHTML = `<button class="chip-asistente ${abierto?'activo':''}" type="button" onclick="toggleMenuProducto()">${ICONO_ASISTENTE}<span>Asistente de producto</span></button>`;
 
-  if(!abierto){
+  if(!chipSlot.firstElementChild){
+    chipSlot.innerHTML = `<button class="chip-asistente" type="button" onclick="toggleMenuProducto()">${ICONO_ASISTENTE}<span>Asistente de producto</span></button>`;
+  }
+  chipSlot.firstElementChild.classList.toggle('activo', menuProductoAbierto);
+
+  if(!menuProductoAbierto){
     if(wrap.classList.contains('abierto')){
-      wrap.style.maxHeight = wrap.scrollHeight + 'px';
+      const panel = wrap.firstElementChild;
+      menuAnimando = true;
+      wrap.style.transition = `max-height .3s ${MENU_EASE}, opacity .24s ease, margin-bottom .3s ${MENU_EASE}`;
+      wrap.style.maxHeight = (panel ? panel.offsetHeight : 0) + 'px';
+      if(panel) panel.style.transform = '';
       requestAnimationFrame(()=>{
-        wrap.classList.remove('abierto');
         wrap.style.maxHeight = '0px';
+        wrap.style.opacity = '0';
+        wrap.style.marginBottom = '0';
       });
       clearTimeout(wrap._t);
-      wrap._t = setTimeout(()=>{ if(!wrap.classList.contains('abierto')){ wrap.innerHTML=''; wrap.style.maxHeight=''; } }, 340);
+      wrap._t = setTimeout(()=>{
+        menuAnimando = false;
+        wrap.classList.remove('abierto');
+        wrap.innerHTML = '';
+        wrap.style.cssText = 'overflow:hidden;max-height:0;opacity:0;margin-bottom:0';
+      }, 320);
     }
     return;
   }
+
+  const firma = p ? p.sku+'|'+JSON.stringify(statsProductoEntregas(p.sku)) : '∅';
+  const nuevo = !wrap.classList.contains('abierto');
 
   let panel;
   if(!p){
@@ -2310,40 +2342,49 @@ function pintarMenuProductoActivo(){
         </div>
       </div>`;
   }
-  wrap.innerHTML = panel;
-  const yaAbierto = wrap.classList.contains('abierto');
-  wrap.classList.add('abierto');
+  if(nuevo || wrap.dataset.firma !== firma){
+    wrap.dataset.firma = firma;
+    wrap.innerHTML = panel;
+  }
   clearTimeout(wrap._t);
-  if(yaAbierto){
-    wrap.style.maxHeight = 'none';
+
+  if(nuevo){
+    menuAnimando = true;
+    wrap.classList.add('abierto');
+    wrap.style.transition = 'none';
+    wrap.style.maxHeight = '0px';
+    wrap.style.opacity = '0';
+    wrap.style.marginBottom = '0';
+    requestAnimationFrame(()=>{
+      const full = wrap.firstElementChild.offsetHeight;
+      wrap.style.transition = `max-height .34s ${MENU_EASE}, opacity .28s ease, margin-bottom .34s ${MENU_EASE}`;
+      wrap.style.maxHeight = full + 'px';
+      wrap.style.opacity = '1';
+      wrap.style.marginBottom = '14px';
+    });
+    wrap._t = setTimeout(()=>{ menuAnimando = false; aplicarColapsoMenu(); }, 360);
   }else{
-    wrap.style.maxHeight = wrap.scrollHeight + 'px';
-    wrap._t = setTimeout(()=>{ if(wrap.classList.contains('abierto')) wrap.style.maxHeight = 'none'; }, 340);
+    aplicarColapsoMenu();
   }
 }
 
 function toggleMenuProducto(){
   menuProductoAbierto = !menuProductoAbierto;
-  menuColapsadoScroll = false;
   if(menuProductoAbierto) window.scrollTo({top:0, behavior:'smooth'});
   pintarMenuProductoActivo();
 }
 
 function mostrarMenuProductoActivo(p){
   productoActivoSku = p ? p.sku : null;
-  if(p){ menuProductoAbierto = true; menuColapsadoScroll = false; }
+  if(p) menuProductoAbierto = true;
   pintarMenuProductoActivo();
-  const cont = $('#menuProductoActivo');
-  if(p && cont) cont.scrollIntoView({behavior:'smooth', block:'start'});
+  if(p) window.scrollTo({top:0, behavior:'smooth'});
 }
 
+let menuColapsoRAF = 0;
 window.addEventListener('scroll', ()=>{
-  if(!menuProductoAbierto) return;
-  const colapsar = menuColapsadoScroll ? window.scrollY > 24 : window.scrollY > 96;
-  if(colapsar !== menuColapsadoScroll){
-    menuColapsadoScroll = colapsar;
-    pintarMenuProductoActivo();
-  }
+  if(!menuProductoAbierto || menuAnimando || menuColapsoRAF) return;
+  menuColapsoRAF = requestAnimationFrame(()=>{ menuColapsoRAF = 0; aplicarColapsoMenu(); });
 }, {passive:true});
 
 pintarMenuProductoActivo();
