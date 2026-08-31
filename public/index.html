@@ -2090,12 +2090,54 @@ function formEditarProducto(sku){
 }
 
 function pintarRecientes(){
-  $('#recientes').innerHTML = recientes.length ? recientes.map(p=>`
-    <div class="item" onclick="fichaProducto(DB.buscar('${p.sku}'))">
-      <div class="cont"><h4>${esc(p.nombre)}</h4><div class="meta">${esc(p.sku)} · ${esc((p.marca||'').toUpperCase())}</div></div>
-      <div class="val">${money(p.contado)}<small>Contado</small></div>
+  const cont = $('#recientes');
+  cont.innerHTML = recientes.length ? recientes.map(p=>`
+    <div class="product-swipe reciente-swipe" data-sku="${esc(p.sku)}">
+      <div class="swipe-actions"><button class="btn-contado" type="button" onclick="event.stopPropagation(); agregarRecienteAEntrega('${p.sku}')">Agregar</button></div>
+      <div class="swipe-content item" style="padding:12px">
+        <div class="cont"><h4>${esc(p.nombre)}</h4><div class="meta">${esc(p.sku)} · ${esc((p.marca||'').toUpperCase())}</div></div>
+        <div class="val">${money(p.contado)}<small>Contado</small></div>
+      </div>
     </div>`).join('')
   : `<div class="vacio"><b>Aún no has escaneado</b>Los productos que leas aparecerán aquí.</div>`;
+  cont.querySelectorAll('.reciente-swipe').forEach(bindSwipeReciente);
+}
+
+function bindSwipeReciente(card){
+  const cont=card.querySelector('.swipe-content');
+  let inicio=0,inicioY=0,actual=0,arrastrando=false,intencion=0,frame=0,pendiente=0,movido=false;
+  const mover=x=>{pendiente=x;if(frame)return;frame=requestAnimationFrame(()=>{frame=0;const offset=Math.max(Math.min(pendiente,0),-132);cont.style.transform=`translate3d(${offset}px,0,0)`;card.classList.toggle('open',offset<=-60);cont.classList.toggle('open',offset<=-60);});};
+  cont.addEventListener('pointerdown',e=>{inicio=actual=e.clientX;inicioY=e.clientY;arrastrando=false;intencion=0;movido=false;});
+  cont.addEventListener('pointermove',e=>{
+    if(intencion===-1)return;
+    const dx=e.clientX-inicio, dy=e.clientY-inicioY;
+    if(intencion===0){
+      if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
+      if(Math.abs(dx)>Math.abs(dy)+2){intencion=1;arrastrando=true;movido=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);}
+      else{intencion=-1;return;}
+    }
+    if(arrastrando&&e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}
+  }, {passive:true});
+  const terminar=()=>{if(!arrastrando){intencion=0;return;}const abrir=actual-inicio<=-60;if(abrir)cerrarOtrosSwipes(card);mover(abrir?-132:0);arrastrando=false;intencion=0;cont.classList.remove('arrastrando');};
+  cont.addEventListener('pointerup',terminar);cont.addEventListener('pointercancel',terminar);
+  cont.addEventListener('click',e=>{
+    if(cont.classList.contains('open')){mover(0);e.preventDefault();return;}
+    if(movido){e.preventDefault();return;}
+    const p=DB.buscar(card.dataset.sku); if(p) fichaProducto(p);
+  });
+}
+
+function agregarRecienteAEntrega(sku){
+  const p = DB.buscar(sku); if(!p) return;
+  if(!entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
+  if(!entregaActual.zona && zonasActuales().length) entregaActual.zona = zonasActuales()[0];
+  entregaActual.entregaCreado = entregaActual.entregaCreado || new Date().toISOString();
+  const ex = entregaActual.items.find(i=>i.sku===p.sku);
+  if(ex){ ex.cantidad = (ex.cantidad||1)+1; }
+  else { entregaActual.items.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado||0, cantidad:1 }); }
+  const total = entregaActual.items.reduce((s,i)=>s+(i.cantidad||1),0);
+  brindis(`${p.nombre} agregado a la entrega (${total})`);
+  pintarRecientes();
 }
 
 /* ============================================================
