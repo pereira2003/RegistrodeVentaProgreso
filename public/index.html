@@ -457,7 +457,10 @@ button{cursor:pointer;border:none;background:none}
     </button>
   </div>
   <button class="btn plano" id="btnNuevoProd" style="margin-bottom:14px">+ Agregar producto</button>
-  <button class="btn plano chico" id="btnPdfProductos" style="width:100%;margin-bottom:10px">Descargar PDF</button>
+  <div class="fila" style="margin-bottom:10px">
+    <button class="btn plano chico" id="btnPdfProductos" style="flex:1">Descargar PDF</button>
+    <button class="btn plano chico" id="btnLimpiarProd" style="flex:1" hidden>Limpiar búsqueda</button>
+  </div>
   <div id="listaProd"></div>
 </section>
 
@@ -613,6 +616,7 @@ const CFG = {
     'Electrónica',
     'Muebles',
     'Colchones',
+    'Cubrecamas',
     'Blancos y textiles',
     'Decoración de hogar',
     'Cocina y mesa',
@@ -1611,10 +1615,14 @@ function procesarCodigoLeido(valor,sesionActual=sesionEscaneo,formato=''){
     if(producto){
       const botonProductos=$('.barra button[data-ir="productos"]');
       botonProductos?.click();
+      skuBuscado=producto.sku;                 // filtro exacto: solo este producto
       $('#filtroProd').value=producto.nombre;
       pintarProductos();
       brindis('Producto encontrado'+tipoLeido);
-    }else brindis('No hay ningún producto con el código '+sku+tipoLeido);
+    }else{
+      skuBuscado='';
+      brindis('No hay ningún producto con el código '+sku+tipoLeido);
+    }
   }else if(modoEscaneo === 'producto'){
     const productoExistente=DB.buscar(sku);
     const datosProducto={...productoPendiente, codigoBarras:sku};
@@ -2265,9 +2273,20 @@ async function aplicarAbono(id){
 /* ============================================================
    PRODUCTOS
    ============================================================ */
-$('#filtroProd').addEventListener('input', pintarProductos);
+// Cuando se busca por cámara guarda el SKU exacto: la lista muestra ese
+// producto y ningún otro. Escribir en el campo vuelve a la búsqueda por texto.
+let skuBuscado = '';
+
+function limpiarBusquedaProductos(){
+  skuBuscado = '';
+  $('#filtroProd').value = '';
+  pintarProductos();
+}
+
+$('#filtroProd').addEventListener('input', ()=>{ skuBuscado=''; pintarProductos(); });
 $('#btnBuscarProductoCamara').addEventListener('click', escanearProductoDesdeLista);
 $('#btnNuevoProd').addEventListener('click', ()=>abrirFormularioProducto());
+$('#btnLimpiarProd').addEventListener('click', limpiarBusquedaProductos);
 
 function opcionesCategoria(actual=''){
   const lista = (CFG.categorias && CFG.categorias.length) ? [...CFG.categorias] : ['Otros'];
@@ -2438,8 +2457,18 @@ function bindSwipeVenta(card){
 
 function pintarProductos(){
   const q = $('#filtroProd').value.toLowerCase().trim();
-  const lista = DB.productos.filter(p=>!q ||
-    (p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q));
+  let lista, exacta = false;
+  if(skuBuscado){
+    // Búsqueda por cámara: solo el producto escaneado, exacto
+    const p = DB.buscar(skuBuscado);
+    lista = p ? [p] : [];
+    exacta = true;
+  }else{
+    lista = DB.productos.filter(p=>!q ||
+      (p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q));
+  }
+  const btnLimpiar = $('#btnLimpiarProd');
+  if(btnLimpiar) btnLimpiar.hidden = !(skuBuscado || q);
   $('#listaProd').innerHTML = lista.length ? lista.map(p=>`
     <div class="product-swipe" data-sku="${esc(p.sku)}">
       <div class="swipe-actions">
@@ -2467,7 +2496,9 @@ function pintarProductos(){
         </div>
       </div>
     </div>`).join('')
-  : `<div class="vacio"><b>Sin resultados</b>Prueba con otro nombre o código.</div>`;
+  : exacta
+    ? `<div class="vacio"><b>Sin coincidencia exacta</b>El código escaneado no corresponde a ningún producto. Usa "Limpiar búsqueda" para ver todo.</div>`
+    : `<div class="vacio"><b>Sin resultados</b>Prueba con otro nombre o código.</div>`;
 
   $('#listaProd').querySelectorAll('.product-swipe').forEach(bindSwipeVenta);
 }
@@ -3173,7 +3204,9 @@ function categoriaDeSku(sku){
 
 $('#btnPdfProductos').addEventListener('click',()=>{
   const q=$('#filtroProd').value.toLowerCase().trim();
-  const productos=DB.productos.filter(p=>!q||(p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q))
+  const exacto = skuBuscado ? DB.buscar(skuBuscado) : null;
+  const productos=(exacto ? [exacto]
+      : DB.productos.filter(p=>!q||(p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q)))
     .slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
   const columnas=[{t:'SKU'},{t:'Código de barras'},{t:'Nombre'},{t:'Color'},{t:'Marca'},{t:'Piezas',num:true},{t:'Contado',num:true},{t:'Crédito',num:true},{t:'Existencia',num:true}];
   const suma=(arr,k)=>arr.reduce((s,p)=>s+(Number(p[k])||0),0);
@@ -3184,7 +3217,7 @@ $('#btnPdfProductos').addEventListener('click',()=>{
   const total=['Total general',' ',' ',' ',' ',' ',money(suma(productos,'contado')),money(suma(productos,'credito')),suma(productos,'stock')];
   descargarTablaPDF({
     documento:'Reporte de productos',
-    periodo: q ? `Filtro: "${q}"` : 'Catálogo completo',
+    periodo: exacto ? `Producto: ${exacto.nombre} (${exacto.sku})` : q ? `Filtro: "${q}"` : 'Catálogo completo',
     resumen:[['Productos',productos.length],['Categorías',grupos.length],['Valor contado',money(suma(productos,'contado'))],['Valor crédito',money(suma(productos,'credito'))],['Existencia total',suma(productos,'stock')]],
     columnas, grupos, totalGeneral:total, archivo:'productos'
   });
