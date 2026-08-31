@@ -71,9 +71,14 @@ select.filtro-control{
 .fila>.filtro-tipo,.fila>.filtro-fecha{min-width:0;width:0}
 .filtro-fila{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;width:100%;min-width:0;align-items:stretch}
 .filtro-fila>.filtro-tipo,.filtro-fila>.filtro-fecha{width:100%;min-width:0;max-width:100%}
-.buscador-productos{display:flex;gap:8px;margin-bottom:12px;align-items:center}
-.buscador-productos input{flex:1;min-width:0;margin:0}
-.buscador-productos input{height:44px}
+.buscador-productos{position:relative;margin-bottom:12px}
+.buscador-productos input{width:100%;min-width:0;margin:0;height:44px;padding-right:46px!important}
+.buscador-productos .btn-icono{
+  position:absolute;right:5px;top:50%;transform:translateY(-50%);
+  width:34px;height:34px;flex:0 0 auto;padding:0;border:none;background:transparent;
+  box-shadow:none;color:var(--tinta-3);display:flex;align-items:center;justify-content:center;border-radius:8px;
+}
+.buscador-productos .btn-icono:active{background:var(--suave)}
 .btn-icono{width:44px;height:44px;flex:0 0 44px;padding:0;border-radius:var(--r)}
 @media (max-width:360px){
   .filtro-control{font-size:12px}
