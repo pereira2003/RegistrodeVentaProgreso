@@ -40,11 +40,12 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
 html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden}
+html{-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 body{
   font-family:var(--texto);background:var(--fondo);color:var(--tinta);
   font-size:14px;line-height:1.55;
   padding-bottom:calc(74px + env(safe-area-inset-bottom));
-  overscroll-behavior-y:contain;
+  overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;
 }
 h1,h2,h3,h4{font-family:var(--display);margin:0;letter-spacing:-.015em;font-weight:700}
 button,input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
@@ -399,7 +400,8 @@ button{cursor:pointer;border:none;background:none}
     <button class="btn-linterna" id="btnLinterna" type="button" hidden aria-pressed="false">Activar linterna</button>
     <div class="apagado" id="apagado">
       <b>Listo para escanear</b>
-      Elige QR o código de barras, activa la cámara y apunta al código del producto.
+      Activa la cámara y apunta al código del producto. Lee QR y códigos de barras
+      numéricos (EAN, UPC, ITF) y alfanuméricos (Code 128, Code 39, Code 93, Codabar).
     </div>
   </div>
 
@@ -970,14 +972,49 @@ const DB = {
   },
 
   buscar(codigo){
-    const clave = normalizarCodigo(codigo);
+    const claves = variantesCodigo(codigo);
+    if(!claves.length) return undefined;
+    const exacto = this.productos.find(p=>
+      claves.includes(normalizarCodigo(p.sku)) || claves.includes(normalizarCodigo(p.codigoBarras)));
+    if(exacto) return exacto;
+    // El producto guardado puede estar en otra variante del mismo código (UPC-A / EAN-13 / GTIN-14)
     return this.productos.find(p=>
-      normalizarCodigo(p.sku)===clave || normalizarCodigo(p.codigoBarras)===clave);
+      variantesCodigo(p.sku).some(v=>claves.includes(v)) ||
+      variantesCodigo(p.codigoBarras).some(v=>claves.includes(v)));
   }
 };
 
 function normalizarCodigo(codigo){
-  return String(codigo??'').replace(/^\](?:C1|E[0-9A-Z]|d[0-9A-Z])/, '').replace(/\s+/g,'').toUpperCase();
+  return String(codigo??'')
+    .replace(/^\](?:C1|E[0-9A-Z]|d[0-9A-Z])/, '')   // identificador AIM del lector
+    .replace(/[\x00-\x1F\x7F\xA0]/g,'')             // separadores GS1 (FNC1) y control
+    .replace(/\s+/g,'')
+    .toUpperCase();
+}
+
+/* Un mismo producto puede venir en varias simbologías numéricas equivalentes:
+   UPC-E (8) → UPC-A (12) → EAN-13 (13) → GTIN-14 (ITF-14). Se comparan todas. */
+function variantesCodigo(codigo){
+  const base = normalizarCodigo(codigo);
+  if(!base) return [];
+  const variantes = new Set([base]);
+  if(/^\d{8}$/.test(base)){
+    const upcA = expandirUPCE(base);
+    if(upcA){ variantes.add(upcA); variantes.add(upcA.padStart(14,'0')); }
+  }
+  if(/^\d{8,14}$/.test(base)) variantes.add(base.padStart(14,'0'));
+  return [...variantes];
+}
+
+function expandirUPCE(codigo){
+  if(!/^[01]\d{7}$/.test(codigo)) return '';
+  const sistema=codigo[0], d=codigo.slice(1,7), verificador=codigo[7], ultimo=d[5];
+  let cuerpo;
+  if(ultimo<='2')      cuerpo = d.slice(0,2)+ultimo+'0000'+d.slice(2,5);
+  else if(ultimo==='3') cuerpo = d.slice(0,3)+'00000'+d.slice(3,5);
+  else if(ultimo==='4') cuerpo = d.slice(0,4)+'00000'+d[4];
+  else                  cuerpo = d.slice(0,5)+'0000'+ultimo;
+  return sistema+cuerpo+verificador;
 }
 
 async function cerrarEntregasVencidas(){
@@ -1052,6 +1089,20 @@ let flujo=null, leyendo=false, leyendoFrame=false, ultimo=0, modoEscaneo='credit
 let linternaActiva=false;
 const intervaloLectura=80, maxDimensionLectura=960;
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
+let detectorNativoListo=null, fallosDetector=0;
+let lecturaPrevia={valor:'',formato:'',veces:0,tiempo:0};
+
+/* Simbologías soportadas: numéricas (EAN/UPC/ITF/DataBar) y alfanuméricas (Code 128/39/93, Codabar, QR, Data Matrix, PDF417, Aztec) */
+const FORMATOS_ZXING = ['QR_CODE','DATA_MATRIX','AZTEC','PDF_417','CODE_128','CODE_39','CODE_93','CODABAR','ITF',
+  'EAN_13','EAN_8','UPC_A','UPC_E','UPC_EAN_EXTENSION','RSS_14','RSS_EXPANDED'];
+const FORMATOS_NATIVOS = ['qr_code','data_matrix','aztec','pdf417','code_128','code_39','code_93','codabar','itf',
+  'ean_13','ean_8','upc_a','upc_e'];
+/* Estas no llevan dígito verificador obligatorio: se exige leerlas dos veces igual antes de aceptarlas */
+const FORMATOS_SIN_VERIFICADOR = new Set(['CODE_39','CODABAR','ITF']);
+const NOMBRE_FORMATO = {QR_CODE:'QR', DATA_MATRIX:'Data Matrix', AZTEC:'Aztec', PDF_417:'PDF417',
+  CODE_128:'Code 128', CODE_39:'Code 39', CODE_93:'Code 93', CODABAR:'Codabar', ITF:'ITF',
+  EAN_13:'EAN-13', EAN_8:'EAN-8', UPC_A:'UPC-A', UPC_E:'UPC-E',
+  RSS_14:'GS1 DataBar', RSS_EXPANDED:'GS1 DataBar Exp.'};
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
 let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
@@ -1131,7 +1182,7 @@ function escanearProductoDesdeLista(){
       <div class="reticula"><div class="marco"><i></i><i></i><i></i><i></i><div class="barrido"></div></div></div>
       <button class="btn-linterna" id="btnLinternaProducto" type="button" hidden aria-pressed="false">Activar linterna</button>
     </div>
-    <div class="aviso" style="margin-top:12px">Apunta la cámara al código de barras del producto.</div>
+    <div class="aviso" style="margin-top:12px">Apunta la cámara al código del producto: barras numéricas o alfanuméricas, QR o Data Matrix.</div>
     <button class="btn plano" style="margin-top:10px" type="button" onclick="cancelarBusquedaProducto()">Detener cámara</button>`);
   setTimeout(()=>{ if(sesion===sesionProducto) iniciarEscaneo('buscarProducto','barra','credito',sesion); },0);
 }
@@ -1143,7 +1194,9 @@ function cancelarBusquedaProducto(){
 function seleccionarTipoEscaneo(modo){
   abrirHoja(`
     <div class="hoja-tope"><h2>Tipo de código</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
-    <div class="aviso">Elige el tipo de código antes de activar la cámara.</div>
+    <div class="aviso">Elige el tipo de código antes de activar la cámara. La opción de barras
+      lee todas las simbologías: numéricas (EAN-13, EAN-8, UPC-A, UPC-E, ITF, GS1 DataBar) y
+      alfanuméricas (Code 128, Code 39, Code 93, Codabar, Data Matrix, PDF417, Aztec).</div>
     <div class="fila" style="margin-top:14px">
       <button class="btn ambar" onclick="seleccionarFormaVenta('${modo}','qr')">Código QR</button>
       <button class="btn plano" onclick="seleccionarFormaVenta('${modo}','barra')">Código de barras</button>
@@ -1163,14 +1216,102 @@ function seleccionarFormaVenta(modo, tipo){
     </div>`);
 }
 
+/* Detector de códigos del propio navegador (Chrome/Edge en Android): más rápido y preciso
+   con barras impresas que la decodificación por JS. Se usa si está disponible. */
+function prepararDetectorNativo(){
+  if(detectorNativoListo) return detectorNativoListo;
+  detectorNativoListo = (async()=>{
+    if(!('BarcodeDetector' in window)) return null;
+    try{
+      const soportados = await window.BarcodeDetector.getSupportedFormats();
+      const usar = FORMATOS_NATIVOS.filter(f=>soportados.includes(f));
+      if(usar.length < 3) return null;   // soporte parcial: mejor ZXing, que cubre todo
+      return new window.BarcodeDetector({formats:usar});
+    }catch(e){ return null; }
+  })();
+  return detectorNativoListo;
+}
+
+/* Sin estas pistas ZXing decide por su cuenta qué intentar; con ellas exige
+   todas las simbologías y activa el modo minucioso. */
+function pistasZXing(){
+  const Z = window.ZXing || window.ZXingBrowser || {};
+  const TIPO = Z.DecodeHintType || {POSSIBLE_FORMATS:2, TRY_HARDER:3};
+  const pistas = new Map();
+  const formatos = Z.BarcodeFormat;
+  if(formatos){
+    const lista = FORMATOS_ZXING.map(n=>formatos[n]).filter(v=>v!==undefined && v!==null);
+    if(lista.length) pistas.set(TIPO.POSSIBLE_FORMATS, lista);
+  }
+  pistas.set(TIPO.TRY_HARDER, true);
+  return pistas;
+}
+
+function nombreFormatoZXing(valor){
+  const B = window.ZXing?.BarcodeFormat || window.ZXingBrowser?.BarcodeFormat;
+  const n = B ? B[valor] : null;
+  return typeof n==='string' ? n : '';
+}
+
+async function iniciarLectorZXing(video, sesionActual){
+  await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
+  await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
+  if(!window.ZXingBrowser?.BrowserMultiFormatReader) throw new Error('Lector de barras no disponible');
+  if(!leyendo || sesionActual!==sesionEscaneo || !flujo) return;
+  lectorBarras = new ZXingBrowser.BrowserMultiFormatReader(pistasZXing(),
+    {delayBetweenScanAttempts:80, delayBetweenScanSuccess:300});
+  controlBarras = await lectorBarras.decodeFromStream(flujo, video, (resultado)=>{
+    if(!resultado) return;
+    confirmarLectura(resultado.getText(), nombreFormatoZXing(resultado.getBarcodeFormat?.()), sesionActual);
+  });
+}
+
+function cicloDetectorNativo(video, sesionActual){
+  if(!leyendo || sesionActual!==sesionEscaneo || !detectorBarras) return;
+  const seguir = ()=>{
+    if(leyendo && sesionActual===sesionEscaneo) setTimeout(()=>cicloDetectorNativo(video,sesionActual), 90);
+  };
+  if(video.readyState < video.HAVE_CURRENT_DATA || !video.videoWidth){ seguir(); return; }
+  detectorBarras.detect(video).then(codigos=>{
+    fallosDetector=0;
+    const leido = codigos && codigos[0];
+    if(leido) confirmarLectura(leido.rawValue, leido.format, sesionActual);
+    seguir();
+  }).catch(()=>{
+    if(++fallosDetector>=5){          // el detector nativo falla en este equipo: pasar a ZXing
+      detectorBarras=null;
+      iniciarLectorZXing(video, sesionActual).catch(()=>{
+        if(leyendo) brindis('No se pudo iniciar el lector de barras. Mantén el código dentro del marco.');
+      });
+      return;
+    }
+    seguir();
+  });
+}
+
+/* Las simbologías sin verificador se aceptan sólo tras dos lecturas idénticas seguidas */
+function confirmarLectura(valor, formato='', sesionActual=sesionEscaneo){
+  if(!valor || !leyendo || sesionActual!==sesionEscaneo) return;
+  const fmt = String(formato||'').toUpperCase().replace(/^PDF417$/,'PDF_417');
+  const necesarias = FORMATOS_SIN_VERIFICADOR.has(fmt) ? 2 : 1;
+  const ahora = Date.now();
+  if(lecturaPrevia.valor===valor && ahora-lecturaPrevia.tiempo<2500) lecturaPrevia.veces++;
+  else lecturaPrevia={valor, formato:fmt, veces:1, tiempo:0};
+  lecturaPrevia.tiempo=ahora;
+  if(lecturaPrevia.veces>=necesarias) procesarCodigoLeido(valor, sesionActual, fmt);
+}
+
 async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     const sesionActual=++sesionEscaneo;
   modoEscaneo = modo;
   tipoCodigo = tipo;
   tipoVentaEscaneo = tipoVenta;
+  fallosDetector = 0;
+  lecturaPrevia = {valor:'',formato:'',veces:0,tiempo:0};
+  detectorBarras = await prepararDetectorNativo();
   try{
     if(tipoCodigo === 'qr') await cargarBiblioteca('jsQR','lib/jsQR.js');
-    if(tipoCodigo === 'barra'){
+    if(tipoCodigo === 'barra' && !detectorBarras){
       await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
       await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
     }
@@ -1179,19 +1320,13 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     $('#apagado').hidden=false;
     return;
   }
-  if(tipoCodigo === 'barra'){
-    await cargarBiblioteca('ZXing','lib/zxing-library.min.js');
-    await cargarBiblioteca('ZXingBrowser','lib/zxing-browser.min.js');
-    if(!window.ZXingBrowser?.BrowserMultiFormatReader) throw new Error('Lector de barras no disponible');
-    lectorBarras = new ZXingBrowser.BrowserMultiFormatReader();
-  }
   if(modo==='entrega' && !entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
   if(modo==='entrega' && entregaActual.items.length){
     mostrarHojaEntrega();
   }
   if(flujo){ apagarCamara(); return; }
   try{
-    flujo = await abrirCamaraCompatible();
+    flujo = await abrirCamaraCompatible(tipoCodigo==='barra');
     if(modo==='producto' && sesion!==sesionProducto){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; return; }
     const v=$('#videoProducto')||$('#video'); v.srcObject=flujo;
     const pista=flujo.getVideoTracks()[0];
@@ -1212,11 +1347,13 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     leyendo=true;
     ultimo=0;
     if(tipoCodigo==='barra'){
-      controlBarras=lectorBarras.decodeFromStream(flujo, v, (resultado, error) => {
-        if(resultado && leyendo && sesionActual===sesionEscaneo) procesarCodigoLeido(resultado.getText(),sesionActual);
-      }).catch(()=>{
-        if(leyendo) brindis('No se pudo iniciar el lector de barras. Mantén el código dentro del marco.');
-      });
+      if(detectorBarras){
+        cicloDetectorNativo(v, sesionActual);
+      }else{
+        iniciarLectorZXing(v, sesionActual).catch(()=>{
+          if(leyendo) brindis('No se pudo iniciar el lector de barras. Mantén el código dentro del marco.');
+        });
+      }
     }else{
       esperarVideoParaLeer(v);
     }
@@ -1242,11 +1379,13 @@ function esperarVideoParaLeer(video){
 function botonEscaneo(modo,tipo){
   return modo==='credito' ? $('#btnCam') : $('#btnCamEntrega');
 }
-async function abrirCamaraCompatible(){
+async function abrirCamaraCompatible(alta=false){
   if(!navigator.mediaDevices?.getUserMedia) throw new Error('Cámara no disponible');
   try{
+    // Las barras finas (Code 128, ITF) necesitan más resolución que un QR
     return await navigator.mediaDevices.getUserMedia({video:{
-      facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720},
+      facingMode:{ideal:'environment'},
+      width:{ideal: alta?1920:1280}, height:{ideal: alta?1080:720},
       focusMode:{ideal:'continuous'}
     }});
   }catch(e){
@@ -1285,6 +1424,9 @@ function apagarCamara(){
   if(lectorBarras?.reset) lectorBarras.reset();
   controlBarras=null;
   lectorBarras=null;
+  detectorBarras=null;
+  fallosDetector=0;
+  lecturaPrevia={valor:'',formato:'',veces:0,tiempo:0};
   if(flujo){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; }
   $('#visor').classList.remove('encendida');
   if($('#video')) $('#video').srcObject=null;
@@ -1338,16 +1480,28 @@ function cicloLectura(){
     const cx=c.getContext('2d',{willReadFrequently:true});
     cx.drawImage(v,0,0,c.width,c.height);
     const leer = (async()=>{
-      return leerQR(cx,c.width,c.height);
+      const qr = leerQR(cx,c.width,c.height);
+      if(qr) return {valor:qr, formato:'QR_CODE'};
+      // Si el vendedor eligió QR pero la etiqueta trae barras, igual se lee
+      if(detectorBarras){
+        try{
+          const codigos = await detectorBarras.detect(c);
+          if(codigos && codigos[0]) return {valor:codigos[0].rawValue, formato:codigos[0].format};
+        }catch(e){ fallosDetector++; if(fallosDetector>=5) detectorBarras=null; }
+      }
+      return null;
     })();
-    leer.then(valor=>procesarCodigoLeido(valor,sesionActual)).catch(()=>{}).finally(()=>{leyendoFrame=false;});
+    leer.then(r=>{ if(r) confirmarLectura(r.valor, r.formato, sesionActual); })
+        .catch(()=>{}).finally(()=>{leyendoFrame=false;});
   }
   requestAnimationFrame(cicloLectura);
 }
-function procesarCodigoLeido(valor,sesionActual=sesionEscaneo){
+function procesarCodigoLeido(valor,sesionActual=sesionEscaneo,formato=''){
   if(!leyendo || sesionActual!==sesionEscaneo || !valor) return;
-  if(navigator.vibrate) navigator.vibrate(60);
   const sku = normalizarCodigo(valor);
+  if(!sku) return;                       // código vacío tras limpiar: seguir escaneando
+  if(navigator.vibrate) navigator.vibrate(60);
+  const tipoLeido = NOMBRE_FORMATO[formato] ? ` (${NOMBRE_FORMATO[formato]})` : '';
   apagarCamara();
   if(modoEscaneo === 'entrega'){
     procesarEscaneoEntrega(sku);
@@ -1359,15 +1513,15 @@ function procesarCodigoLeido(valor,sesionActual=sesionEscaneo){
       botonProductos?.click();
       $('#filtroProd').value=producto.nombre;
       pintarProductos();
-      brindis('Producto encontrado');
-    }else brindis('No hay ningún producto con el código '+sku);
+      brindis('Producto encontrado'+tipoLeido);
+    }else brindis('No hay ningún producto con el código '+sku+tipoLeido);
   }else if(modoEscaneo === 'producto'){
     const productoExistente=DB.buscar(sku);
     const datosProducto={...productoPendiente, codigoBarras:sku};
     cerrarHoja();
     if(productoExistente){
       alert(`Este código de barras ya está registrado para: ${productoExistente.nombre}`);
-    }
+    }else brindis('Código leído'+tipoLeido+': '+sku);
     abrirFormularioProducto(datosProducto);
     productoPendiente=null;
   }else{
@@ -2086,6 +2240,7 @@ function bindSwipeVenta(card){
   let startY = 0;
   let currentX = 0;
   let dragging = false;
+  let axis = '';
   const maxX = 174;
   let frame = 0;
   let pendingOffset = 0;
