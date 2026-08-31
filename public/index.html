@@ -606,7 +606,23 @@ const CFG = {
   // 0.10 = 10 %. El resto se reparte en partes iguales entre los meses del plazo.
   primaPct: 0.10,
   plazos: [3, 6, 12, 18, 24],
-  plazoPorDefecto: 12
+  plazoPorDefecto: 12,
+  // Categorías que aparecen en el formulario de producto. Edita la lista a tu gusto.
+  categorias: [
+    'Línea blanca',
+    'Electrónica',
+    'Muebles',
+    'Colchones',
+    'Blancos y textiles',
+    'Decoración de hogar',
+    'Cocina y mesa',
+    'Baño',
+    'Cuidado personal',
+    'Herramientas',
+    'Juguetería',
+    'Deportes',
+    'Otros'
+  ]
 };
 
 /* ============================================================
@@ -1153,7 +1169,8 @@ function escanearBarrasProducto(){
     marca:$('#pMarca')?.value.trim() || '',
     categoria:$('#pCat')?.value || 'Otros',
     contado:$('#pContado')?.value || '', credito:$('#pCredito')?.value || '',
-    stock:$('#pStock')?.value || 0
+    stock:$('#pStock')?.value || 0,
+    piezas:$('#pPiezas')?.value || 1
   };
   const sesion=++sesionProducto;
   abrirHoja(`
@@ -1854,7 +1871,7 @@ function fichaProducto(p){
       <div class="banda"><code>${esc(p.sku)}</code><em>${esc(p.categoria||'')}</em></div>
       <div class="cuerpo">
         <h3>${esc(p.nombre)}</h3>
-        <div class="marca-p">${esc(p.marca||'')} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}</div>
+        <div class="marca-p">${esc(p.marca||'')} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}${p.piezas>1?' · '+p.piezas+' piezas por paquete':''}</div>
         <div class="precios">
           <div class="precio"><em>Contado</em><b>${money(p.contado)}</b></div>
           <div class="precio destaca"><em>Crédito</em><b>${money(p.credito)}</b></div>
@@ -2169,6 +2186,13 @@ $('#filtroProd').addEventListener('input', pintarProductos);
 $('#btnBuscarProductoCamara').addEventListener('click', escanearProductoDesdeLista);
 $('#btnNuevoProd').addEventListener('click', ()=>abrirFormularioProducto());
 
+function opcionesCategoria(actual=''){
+  const lista = (CFG.categorias && CFG.categorias.length) ? [...CFG.categorias] : ['Otros'];
+  // Si el producto ya tiene una categoría que no está en la lista, se conserva
+  if(actual && !lista.includes(actual)) lista.unshift(actual);
+  return lista.map(cat=>`<option ${actual===cat ? 'selected' : ''}>${esc(cat)}</option>`).join('');
+}
+
 function abrirFormularioProducto(p = null){
   const editando = !!(p && DB.buscar(p.sku));
   abrirHoja(`
@@ -2185,15 +2209,20 @@ function abrirFormularioProducto(p = null){
         <div class="campo"><label>Marca</label><input id="pMarca" value="${esc(p ? p.marca || '' : '')}"></div>
         <div class="campo"><label>Categoría</label>
           <select id="pCat">
-            ${['Línea blanca','Electrónica','Muebles','Cuidado personal','Otros'].map(cat => `<option ${p && p.categoria===cat ? 'selected' : ''}>${esc(cat)}</option>`).join('')}
+            ${opcionesCategoria(p ? p.categoria : '')}
           </select></div>
       </div>
       <div class="dosc">
         <div class="campo"><label>Precio contado</label><input id="pContado" type="number" step="0.01" inputmode="decimal" value="${p ? (p.contado ?? 0) : ''}"></div>
         <div class="campo"><label>Precio crédito</label><input id="pCredito" type="number" step="0.01" inputmode="decimal" value="${p ? (p.credito ?? 0) : ''}"></div>
       </div>
-      <div class="campo" style="margin-bottom:0"><label>Existencia</label>
-        <input id="pStock" type="number" inputmode="numeric" value="${p ? (p.stock ?? 0) : 0}"></div>
+      <div class="dosc">
+        <div class="campo"><label>Existencia</label>
+          <input id="pStock" type="number" inputmode="numeric" value="${p ? (p.stock ?? 0) : 0}"></div>
+        <div class="campo"><label>Piezas por paquete</label>
+          <input id="pPiezas" type="number" min="1" step="1" inputmode="numeric" value="${p ? (p.piezas ?? 1) : 1}"
+            placeholder="Ej. 3 (funda + sábana + forro)"></div>
+      </div>
     </div>
     <button class="btn ambar" style="margin-top:14px" onclick="guardarProducto('${editando ? p.sku : ''}')">${editando ? 'Actualizar producto' : 'Guardar producto'}</button>
   `);
@@ -2207,7 +2236,8 @@ async function guardarProducto(skuOriginal = ''){
 
   const producto = {
     sku, codigoBarras, nombre, color:$('#pColor').value.trim(), marca:$('#pMarca').value.trim(), categoria:$('#pCat').value,
-    contado:+$('#pContado').value||0, credito:+$('#pCredito').value||0, stock:+$('#pStock').value||0
+    contado:+$('#pContado').value||0, credito:+$('#pCredito').value||0, stock:+$('#pStock').value||0,
+    piezas:Math.max(1, Math.round(+$('#pPiezas').value||1))
   };
 
   const existe = DB.buscar(sku);
@@ -2348,7 +2378,7 @@ function pintarProductos(){
             <div style="font-size:11px; font-weight:700; color:var(--tinta-1); letter-spacing:.06em; text-transform:uppercase;">${esc(p.categoria||'Sin categoría')}</div>
             <div style="font-size:10px; color:var(--tinta-3); white-space:nowrap;">${fechaCompleta(p.fecha || hoy())}</div>
           </div>
-          <div class="meta" style="line-height:1.5;">Código: ${esc(p.sku)}<br>${esc(p.marca||'Sin marca')}</div>
+          <div class="meta" style="line-height:1.5;">Código: ${esc(p.sku)}<br>${esc(p.marca||'Sin marca')}${p.piezas>1?'<br>'+p.piezas+' piezas por paquete':''}</div>
           <span class="marbete ${p.stock>3?'m-verde':p.stock>0?'m-ambar':'m-rojo'}">
             ${p.stock>0?p.stock+' en existencia':'Agotado'}</span>
         </div>
@@ -3062,13 +3092,13 @@ $('#btnPdfProductos').addEventListener('click',()=>{
   const q=$('#filtroProd').value.toLowerCase().trim();
   const productos=DB.productos.filter(p=>!q||(p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q))
     .slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''),'es'));
-  const columnas=[{t:'SKU'},{t:'Código de barras'},{t:'Nombre'},{t:'Color'},{t:'Marca'},{t:'Contado',num:true},{t:'Crédito',num:true},{t:'Existencia',num:true}];
+  const columnas=[{t:'SKU'},{t:'Código de barras'},{t:'Nombre'},{t:'Color'},{t:'Marca'},{t:'Piezas',num:true},{t:'Contado',num:true},{t:'Crédito',num:true},{t:'Existencia',num:true}];
   const suma=(arr,k)=>arr.reduce((s,p)=>s+(Number(p[k])||0),0);
   const grupos=agruparParaPDF(productos,
     p=>p.categoria||'Sin categoría',
-    p=>[p.sku||'—',p.codigoBarras||'—',p.nombre||'—',p.color||'—',p.marca||'—',money(p.contado),money(p.credito),p.stock||0],
-    its=>['Subtotal',' ',' ',' ',' ',money(suma(its,'contado')),money(suma(its,'credito')),suma(its,'stock')]);
-  const total=['Total general',' ',' ',' ',' ',money(suma(productos,'contado')),money(suma(productos,'credito')),suma(productos,'stock')];
+    p=>[p.sku||'—',p.codigoBarras||'—',p.nombre||'—',p.color||'—',p.marca||'—',p.piezas||1,money(p.contado),money(p.credito),p.stock||0],
+    its=>['Subtotal',' ',' ',' ',' ',' ',money(suma(its,'contado')),money(suma(its,'credito')),suma(its,'stock')]);
+  const total=['Total general',' ',' ',' ',' ',' ',money(suma(productos,'contado')),money(suma(productos,'credito')),suma(productos,'stock')];
   descargarTablaPDF({
     documento:'Reporte de productos',
     periodo: q ? `Filtro: "${q}"` : 'Catálogo completo',
