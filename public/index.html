@@ -29,6 +29,7 @@
   --verde-claro:#E2EFEB;
   --ocre:#9A7955;
   --ocre-claro:#F7F3E9;
+  --oscuro:#6B5641;
   --arena:#D8C2A4;
   --azul-claro:#D6E6F2;
   --r:8px;
@@ -177,7 +178,8 @@ button{cursor:pointer;border:none;background:none}
 }
 .btn:active{transform:translateY(1px);box-shadow:none}
 .btn.ambar{background:var(--arena);color:var(--tinta)}
-#btnCam{color:#fff}
+.btn.oscuro{background:var(--oscuro);color:#fff;border-color:var(--oscuro)}
+#btnCam,#btnCamEntrega,#btnImprimir{background:var(--oscuro);color:#fff;border-color:var(--oscuro)}
 .btn.plano{background:var(--papel);color:var(--tinta)}
 .btn.peligro{background:var(--papel);color:var(--rojo)}
 .btn.chico{padding:9px 12px;font-size:12px;box-shadow:none;width:auto}
@@ -207,8 +209,8 @@ button{cursor:pointer;border:none;background:none}
   background:var(--papel);text-align:center;font-family:var(--display);font-weight:700;font-size:14px;
 }
 .chip small{display:block;font-family:var(--dato);font-weight:500;font-size:9px;color:var(--tinta-3);margin-top:2px}
-.chip.on{background:var(--rojo);color:var(--tinta)}
-.chip.on small{color:#6B5A45}
+.chip.on{background:var(--oscuro);color:#fff;border-color:var(--oscuro)}
+.chip.on small{color:rgba(255,255,255,.72)}
 .chips.cuatro .chip{flex:0 0 calc((100% - 21px)/4)}
 
 /* ---------- Ficha de producto ---------- */
@@ -1339,8 +1341,8 @@ function seleccionarTipoEscaneo(modo){
       lee todas las simbologías: numéricas (EAN-13, EAN-8, UPC-A, UPC-E, ITF, GS1 DataBar) y
       alfanuméricas (Code 128, Code 39, Code 93, Codabar, Data Matrix, PDF417, Aztec).</div>
     <div class="fila" style="margin-top:14px">
-      <button class="btn ambar" onclick="seleccionarFormaVenta('${modo}','qr')">Código QR</button>
-      <button class="btn plano" onclick="seleccionarFormaVenta('${modo}','barra')">Código de barras</button>
+      <button class="btn oscuro" onclick="seleccionarFormaVenta('${modo}','qr')">Código QR</button>
+      <button class="btn oscuro" onclick="seleccionarFormaVenta('${modo}','barra')">Código de barras</button>
     </div>`);
 }
 
