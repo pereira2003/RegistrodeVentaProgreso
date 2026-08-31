@@ -221,6 +221,18 @@ button{cursor:pointer;border:none;background:none}
 .precio b{font-family:var(--display);font-size:23px;font-weight:800;display:block;margin-top:3px;letter-spacing:-.035em}
 .precio.destaca{background:var(--rojo-claro);border-color:var(--rojo)}
 .precio.destaca b{color:var(--rojo)}
+.menu-acciones{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.opcion-menu{
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;
+  border:1px solid var(--borde);border-radius:var(--r);background:var(--papel);
+  padding:13px 14px;cursor:pointer;text-align:left;box-shadow:var(--duro);
+}
+.opcion-menu span{font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:-.01em}
+.opcion-menu small{font-family:var(--dato);font-size:10.5px;color:var(--tinta-3);letter-spacing:.02em}
+.opcion-menu.destacada{border-color:var(--verde);background:var(--verde-claro)}
+.opcion-menu.destacada span{color:var(--verde)}
+.mini-cifras{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px}
+.mini-cifras .cifra b{font-size:20px}
 
 /* ---------- Listas ---------- */
 .item{
@@ -1678,7 +1690,7 @@ function abrirProducto(sku, tipoVenta=null){
   if(tipoVenta) {
     setTimeout(()=>formVenta(p.sku, tipoVenta), 450);
   } else {
-    setTimeout(()=>fichaProducto(p), 450);
+    setTimeout(()=>menuProducto(p), 450);
   }
 }
 
@@ -2105,6 +2117,55 @@ function procesarEscaneoEntrega(sku){
   mostrarHojaEntrega();
 }
 
+function statsProductoEntregas(sku){
+  let entregado=0, vendido=0, devuelto=0, enRuta=0, entregasEnRuta=0;
+  for(const e of (DB.entregas||[])){
+    const suma=arr=>(arr||[]).filter(i=>i.sku===sku).reduce((s,i)=>s+(i.cantidad||1),0);
+    const ent=suma(e.entregados), ven=suma(e.vendidos), dev=suma(e.devueltos);
+    entregado += ent + ven;
+    vendido += ven;
+    devuelto += dev;
+    if(!e.ventaGenerada){
+      const activo = Math.max(0, ent - dev);
+      if(activo > 0){ enRuta += activo; entregasEnRuta++; }
+    }
+  }
+  return { entregado, vendido, devuelto, enRuta, entregasEnRuta };
+}
+
+function menuProducto(p){
+  const s = statsProductoEntregas(p.sku);
+  const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'sin vendedor';
+  abrirHoja(`
+    <div class="hoja-tope"><h2>¿Qué deseas hacer?</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="ficha">
+      <div class="banda"><code>${esc(p.sku)}</code><em>${esc(p.categoria||'')}</em></div>
+      <div class="cuerpo">
+        <h3>${esc(p.nombre)}</h3>
+        <div class="marca-p">${esc((p.marca||'').toUpperCase())} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}</div>
+      </div>
+    </div>
+    <div class="menu-acciones">
+      <button class="opcion-menu destacada" type="button" onclick="agregarRecienteAEntrega('${p.sku}')">
+        <span>Agregar a entrega</span><small>Súmalo a la entrega activa de ${esc(vendedor)}</small></button>
+      <button class="opcion-menu" type="button" onclick="formVenta('${p.sku}','contado')">
+        <span>Cotizar al contado</span><small>${money(p.contado)}</small></button>
+      <button class="opcion-menu" type="button" onclick="formVenta('${p.sku}','credito')">
+        <span>Cotizar a crédito</span><small>${money(p.credito)}</small></button>
+      <button class="opcion-menu" type="button" onclick="fichaProducto(DB.buscar('${p.sku}'))">
+        <span>Ver detalle del producto</span><small>Precios, existencia y piezas</small></button>
+    </div>
+    <div class="rotulo">Movimiento en entregas</div>
+    <div class="mini-cifras">
+      <div class="cifra"><em>En ruta ahora</em><b>${s.enRuta}</b></div>
+      <div class="cifra"><em>En entregas</em><b>${s.entregasEnRuta}</b></div>
+      <div class="cifra bien"><em>Vendidos</em><b>${s.vendido}</b></div>
+      <div class="cifra"><em>Devueltos</em><b>${s.devuelto}</b></div>
+      <div class="cifra" style="grid-column:1/-1"><em>Entregado histórico</em><b>${s.entregado}</b></div>
+    </div>
+  `);
+}
+
 function fichaProducto(p){
   abrirHoja(`
     <div class="hoja-tope"><h2>Producto</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
@@ -2174,7 +2235,7 @@ function bindSwipeReciente(card){
   cont.addEventListener('click',e=>{
     if(cont.classList.contains('open')){mover(0);e.preventDefault();return;}
     if(movido){e.preventDefault();return;}
-    const p=DB.buscar(card.dataset.sku); if(p) fichaProducto(p);
+    const p=DB.buscar(card.dataset.sku); if(p) menuProducto(p);
   });
 }
 
