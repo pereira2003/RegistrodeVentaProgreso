@@ -986,7 +986,7 @@ const DB = {
 
 function normalizarCodigo(codigo){
   return String(codigo??'')
-    .replace(/^\](?:C1|E[0-9A-Z]|d[0-9A-Z])/, '')   // identificador AIM del lector
+    .replace(/^\][A-Za-z][0-9A-Za-z]/, '')          // identificador AIM del lector (]C0 Code128, ]A0 Code39, ]C1 GS1, ]E0 EAN, ]d Data Matrix…)
     .replace(/[\x00-\x1F\x7F\xA0]/g,'')             // separadores GS1 (FNC1) y control
     .replace(/\s+/g,'')
     .toUpperCase();
