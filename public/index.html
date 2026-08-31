@@ -221,9 +221,18 @@ button{cursor:pointer;border:none;background:none}
 .precio b{font-family:var(--display);font-size:23px;font-weight:800;display:block;margin-top:3px;letter-spacing:-.035em}
 .precio.destaca{background:var(--rojo-claro);border-color:var(--rojo)}
 .precio.destaca b{color:var(--rojo)}
+.chip-asistente{
+  display:inline-flex;align-items:center;gap:8px;
+  border:1px solid var(--borde);background:var(--papel);border-radius:999px;
+  padding:9px 15px 9px 11px;box-shadow:var(--duro);cursor:pointer;
+  font-family:var(--dato);font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--tinta-2);
+  margin-bottom:12px;
+}
+.chip-asistente svg{width:20px;height:20px;flex:0 0 auto;color:var(--verde)}
+.chip-asistente.activo{border-color:var(--verde);background:var(--verde-claro);color:var(--verde)}
 .panel-producto{
   background:var(--papel);border:1px solid var(--verde);border-radius:var(--r);
-  box-shadow:var(--duro);padding:14px;margin-bottom:16px;
+  box-shadow:var(--duro);padding:14px;margin-bottom:16px;animation:sube .18s ease;
 }
 .panel-producto.sin-producto{border-color:var(--borde)}
 .panel-producto .pp-tope{display:flex;align-items:flex-start;gap:10px;margin-bottom:4px}
@@ -2159,12 +2168,18 @@ function statsProductoEntregas(sku){
 
 let productoActivoSku = null;
 
+let menuProductoAbierto = false;
+const ICONO_ASISTENTE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-4 3v-3H6a2 2 0 0 1-2-2z"/><path d="M19 2.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="currentColor" stroke="none"/></svg>`;
+
 function pintarMenuProductoActivo(){
   const cont = $('#menuProductoActivo');
   if(!cont) return;
   const p = productoActivoSku ? DB.buscar(productoActivoSku) : null;
+  const chip = `<button class="chip-asistente ${menuProductoAbierto?'activo':''}" type="button" onclick="toggleMenuProducto()">${ICONO_ASISTENTE}<span>Asistente de producto</span></button>`;
+  if(!menuProductoAbierto){ cont.innerHTML = chip; return; }
+  let panel;
   if(!p){
-    cont.innerHTML = `
+    panel = `
       <div class="panel-producto sin-producto">
         <div class="pp-tope">
           <div class="pp-chispa">✨</div>
@@ -2172,45 +2187,53 @@ function pintarMenuProductoActivo(){
             <div class="pp-titulo">¿Qué deseas hacer con este producto?</div>
             <div class="pp-vacio-txt">Escanea o busca un producto y aquí eliges: agregarlo a la entrega, cotizar al contado o a crédito, o ver su movimiento en ruta.</div>
           </div>
+          <button class="cerrar" type="button" onclick="toggleMenuProducto()">✕</button>
         </div>
       </div>`;
-    return;
-  }
-  const s = statsProductoEntregas(p.sku);
-  const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'sin vendedor';
-  cont.innerHTML = `
-    <div class="panel-producto">
-      <div class="pp-tope">
-        <div class="pp-chispa">✨</div>
-        <div class="pp-info">
-          <div class="pp-titulo">¿Qué deseas hacer con este producto?</div>
-          <div class="pp-nombre">${esc(p.nombre)}</div>
-          <div class="pp-meta">${esc(p.sku)}${p.marca?' · '+esc((p.marca||'').toUpperCase()):''} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}</div>
+  }else{
+    const s = statsProductoEntregas(p.sku);
+    const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'sin vendedor';
+    panel = `
+      <div class="panel-producto">
+        <div class="pp-tope">
+          <div class="pp-chispa">✨</div>
+          <div class="pp-info">
+            <div class="pp-titulo">¿Qué deseas hacer con este producto?</div>
+            <div class="pp-nombre">${esc(p.nombre)}</div>
+            <div class="pp-meta">${esc(p.sku)}${p.marca?' · '+esc((p.marca||'').toUpperCase()):''} · ${p.stock>0?p.stock+' en existencia':'Sin existencia'}</div>
+          </div>
+          <button class="cerrar" type="button" onclick="toggleMenuProducto()">✕</button>
         </div>
-        <button class="cerrar" type="button" onclick="mostrarMenuProductoActivo(null)">✕</button>
-      </div>
-      <div class="menu-acciones">
-        <button class="opcion-menu destacada" type="button" onclick="agregarRecienteAEntrega('${p.sku}')">
-          <span>Agregar a entrega</span><small>Entrega activa de ${esc(vendedor)}</small></button>
-        <button class="opcion-menu" type="button" onclick="formVenta('${p.sku}','contado')">
-          <span>Cotizar al contado</span><small>${money(p.contado)}</small></button>
-        <button class="opcion-menu" type="button" onclick="formVenta('${p.sku}','credito')">
-          <span>Cotizar a crédito</span><small>${money(p.credito)}</small></button>
-        <button class="opcion-menu" type="button" onclick="fichaProducto(DB.buscar('${p.sku}'))">
-          <span>Ver detalle del producto</span><small>Precios, existencia y piezas</small></button>
-      </div>
-      <div class="mini-cifras">
-        <div class="cifra"><em>En ruta ahora</em><b>${s.enRuta}</b></div>
-        <div class="cifra"><em>En entregas</em><b>${s.entregasEnRuta}</b></div>
-        <div class="cifra bien"><em>Vendidos</em><b>${s.vendido}</b></div>
-        <div class="cifra"><em>Devueltos</em><b>${s.devuelto}</b></div>
-        <div class="cifra" style="grid-column:1/-1"><em>Entregado histórico</em><b>${s.entregado}</b></div>
-      </div>
-    </div>`;
+        <div class="menu-acciones">
+          <button class="opcion-menu destacada" type="button" onclick="agregarRecienteAEntrega('${p.sku}')">
+            <span>Agregar a entrega</span><small>Entrega activa de ${esc(vendedor)}</small></button>
+          <button class="opcion-menu" type="button" onclick="formVenta('${p.sku}','contado')">
+            <span>Cotizar al contado</span><small>${money(p.contado)}</small></button>
+          <button class="opcion-menu" type="button" onclick="formVenta('${p.sku}','credito')">
+            <span>Cotizar a crédito</span><small>${money(p.credito)}</small></button>
+          <button class="opcion-menu" type="button" onclick="fichaProducto(DB.buscar('${p.sku}'))">
+            <span>Ver detalle del producto</span><small>Precios, existencia y piezas</small></button>
+        </div>
+        <div class="mini-cifras">
+          <div class="cifra"><em>En ruta ahora</em><b>${s.enRuta}</b></div>
+          <div class="cifra"><em>En entregas</em><b>${s.entregasEnRuta}</b></div>
+          <div class="cifra bien"><em>Vendidos</em><b>${s.vendido}</b></div>
+          <div class="cifra"><em>Devueltos</em><b>${s.devuelto}</b></div>
+          <div class="cifra" style="grid-column:1/-1"><em>Entregado histórico</em><b>${s.entregado}</b></div>
+        </div>
+      </div>`;
+  }
+  cont.innerHTML = chip + panel;
+}
+
+function toggleMenuProducto(){
+  menuProductoAbierto = !menuProductoAbierto;
+  pintarMenuProductoActivo();
 }
 
 function mostrarMenuProductoActivo(p){
   productoActivoSku = p ? p.sku : null;
+  if(p) menuProductoAbierto = true;
   pintarMenuProductoActivo();
   const cont = $('#menuProductoActivo');
   if(p && cont) cont.scrollIntoView({behavior:'smooth', block:'start'});
