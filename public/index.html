@@ -2959,10 +2959,17 @@ function abrirFormularioProducto(p = null){
     <div class="tarjeta pad">
       ${editando ? `<div class="campo"><label>Código interno (SKU)</label><input id="pSku" value="${esc(p.sku)}" readonly
         style="font-family:var(--dato);text-transform:uppercase;background:var(--suave)"></div>` : '<input id="pSku" type="hidden" value="">'}
-      <div class="campo"><label>Código de barras del producto</label><input id="pBarras" value="${esc(p ? p.codigoBarras || '' : '')}" placeholder="Ej. 7501234567890 o PTSCA043"
-        inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false"
-        style="font-family:var(--dato);letter-spacing:.08em;text-transform:uppercase"></div>
-      <button class="btn plano chico" type="button" onclick="escanearBarrasProducto()">Leer código con cámara</button>
+      <div class="campo">
+        <label>Código de barras del producto</label>
+        <div class="buscador-productos" style="margin-bottom:0">
+          <input id="pBarras" value="${esc(p ? p.codigoBarras || '' : '')}" placeholder="Ej. 7501234567890 o PTSCA043"
+            inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false"
+            style="font-family:var(--dato);letter-spacing:.08em;text-transform:uppercase">
+          <button class="btn plano btn-icono" type="button" onclick="escanearBarrasProducto()" title="Leer código con cámara" aria-label="Leer código con cámara">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4zM12 9.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="18" cy="9" r="1" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </div>
       <div class="campo"><label>Nombre</label><input id="pNombre" value="${esc(p ? p.nombre : '')}" placeholder="Refrigeradora No Frost 14 pies"
         oninput="sugerirCategoria(this.value)"></div>
       <div class="campo"><label>Color</label><input id="pColor" value="${esc(p ? p.color || '' : '')}" placeholder="Ej. Negro"></div>
