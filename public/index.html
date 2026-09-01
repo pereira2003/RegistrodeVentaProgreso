@@ -1941,12 +1941,12 @@ function mostrarHojaEntrega(){
       </div>
     </div>
     <div class="rotulo">Agregar producto por código</div>
-    <div class="buscador-productos" style="margin-bottom:14px">
-      <input id="entregaCodigoManual" placeholder="Código del producto"
+    <div class="fila" style="margin-bottom:14px">
+      <input id="entregaCodigoManual" placeholder="Ej. 7501234567890 o PTSCA043"
         inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false"
-        style="font-family:var(--dato);letter-spacing:.06em;text-transform:uppercase"
+        style="padding:13px 12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;font-family:var(--dato);letter-spacing:.08em;text-transform:uppercase"
         onkeydown="if(event.key==='Enter'){event.preventDefault();agregarProductoEntregaManual()}">
-      <button class="btn ambar chico" type="button" style="flex:0 0 auto" onclick="agregarProductoEntregaManual()">Agregar</button>
+      <button class="btn ambar" type="button" style="flex:0 0 96px" onclick="agregarProductoEntregaManual()">Agregar</button>
     </div>
     <div class="rotulo rotulo-accion">Productos que lleva
       ${items.length ? `<span class="acciones-rotulo">
