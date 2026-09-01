@@ -2915,6 +2915,23 @@ function opcionesCategoria(actual=''){
   return lista.map(cat=>`<option ${actual===cat ? 'selected' : ''}>${esc(cat)}</option>`).join('');
 }
 
+/* Marcas conocidas: se arman con las que ya usan los productos guardados.
+   Al guardar un producto con una marca nueva, queda disponible para el resto. */
+function marcasActuales(actual=''){
+  const set = new Set();
+  (DB.productos||[]).forEach(p=>{
+    const m = (p.marca||'').trim().toUpperCase();
+    if(m) set.add(m);
+  });
+  const extra = (actual||'').trim().toUpperCase();
+  if(extra) set.add(extra);
+  return [...set].sort((a,b)=>a.localeCompare(b,'es'));
+}
+
+function opcionesMarca(actual=''){
+  return marcasActuales(actual).map(m=>`<option value="${esc(m)}"></option>`).join('');
+}
+
 const sinAcentos = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 
 /* Palabras clave por categoría (sin acentos). Se revisa de la más específica
@@ -2974,8 +2991,10 @@ function abrirFormularioProducto(p = null){
         oninput="sugerirCategoria(this.value)"></div>
       <div class="campo"><label>Color</label><input id="pColor" value="${esc(p ? p.color || '' : '')}" placeholder="Ej. Negro"></div>
       <div class="dosc">
-        <div class="campo"><label>Marca</label><input id="pMarca" value="${esc(p ? (p.marca||'').toUpperCase() : '')}"
-          autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-transform:uppercase"></div>
+        <div class="campo"><label>Marca</label>
+          <input id="pMarca" list="listaMarcas" value="${esc(p ? (p.marca||'').toUpperCase() : '')}" placeholder="Escribe o elige una marca"
+            autocapitalize="characters" spellcheck="false" style="text-transform:uppercase">
+          <datalist id="listaMarcas">${opcionesMarca(p ? p.marca : '')}</datalist></div>
         <div class="campo"><label>Categoría</label>
           <select id="pCat" onchange="this.dataset.tocado='1'">
             ${opcionesCategoria(p ? p.categoria : '')}
