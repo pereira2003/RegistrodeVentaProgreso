@@ -315,13 +315,13 @@ button{cursor:pointer;border:none;background:none}
   pointer-events:none;align-items:stretch;justify-content:center;padding:8px 0 8px 10px;
 }
 .product-swipe .swipe-actions button{
-  flex:1;min-width:0;border:1px solid rgba(255,255,255,.4);color:#fff;font-weight:600;font-family:var(--dato);
+  flex:1;min-width:0;border:1px solid currentColor;font-weight:600;font-family:var(--dato);
   font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
-  border-radius:999px;padding:0 12px;box-shadow:none;
+  border-radius:8px;padding:0 12px;box-shadow:none;background:transparent;
   display:flex;align-items:center;justify-content:center;min-height:34px;
 }
-.product-swipe .swipe-actions .btn-contado{background:#4d7e74;}
-.product-swipe .swipe-actions .btn-credito{background:#c7ac7a;color:#fff;}
+.product-swipe .swipe-actions .btn-contado{color:#3a5c52;}
+.product-swipe .swipe-actions .btn-credito{color:#8a6a3f;}
 .product-swipe.open .swipe-actions{width:132px;opacity:1;pointer-events:auto}
 .product-swipe .swipe-content{
   position:relative;z-index:2;transition:transform .22s ease;touch-action:pan-y;contain:paint;
@@ -344,7 +344,7 @@ button{cursor:pointer;border:none;background:none}
   font-family:var(--dato);font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
   padding:5px 11px;border-radius:999px;cursor:pointer;flex:0 0 auto;
 }
-.entrega-item-swipe .swipe-actions .btn-vendido{background:#4A6E8C;}
+.entrega-item-swipe .swipe-actions .btn-vendido{background:#4A6E8C;color:#fff;border-color:#4A6E8C;}
 .rotulo-accion .acciones-rotulo{display:flex;gap:6px;flex:0 0 auto}
 .mini-accion.activa{background:#4A6E8C;color:#fff;border-color:#4A6E8C}
 .sel-todos{
