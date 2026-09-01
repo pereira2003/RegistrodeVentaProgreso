@@ -342,6 +342,11 @@ button{cursor:pointer;border:none;background:none}
   background:none;cursor:pointer;white-space:nowrap}
 .sol-fila .sol-acc .ok{color:#3a5c52}
 .sol-fila .sol-acc .del{color:#8a6a3f}
+.agenda-fila{border:1px solid var(--suave);border-radius:var(--r);background:var(--papel);
+  box-shadow:var(--duro);padding:12px;margin-bottom:10px}
+.agenda-cab{display:flex;flex-direction:column;gap:3px}
+.agenda-cab b{font-family:var(--display);font-size:15px;font-weight:700}
+.agenda-cab span{font-family:var(--dato);font-size:10.5px;color:var(--tinta-3)}
 .product-swipe{
   position:relative;overflow:hidden;border-radius:18px;margin-bottom:10px;background:transparent;
   isolation:isolate;z-index:1;
@@ -917,7 +922,7 @@ const SEMILLA = [
 ];
 
 const DB = {
-  modo:'local', productos:[], ventas:[], entregas:[], vendedores:[], zonas:[], solicitudes:[], fb:null,
+  modo:'local', productos:[], ventas:[], entregas:[], vendedores:[], zonas:[], solicitudes:[], agendas:[], fb:null,
 
   async iniciar(){
     if(CFG.firebase){
@@ -934,13 +939,16 @@ const DB = {
     this.vendedores = caja.leer('gp_vendedores', CFG.vendedores.slice());
     this.zonas      = caja.leer('gp_zonas', CFG.zonas.slice());
     this.solicitudes = caja.leer('gp_solicitudes', []);
+    this.agendas = caja.leer('gp_agendas', []);
     caja.guardar('gp_productos', this.productos);
     caja.guardar('gp_entregas', this.entregas);
     caja.guardar('gp_vendedores', this.vendedores);
     caja.guardar('gp_zonas', this.zonas);
     caja.guardar('gp_solicitudes', this.solicitudes);
+    caja.guardar('gp_agendas', this.agendas);
     sello('Modo prueba','local');
     await cerrarEntregasVencidas();
+    await convertirAgendasVencidas();
     pintarTodo();
     ocultarCargaInicial();
   },
@@ -990,6 +998,12 @@ const DB = {
       caja.guardar('gp_solicitudes', this.solicitudes);
       pintarTodo();
     });
+    f.onSnapshot(f.collection(bd,'agendas'), s=>{
+      this.agendas = s.docs.map(d=>({id:d.id,...d.data()}));
+      caja.guardar('gp_agendas', this.agendas);
+      convertirAgendasVencidas();
+      pintarTodo();
+    });
   },
 
   async migrarDatosLocales(){
@@ -1007,6 +1021,7 @@ const DB = {
     await migrarColeccion('ventas', caja.leer('gp_ventas', []), v=>String(v.id||'').trim());
     await migrarColeccion('entregas', caja.leer('gp_entregas', []), e=>String(e.creado||'').trim());
     await migrarColeccion('solicitudes', caja.leer('gp_solicitudes', []), s=>String(s.creado||'').trim());
+    await migrarColeccion('agendas', caja.leer('gp_agendas', []), a=>String(a.creado||'').trim());
   },
 
   async sembrar(lista=SEMILLA){ for(const p of lista) await this.agregarProducto(p); },
@@ -1090,6 +1105,38 @@ const DB = {
         pintarTodo();
       }
     },
+
+  async ajustarStock(sku, delta){
+    const p = this.buscar(sku);
+    if(!p || !delta) return;
+    const nuevo = Math.max(0, (p.stock||0) + delta);
+    p.stock = nuevo;
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb;
+      await f.updateDoc(f.doc(bd,'productos',p.sku), {stock:nuevo});
+    }else{
+      caja.guardar('gp_productos', this.productos);
+    }
+    pintarTodo();
+  },
+
+  async guardarAgenda(a){
+    this.agendas=[...(this.agendas||[]).filter(x=>x.creado!==a.creado), a];
+    caja.guardar('gp_agendas', this.agendas);
+    pintarTodo();
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; await f.setDoc(f.doc(bd,'agendas',a.creado), a);
+    }
+  },
+
+  async eliminarAgenda(creado){
+    this.agendas=(this.agendas||[]).filter(x=>x.creado!==creado);
+    caja.guardar('gp_agendas', this.agendas);
+    pintarTodo();
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; await f.deleteDoc(f.doc(bd,'agendas',creado));
+    }
+  },
 
   async guardarSolicitud(s){
     this.solicitudes=[...(this.solicitudes||[]).filter(x=>x.creado!==s.creado), s];
@@ -1483,7 +1530,7 @@ function inicializarVendedorActual(){
 
 $('#selVendedor').addEventListener('change', (e)=>aplicarVendedorActual(e.target.value));
 $('#btnCam').addEventListener('click', ()=>seleccionarTipoEscaneo('credito'));
-$('#btnCamEntrega').addEventListener('click', ()=>seleccionarTipoEscaneo('entrega'));
+$('#btnCamEntrega').addEventListener('click', ()=>iniciarEntregaFlujo());
 document.addEventListener('click', e=>{
   if(e.target.matches('.btn-linterna')) alternarLinterna(e.target);
 });
@@ -4051,11 +4098,227 @@ $('#btnLimpiarSolicitudes')?.addEventListener('click', ()=>{
   if(confirm('¿Borrar las solicitudes ya entregadas?')) DB.limpiarSolicitudes(true).catch(errorOperacion);
 });
 $('#btnAgendar')?.addEventListener('click', abrirAgenda);
+
+/* ============================================================
+   AGENDA DE ENTREGAS  (reservan stock hasta su fecha)
+   ============================================================ */
+let agendaBorrador = null;   // { creado, fecha, vendedor, zona, items:[] }
+let convirtiendoAgendas = false;
+
+function agendasPendientes(){
+  return (DB.agendas||[]).filter(a=>a.estado==='pendiente')
+    .sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+}
+
+async function convertirAgendasVencidas(){
+  if(convirtiendoAgendas) return;
+  convirtiendoAgendas = true;
+  try{
+    const hoyStr = hoy();
+    for(const a of (DB.agendas||[])){
+      if(a.estado!=='pendiente' || String(a.fecha||'') > hoyStr) continue;
+      for(const it of (a.items||[])) await DB.ajustarStock(it.sku, +(it.cantidad||1));
+      const creado = new Date().toISOString();
+      const entrega = {
+        vendor: a.vendedor||'Sin vendedor', zona: a.zona||'Sin zona',
+        entregados: (a.items||[]).map(it=>({sku:it.sku,nombre:it.nombre,marca:it.marca||'',precio:Number(it.precio)||0,cantidad:it.cantidad||1})),
+        devueltos: [], vendidos: [],
+        fecha: hoyStr, creado, entregaCreado: creado, devolucionCreado: null,
+        origenAgenda: a.creado
+      };
+      DB.entregas = [...(DB.entregas||[]), entrega];
+      await DB.guardarEntrega(entrega);
+      await DB.guardarAgenda({ ...a, estado:'cumplida', entregaCreado:creado });
+    }
+    caja.guardar('gp_entregas', DB.entregas||[]);
+  }catch(e){ console.error(e); }
+  convirtiendoAgendas = false;
+}
+
 function abrirAgenda(){
+  const pend = agendasPendientes();
   abrirHoja(`
-    <div class="hoja-tope"><h2>Agendar</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
-    <div class="aviso">Esta sección todavía no está lista. Decime qué querés agendar (visitas, recordatorios, entregas programadas…) y la armo.</div>
+    <div class="hoja-tope"><h2>Entregas agendadas</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="aviso">Al agendar una entrega, el producto queda <b>reservado</b> (baja de existencia). El día agendado se convierte en entrega automáticamente.</div>
+    <button class="btn suave" type="button" style="margin:14px 0 6px" onclick="abrirFormAgenda()">+ Nueva entrega agendada</button>
+    <div class="rotulo">Pendientes</div>
+    <div id="agendaLista">${pend.length ? pend.map(filaAgendaHTML).join('') : '<div class="vacio"><b>Sin entregas agendadas</b>Programá una con el botón de arriba.</div>'}</div>
   `);
+}
+
+function pintarAgendas(){
+  const cont = $('#agendaLista');
+  if(!cont) return;   // la hoja de agenda no está abierta
+  const pend = agendasPendientes();
+  cont.innerHTML = pend.length ? pend.map(filaAgendaHTML).join('') : '<div class="vacio"><b>Sin entregas agendadas</b>Programá una con el botón de arriba.</div>';
+}
+
+function filaAgendaHTML(a){
+  const items = (a.items||[]).map(i=>`${esc(i.nombre)} ×${i.cantidad||1}`).join(', ');
+  return `<div class="agenda-fila">
+    <div class="agenda-cab">
+      <b>${fechaCompleta(a.fecha)}</b>
+      <span>${esc(a.vendedor||'Sin vendedor')}${a.zona?` · ${esc(a.zona)}`:''}</span>
+    </div>
+    <div class="meta" style="margin:6px 0 8px">${items||'—'}</div>
+    <div class="fila">
+      <button class="btn plano chico" type="button" onclick="editarAgenda('${a.creado}')">Editar</button>
+      <button class="btn peligro chico" type="button" onclick="cancelarAgenda('${a.creado}')">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+function abrirFormAgenda(creado=''){
+  const a = creado ? (DB.agendas||[]).find(x=>x.creado===creado) : null;
+  agendaBorrador = a
+    ? { creado:a.creado, fecha:a.fecha, vendedor:a.vendedor, zona:a.zona, items:(a.items||[]).map(i=>({...i})) }
+    : { creado:'', fecha:'', vendedor:(vendedoresActuales()[0]||''), zona:(zonasActuales()[0]||''), items:[] };
+  renderFormAgenda();
+}
+
+function renderFormAgenda(){
+  const b = agendaBorrador; if(!b) return;
+  const zonas = zonasActuales();
+  abrirHoja(`
+    <div class="hoja-tope"><h2>${b.creado?'Editar':'Nueva'} entrega agendada</h2><button class="cerrar" onclick="cerrarFormAgenda()">✕</button></div>
+    <div class="tarjeta pad">
+      <div class="campo"><label>Fecha de entrega</label>
+        <input id="agFecha" type="date" min="${hoy()}" value="${esc(b.fecha||'')}"></div>
+      <div class="dosc">
+        <div class="campo"><label>Vendedor</label>
+          <select id="agVendedor">${vendedorOptions(b.vendedor)}</select></div>
+        <div class="campo"><label>Zona</label>
+          <select id="agZona">${zonas.map(z=>`<option ${z===b.zona?'selected':''}>${esc(z)}</option>`).join('')}</select></div>
+      </div>
+      <div class="campo marca-combo" style="margin-bottom:6px"><label>Agregar producto</label>
+        <input id="agProducto" placeholder="Escribe el producto" autocomplete="off" spellcheck="false"
+          oninput="sugerirProductosAgenda(this.value)" onfocus="sugerirProductosAgenda(this.value)"
+          onblur="setTimeout(cerrarSugerenciasAgenda,150)">
+        <div id="agSugerencias" class="sug-marca"></div></div>
+      <div class="fila">
+        <input id="agCantidad" type="number" inputmode="numeric" min="1" step="1" value="1" style="flex:0 0 84px;padding:11px 12px;border:1.5px solid var(--suave);border-radius:var(--r);background:#fff">
+        <button class="btn plano" type="button" onclick="agregarItemAgenda()">Agregar</button>
+      </div>
+    </div>
+    <div class="rotulo">Productos a reservar</div>
+    <div id="agItems">${renderItemsAgenda()}</div>
+    <button class="btn suave" type="button" style="margin-top:14px" onclick="guardarAgendaBorrador()">Guardar agenda</button>
+  `);
+}
+
+function renderItemsAgenda(){
+  const items = agendaBorrador?.items || [];
+  if(!items.length) return '<div class="vacio"><b>Sin productos</b>Buscá uno y tocá Agregar.</div>';
+  return `<div class="sol-lista-vendedor">${items.map((it,i)=>`
+    <div class="sol-fila">
+      <div class="sol-txt"><b>${esc(it.nombre)} ×${it.cantidad||1}</b><span>${esc(it.sku)} · ${money((it.precio||0)*(it.cantidad||1))}</span></div>
+      <div class="sol-acc"><button type="button" class="del" onclick="quitarItemAgenda(${i})">Quitar</button></div>
+    </div>`).join('')}</div>`;
+}
+
+let agProductoElegido = null;
+function sugerirProductosAgenda(texto){
+  const cont = $('#agSugerencias'); if(!cont) return;
+  const q = String(texto||'').trim().toLowerCase();
+  if(!q){ cont.innerHTML=''; return; }
+  const lista = (DB.productos||[]).filter(p=>
+    ((p.nombre||'')+' '+(p.marca||'')+' '+(p.sku||'')).toLowerCase().includes(q)).slice(0,10);
+  if(!lista.length){ cont.innerHTML = `<div class="vacio-sug">Sin coincidencias</div>`; return; }
+  cont.innerHTML = lista.map(p=>`<button type="button" data-sku="${esc(p.sku)}">${esc(p.nombre)} · <span style="color:var(--tinta-3)">${p.stock||0} disp.</span></button>`).join('');
+  cont.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('mousedown', e=>e.preventDefault());
+    b.addEventListener('click', ()=>{
+      const p = DB.buscar(b.dataset.sku);
+      if(p){ agProductoElegido = p; $('#agProducto').value = p.nombre; }
+      cerrarSugerenciasAgenda();
+    });
+  });
+}
+function cerrarSugerenciasAgenda(){ const c=$('#agSugerencias'); if(c) c.innerHTML=''; }
+
+function agregarItemAgenda(){
+  const b = agendaBorrador; if(!b) return;
+  const txt = $('#agProducto')?.value.trim() || '';
+  let p = agProductoElegido && agProductoElegido.nombre===txt ? agProductoElegido : DB.buscar(txt);
+  if(!p){
+    const q = txt.toLowerCase();
+    p = (DB.productos||[]).find(x=>((x.nombre||'')+' '+(x.marca||'')+' '+(x.sku||'')).toLowerCase().includes(q));
+  }
+  if(!p){ brindis('No encontré ese producto en el catálogo'); return; }
+  const cant = Math.max(1, Math.round(+($('#agCantidad')?.value||1)) || 1);
+  const ya = b.items.find(it=>it.sku===p.sku);
+  if(ya) ya.cantidad = (ya.cantidad||1) + cant;
+  else b.items.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:Number(p.contado)||0, cantidad:cant });
+  agProductoElegido = null;
+  if($('#agProducto')) $('#agProducto').value='';
+  if($('#agCantidad')) $('#agCantidad').value='1';
+  cerrarSugerenciasAgenda();
+  $('#agItems').innerHTML = renderItemsAgenda();
+}
+
+function quitarItemAgenda(i){
+  if(!agendaBorrador) return;
+  agendaBorrador.items.splice(i,1);
+  $('#agItems').innerHTML = renderItemsAgenda();
+}
+
+async function guardarAgendaBorrador(){
+  const b = agendaBorrador; if(!b) return;
+  const fecha = $('#agFecha')?.value || '';
+  const vendedor = $('#agVendedor')?.value || '';
+  const zona = $('#agZona')?.value || '';
+  if(!fecha){ brindis('Elige la fecha de entrega'); return; }
+  if(fecha < hoy()){ brindis('La fecha ya pasó'); return; }
+  if(!b.items.length){ brindis('Agregá al menos un producto'); return; }
+  const agenda = {
+    creado: b.creado || new Date().toISOString(),
+    fecha, vendedor, zona,
+    items: b.items.map(it=>({ ...it, cantidad: it.cantidad||1 })),
+    estado: 'pendiente', entregaCreado: null
+  };
+  // Ajuste de reserva = lo nuevo menos lo que ya estaba reservado en esta agenda
+  const prev = b.creado ? ((DB.agendas||[]).find(x=>x.creado===b.creado)?.items||[]) : [];
+  const prevMap = new Map(prev.map(it=>[it.sku, it.cantidad||1]));
+  const newMap = new Map(agenda.items.map(it=>[it.sku, it.cantidad||1]));
+  try{
+    for(const sku of new Set([...prevMap.keys(), ...newMap.keys()])){
+      const delta = (prevMap.get(sku)||0) - (newMap.get(sku)||0); // + libera, - reserva más
+      if(delta) await DB.ajustarStock(sku, delta);
+    }
+    await DB.guardarAgenda(agenda);
+    agendaBorrador = null;
+    brindis('Entrega agendada · producto reservado');
+    convertirAgendasVencidas().then(()=>abrirAgenda());
+  }catch(e){ errorOperacion(e); }
+}
+
+function cerrarFormAgenda(){
+  agendaBorrador = null;
+  abrirAgenda();
+}
+
+function editarAgenda(creado){ abrirFormAgenda(creado); }
+
+async function cancelarAgenda(creado){
+  const a = (DB.agendas||[]).find(x=>x.creado===creado);
+  if(!a) return;
+  if(!confirm('¿Cancelar esta entrega agendada? El producto vuelve a existencia.')) return;
+  try{
+    for(const it of (a.items||[])) await DB.ajustarStock(it.sku, +(it.cantidad||1));
+    await DB.eliminarAgenda(creado);
+    brindis('Agenda cancelada · producto liberado');
+    abrirAgenda();
+  }catch(e){ errorOperacion(e); }
+}
+
+function iniciarEntregaFlujo(){
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Entrega y devolución</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="aviso">¿Registrás la entrega ahora o la dejás agendada para otra fecha?</div>
+    <div class="fila" style="margin-top:14px">
+      <button class="btn suave" type="button" onclick="cerrarHoja(); seleccionarTipoEscaneo('entrega')">Entrega ahora</button>
+      <button class="btn suave" type="button" onclick="abrirFormAgenda()">Agendar entrega</button>
+    </div>`);
 }
 
 // La etiqueta "Seleccione fecha" es solo un marcador: se oculta al enfocar el
@@ -4455,7 +4718,7 @@ function pintarTodo(){
   requestAnimationFrame(()=>{
     repintadoPendiente = false;
     inicializarVendedorActual();
-    pintarProductos(); pintarVentas(); pintarCartera(); pintarEntregas(); pintarSolicitudes(); pintarRecientes(); pintarMenuProductoActivo();
+    pintarProductos(); pintarVentas(); pintarCartera(); pintarEntregas(); pintarSolicitudes(); pintarAgendas(); pintarRecientes(); pintarMenuProductoActivo();
   });
 }
 
@@ -4475,6 +4738,7 @@ if(vistaGuardada==='cartera'){
 }
 DB.iniciar();
 setInterval(()=>cerrarEntregasVencidas().catch(errorOperacion),60000);
+setInterval(()=>convertirAgendasVencidas().catch(errorOperacion),60000);
 setTimeout(ocultarCargaInicial, 9000);
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').then(reg=>{
