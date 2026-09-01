@@ -541,6 +541,8 @@ button{cursor:pointer;border:none;background:none}
   <div class="fila">
     <select id="selVendedor" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;font-family:var(--dato)"></select>
   </div>
+  <div class="rotulo" id="solActivoRotulo" hidden>Este vendedor solicitó</div>
+  <div id="solActivoLista" class="sol-lista-vendedor"></div>
 
   <div style="margin-top:10px" class="fila">
     <button class="btn ambar" id="btnCam">Escanear crédito</button>
@@ -1423,6 +1425,16 @@ function aplicarVendedorActual(vendedor){
   if(selectorVenta){ selectorVenta.value = value; }
   const selectorEntrega = $('#entregaVendor');
   if(selectorEntrega){ selectorEntrega.value = value; }
+  mostrarSolicitudesActivo();
+}
+
+function mostrarSolicitudesActivo(){
+  const cont = $('#solActivoLista');
+  if(!cont) return;
+  const lista = ordenarSolicitudes((DB.solicitudes||[]).filter(s=>s.vendedor===vendedorActual && !s.entregada));
+  cont.innerHTML = lista.map(s=>filaSolicitudHTML(s,false)).join('');
+  const rot = $('#solActivoRotulo');
+  if(rot) rot.hidden = !lista.length;
 }
 
 function inicializarVendedorActual(){
@@ -3176,6 +3188,7 @@ function pintarSolicitudes(){
       : `<div class="vacio"><b>Sin solicitudes</b>Cuando un vendedor pida un producto aparece aquí.</div>`;
   }
   mostrarSolicitudesVendedor();
+  mostrarSolicitudesActivo();
 }
 
 const sinAcentos = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
