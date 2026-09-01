@@ -1227,6 +1227,33 @@ $('#velo').addEventListener('click',cerrarHoja);
   hoja.addEventListener('pointercancel',fin);
 })();
 
+/* Aviso con estética de la app: el código de barras ya pertenece a un producto */
+function avisarCodigoRegistrado(prod, codigo, alContinuar){
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Código ya registrado</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="aviso" style="display:flex;gap:10px;align-items:flex-start">
+      <span aria-hidden="true" style="font-size:18px;line-height:1.2">⚠️</span>
+      <div>Este código de barras ya pertenece a un producto del catálogo. Puedes ver ese producto o continuar para registrar uno nuevo con otro código interno.</div>
+    </div>
+    <div class="cuadro" style="border-left-color:var(--ocre)">
+      <div class="grande" style="margin-bottom:11px">
+        <b style="color:var(--ocre);font-size:22px">${esc(prod.nombre)}</b>
+      </div>
+      <dl>
+        <dt>Marca</dt><dd>${esc(prod.marca || '—')}</dd>
+        <dt>Código de barras</dt><dd>${esc(codigo)}</dd>
+        <dt>Código interno</dt><dd>${esc(prod.sku)}</dd>
+      </dl>
+    </div>
+    <div class="fila" style="margin-top:14px">
+      <button class="btn plano" type="button" id="avisoCancelar">Cancelar</button>
+      <button class="btn ambar" type="button" id="avisoContinuar">Registrar nuevo</button>
+    </div>
+  `);
+  $('#avisoCancelar').addEventListener('click', cerrarHoja);
+  $('#avisoContinuar').addEventListener('click', ()=>{ cerrarHoja(); if(typeof alContinuar==='function') alContinuar(); });
+}
+
 /* ============================================================
    ESCÁNER
    ============================================================ */
@@ -1519,7 +1546,7 @@ function confirmarLectura(valor, formato='', sesionActual=sesionEscaneo){
   if(lecturaPrevia.veces>=2) procesarCodigoLeido(valor, sesionActual, fmt);
 }
 
-async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
+async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0, forzarCamara=false){
     const sesionActual=++sesionEscaneo;
   modoEscaneo = modo;
   tipoCodigo = tipo;
@@ -1541,8 +1568,9 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0){
     return;
   }
   if(modo==='entrega' && !entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
-  if(modo==='entrega' && entregaActual.items.length){
+  if(modo==='entrega' && entregaActual.items.length && !forzarCamara){
     mostrarHojaEntrega();
+    return;
   }
   if(flujo){ apagarCamara(); return; }
   try{
@@ -1753,12 +1781,14 @@ function procesarCodigoLeido(valor,sesionActual=sesionEscaneo,formato=''){
   }else if(modoEscaneo === 'producto'){
     const productoExistente=DB.buscar(sku);
     const datosProducto={...productoPendiente, codigoBarras:sku};
+    productoPendiente=null;
     cerrarHoja();
     if(productoExistente){
-      alert(`Este código de barras ya está registrado para: ${productoExistente.nombre}`);
-    }else brindis('Código leído'+tipoLeido+': '+sku);
-    abrirFormularioProducto(datosProducto);
-    productoPendiente=null;
+      avisarCodigoRegistrado(productoExistente, sku, ()=>abrirFormularioProducto(datosProducto));
+    }else{
+      brindis('Código leído'+tipoLeido+': '+sku);
+      abrirFormularioProducto(datosProducto);
+    }
   }else{
     abrirProducto(sku, tipoVentaEscaneo);
   }
@@ -1910,6 +1940,14 @@ function mostrarHojaEntrega(){
         </div>
       </div>
     </div>
+    <div class="rotulo">Agregar producto por código</div>
+    <div class="buscador-productos" style="margin-bottom:14px">
+      <input id="entregaCodigoManual" placeholder="Código del producto"
+        inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false"
+        style="font-family:var(--dato);letter-spacing:.06em;text-transform:uppercase"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();agregarProductoEntregaManual()}">
+      <button class="btn ambar chico" type="button" style="flex:0 0 auto" onclick="agregarProductoEntregaManual()">Agregar</button>
+    </div>
     <div class="rotulo rotulo-accion">Productos que lleva
       ${items.length ? `<span class="acciones-rotulo">
         <button type="button" class="mini-accion ${entregaSeleccionando?'activa':''}" onclick="alternarSeleccionEntrega()">${entregaSeleccionando?'Cancelar':'Seleccionar'}</button>
@@ -1955,9 +1993,24 @@ function mostrarHojaEntrega(){
         </div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin devoluciones</b>Si escaneas el mismo producto otra vez, queda aquí.</div>`}
     <button class="btn ambar" style="margin-top:14px" onclick="guardarEntrega()">Guardar</button>
-    <button class="btn plano" style="margin-top:8px" onclick="cerrarHoja(); iniciarEscaneo('entrega', tipoCodigo)">Escaneo otro producto</button>
+    <button class="btn plano" style="margin-top:8px" onclick="escanearOtroEnEntrega()">Escanear otro producto</button>
   `);
   $('#hojaCont').querySelectorAll('.entrega-item-swipe').forEach(bindSwipeEntrega);
+}
+
+function escanearOtroEnEntrega(){
+  cerrarHoja();
+  const btn = $('.barra button[data-ir="escanear"]');
+  if(btn && !btn.classList.contains('on')) btn.click();
+  iniciarEscaneo('entrega', tipoCodigo || 'barra', 'credito', 0, true);
+}
+
+function agregarProductoEntregaManual(){
+  const campo = $('#entregaCodigoManual');
+  const codigo = normalizarCodigo(campo ? campo.value : '');
+  if(!codigo){ brindis('Escribe el código del producto'); campo?.focus(); return; }
+  procesarEscaneoEntrega(codigo);
+  $('#entregaCodigoManual')?.focus();
 }
 
 function cambiarVendedorEntrega(vendedor){
