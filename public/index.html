@@ -1247,34 +1247,57 @@ function expandirUPCE(codigo){
   return sistema+cuerpo+verificador;
 }
 
+const HORAS_CIERRE_VENTA = 8;    // a las 8 h lo entregado no devuelto se marca como vendido
+const HORAS_NO_DEVUELTO  = 48;   // a las 48 h lo que sigue afuera se marca "no devuelto"
+
 async function cerrarEntregasVencidas(){
   const ahora=Date.now();
   for(const entrega of (DB.entregas||[])){
-    if(entrega.ventaGenerada) continue;
     const inicio=Date.parse(entrega.entregaCreado||entrega.creado||'');
     const marcadosVendidos=(entrega.vendidos||[]);
-    if(!inicio || ahora-inicio < 24*60*60*1000 || (!(entrega.entregados||[]).length && !marcadosVendidos.length)) continue;
+    if(!inicio || (!(entrega.entregados||[]).length && !marcadosVendidos.length)) continue;
+    const horas=(ahora-inicio)/3600000;
     const devueltos=new Map((entrega.devueltos||[]).map(item=>[item.sku,(item.cantidad||1)]));
-    const vendidos=marcadosVendidos.length
-      ? marcadosVendidos.map(item=>({ ...item, cantidad:Math.max(0,item.cantidad||1) })).filter(item=>item.cantidad>0)
-      : (entrega.entregados||[]).map(item=>({
-          ...item, cantidad:Math.max(0,(item.cantidad||1)-(devueltos.get(item.sku)||0))
-        })).filter(item=>item.cantidad>0);
-    entrega.ventaGenerada=true;
-    for(const item of vendidos){
-      const id=`entrega-${encodeURIComponent(entrega.creado)}-${encodeURIComponent(item.sku)}`;
-      if((DB.ventas||[]).some(venta=>venta.id===id)) continue;
-      const total=+((Number(item.precio)||0)*item.cantidad).toFixed(2);
-      const venta={id,sku:item.sku,producto:item.nombre,marca:item.marca||'',tipo:'contado',
-        cantidad:item.cantidad,precioUnitario:Number(item.precio)||0,total,prima:total,
-        totalCancelar:0,saldo:0,estado:'pagada',cuotas:[],cliente:'Venta por entrega',
-        documento:'',telefono:'',direccion:'',vendedor:entrega.vendor||'Sin vendedor',
-        sucursal:sucursalActual(),fecha:entrega.fecha||hoy(),creado:new Date().toISOString(),
-        abonos:[],origen:'entrega',entregaCreado:entrega.creado};
-      if(DB.modo==='firebase') DB.ventas.push(venta);
-      await DB.guardarVenta(venta);
+
+    // 8 h: lo entregado que no se devolvió se registra como venta de contado
+    if(!entrega.ventaGenerada && horas>=HORAS_CIERRE_VENTA){
+      const vendidos=marcadosVendidos.length
+        ? marcadosVendidos.map(item=>({ ...item, cantidad:Math.max(0,item.cantidad||1) })).filter(item=>item.cantidad>0)
+        : (entrega.entregados||[]).map(item=>({
+            ...item, cantidad:Math.max(0,(item.cantidad||1)-(devueltos.get(item.sku)||0))
+          })).filter(item=>item.cantidad>0);
+      entrega.ventaGenerada=true;
+      entrega.ventaAuto=!marcadosVendidos.length;   // se vendió automáticamente todo lo entregado
+      for(const item of vendidos){
+        const id=`entrega-${encodeURIComponent(entrega.creado)}-${encodeURIComponent(item.sku)}`;
+        if((DB.ventas||[]).some(venta=>venta.id===id)) continue;
+        const total=+((Number(item.precio)||0)*item.cantidad).toFixed(2);
+        const venta={id,sku:item.sku,producto:item.nombre,marca:item.marca||'',tipo:'contado',
+          cantidad:item.cantidad,precioUnitario:Number(item.precio)||0,total,prima:total,
+          totalCancelar:0,saldo:0,estado:'pagada',cuotas:[],cliente:'Venta por entrega',
+          documento:'',telefono:'',direccion:'',vendedor:entrega.vendor||'Sin vendedor',
+          sucursal:sucursalActual(),fecha:entrega.fecha||hoy(),creado:new Date().toISOString(),
+          abonos:[],origen:'entrega',entregaCreado:entrega.creado};
+        if(DB.modo==='firebase') DB.ventas.push(venta);
+        await DB.guardarVenta(venta);
+      }
+      await DB.guardarEntrega(entrega);
     }
-    await DB.guardarEntrega(entrega);
+
+    // 48 h: lo que se entregó y nunca se devolvió (ni quedó como venta) se marca "no devuelto"
+    if(!entrega.noDevuelto && !entrega.ventaAuto && horas>=HORAS_NO_DEVUELTO){
+      const vendidosMap=new Map(marcadosVendidos.map(i=>[i.sku,(i.cantidad||1)]));
+      const pendientes=(entrega.entregados||[]).map(it=>({
+        sku:it.sku, nombre:it.nombre,
+        cantidad:Math.max(0,(it.cantidad||1)-(devueltos.get(it.sku)||0)-(vendidosMap.get(it.sku)||0))
+      })).filter(it=>it.cantidad>0);
+      if(pendientes.length){
+        entrega.noDevuelto=true;
+        entrega.noDevueltoItems=pendientes;
+        entrega.noDevueltoFecha=hoy();
+        await DB.guardarEntrega(entrega);
+      }
+    }
   }
   caja.guardar('gp_ventas',DB.ventas||[]);
   caja.guardar('gp_entregas',DB.entregas||[]);
@@ -4271,6 +4294,7 @@ function pintarEntregas(){
   const totalEntregados = entregas.reduce((s,e)=>s + contar(e.entregados) + contar(e.vendidos),0);
   const totalVendidos = entregas.reduce((s,e)=>s + contar(e.vendidos),0);
   const totalDevueltos = entregas.reduce((s,e)=>s + contar(e.devueltos),0);
+  const totalNoDevueltos = entregas.reduce((s,e)=>s + (e.noDevuelto ? contar(e.noDevueltoItems) : 0),0);
   const vendedores = new Set(entregas.map(e=>e.vendor));
 
   $('#resumenEntregas').innerHTML = `
@@ -4278,6 +4302,7 @@ function pintarEntregas(){
     <div class="cifra bien"><em>Productos entregados</em><b>${totalEntregados}</b></div>
     <div class="cifra vendido"><em>Productos vendidos</em><b>${totalVendidos}</b></div>
     <div class="cifra"><em>Productos devueltos</em><b>${totalDevueltos}</b></div>
+    <div class="cifra ${totalNoDevueltos?'alerta':''}"><em>No devueltos</em><b>${totalNoDevueltos}</b></div>
     <div class="cifra"><em>Vendedores</em><b>${vendedores.size}</b></div>`;
 
   $('#listaEntregas').innerHTML = entregas.length ? entregas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||'')).map(e=>{
@@ -4321,6 +4346,10 @@ function pintarEntregas(){
           ${totalVen ? `<div style="margin-top:10px; padding:10px 12px; border:1px solid rgba(74,110,140,.32); border-radius:8px; background:rgba(214,230,242,.45)">
             <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#4A6E8C; margin-bottom:6px;">Vendidos</div>
             <div class="meta">${vendidos}</div>
+          </div>` : ''}
+          ${e.noDevuelto ? `<div style="margin-top:10px; padding:10px 12px; border:1px solid var(--rojo); border-radius:8px; background:var(--rojo-claro)">
+            <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--rojo); margin-bottom:6px;">No devuelto${e.noDevueltoFecha?` · ${fechaCompleta(e.noDevueltoFecha)}`:''}</div>
+            <div class="meta">${listaTxt(e.noDevueltoItems) || '—'}</div>
           </div>` : ''}
           <div style="margin-top:14px; padding-top:10px; border-top:1px solid rgba(44,44,44,.12);">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
