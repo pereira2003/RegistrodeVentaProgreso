@@ -143,7 +143,8 @@ button{cursor:pointer;border:none;background:none}
 .rotulo:first-child{margin-top:0}
 .vista-tope{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
 .vista-tope .rotulo{margin:0}
-.vista-tope .btn-icono{flex:0 0 40px;width:40px;height:40px}
+.icono-desnudo{flex:0 0 auto;padding:2px;background:none;border:0;box-shadow:none;color:var(--tinta-2);line-height:0;cursor:pointer}
+.icono-desnudo:active{transform:translateY(1px)}
 
 /* ---------- Tarjetas ---------- */
 .tarjeta{background:var(--papel);border:1px solid var(--borde);border-radius:var(--r);box-shadow:var(--duro)}
@@ -581,8 +582,8 @@ button{cursor:pointer;border:none;background:none}
 <section class="vista" data-vista="ventas">
   <div class="vista-tope">
     <div class="rotulo">Filtrar ventas</div>
-    <button class="btn plano btn-icono" id="btnIrCartera" type="button" title="Cartera — cuentas por cobrar" aria-label="Ver cartera">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 7h18v12H3zM3 7l2-3h14l2 3M8 13h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    <button class="icono-desnudo" id="btnIrCartera" type="button" title="Cartera — cuentas por cobrar" aria-label="Ver cartera">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M3 7h18v12H3zM3 7l2-3h14l2 3M8 13h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>
     </button>
   </div>
   <div class="filtro-fila" style="margin-bottom:8px">
