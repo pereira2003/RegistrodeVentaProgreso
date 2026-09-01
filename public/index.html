@@ -145,6 +145,9 @@ button{cursor:pointer;border:none;background:none}
 .vista-tope .rotulo{margin:0}
 .icono-desnudo{flex:0 0 auto;padding:2px;background:none;border:0;box-shadow:none;color:var(--tinta-2);line-height:0;cursor:pointer}
 .icono-desnudo:active{transform:translateY(1px)}
+.icono-desnudo.con-texto{display:flex;flex-direction:column;align-items:center;gap:3px}
+.icono-desnudo.con-texto span{font-family:var(--dato);font-size:8.5px;font-weight:600;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--tinta-3);line-height:1}
 
 /* ---------- Tarjetas ---------- */
 .tarjeta{background:var(--papel);border:1px solid var(--borde);border-radius:var(--r);box-shadow:var(--duro)}
@@ -602,7 +605,13 @@ button{cursor:pointer;border:none;background:none}
 
 <!-- ================= SOLICITUDES ================= -->
 <section class="vista" data-vista="solicitudes">
-  <div class="rotulo">Nueva solicitud</div>
+  <div class="vista-tope">
+    <div class="rotulo">Nueva solicitud</div>
+    <button class="icono-desnudo con-texto" id="btnAgendar" type="button" aria-label="Agendar">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M7 3v4M17 3v4M4 8h16M5 6h14v14H5zM8 12h3M8 16h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      <span>Agendar</span>
+    </button>
+  </div>
   <div class="tarjeta pad">
     <div class="campo"><label>Vendedor</label>
       <select id="solVendedor"></select></div>
@@ -4040,6 +4049,13 @@ $('#btnVolverVentas')?.addEventListener('click', ()=>$('.barra button[data-ir="v
 $('#btnLimpiarSolicitudes')?.addEventListener('click', ()=>{
   if(confirm('¿Borrar las solicitudes ya entregadas?')) DB.limpiarSolicitudes(true).catch(errorOperacion);
 });
+$('#btnAgendar')?.addEventListener('click', abrirAgenda);
+function abrirAgenda(){
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Agendar</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="aviso">Esta sección todavía no está lista. Decime qué querés agendar (visitas, recordatorios, entregas programadas…) y la armo.</div>
+  `);
+}
 
 // La etiqueta "Seleccione fecha" es solo un marcador: se oculta al enfocar el
 // campo o cuando ya tiene un valor, para que no quede encima de la fecha elegida.
