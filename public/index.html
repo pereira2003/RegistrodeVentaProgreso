@@ -141,6 +141,9 @@ button{cursor:pointer;border:none;background:none}
   padding:0;margin:30px 0 11px;
 }
 .rotulo:first-child{margin-top:0}
+.vista-tope{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
+.vista-tope .rotulo{margin:0}
+.vista-tope .btn-icono{flex:0 0 40px;width:40px;height:40px}
 
 /* ---------- Tarjetas ---------- */
 .tarjeta{background:var(--papel);border:1px solid var(--borde);border-radius:var(--r);box-shadow:var(--duro)}
@@ -576,7 +579,12 @@ button{cursor:pointer;border:none;background:none}
 
 <!-- ================= VENTAS ================= -->
 <section class="vista" data-vista="ventas">
-  <div class="rotulo">Filtrar ventas</div>
+  <div class="vista-tope">
+    <div class="rotulo">Filtrar ventas</div>
+    <button class="btn plano btn-icono" id="btnIrCartera" type="button" title="Cartera — cuentas por cobrar" aria-label="Ver cartera">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 7h18v12H3zM3 7l2-3h14l2 3M8 13h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    </button>
+  </div>
   <div class="filtro-fila" style="margin-bottom:8px">
     <select id="filtroVentasTipo" class="filtro-control filtro-placeholder filtro-tipo">
       <option value="" disabled selected>Seleccione el filtro</option>
@@ -599,7 +607,10 @@ button{cursor:pointer;border:none;background:none}
 
 <!-- ================= CARTERA ================= -->
 <section class="vista" data-vista="cartera">
-  <div class="rotulo">Filtrar cartera</div>
+  <div class="vista-tope">
+    <div class="rotulo">Filtrar cartera</div>
+    <button class="btn plano chico" id="btnVolverVentas" type="button" style="flex:0 0 auto">← Ventas</button>
+  </div>
   <div class="filtro-fila" style="margin-bottom:8px">
     <select id="filtroCarteraTipo" class="filtro-control filtro-placeholder filtro-tipo">
       <option value="" disabled selected>Seleccione el filtro</option>
@@ -682,9 +693,6 @@ button{cursor:pointer;border:none;background:none}
   <button data-ir="ventas">
     <svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-5 3 3 5-7"/></svg>
     Ventas</button>
-  <button data-ir="cartera">
-    <svg viewBox="0 0 24 24"><path d="M3 7h18v12H3zM3 7l2-3h14l2 3M8 13h8"/></svg>
-    Cartera</button>
   <button data-ir="etiquetas">
     <svg viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9V4z"/><circle cx="8" cy="8" r="1.4"/></svg>
     Etiquetas</button>
@@ -3779,6 +3787,18 @@ $('#btnGestionZonas').addEventListener('click',gestionarZonas);
 $('#filtroCarteraTipo').addEventListener('change',()=>configurarFiltroFecha('filtroCarteraTipo','filtroCarteraFecha',pintarCartera));
 $('#filtroCarteraFecha').addEventListener('input',pintarCartera);
 
+/* Cartera vive dentro de "Ventas": se abre con el icono de la esquina y
+   la barra inferior sigue marcando Ventas. */
+function mostrarCartera(){
+  $$('.vista').forEach(v=>v.classList.toggle('activa', v.dataset.vista==='cartera'));
+  $$('.barra button').forEach(x=>x.classList.toggle('on', x.dataset.ir==='ventas'));
+  caja.guardar('gp_vista','cartera');
+  window.scrollTo(0,0);
+  pintarCartera();
+}
+$('#btnIrCartera')?.addEventListener('click', mostrarCartera);
+$('#btnVolverVentas')?.addEventListener('click', ()=>$('.barra button[data-ir="ventas"]')?.click());
+
 // La etiqueta "Seleccione fecha" es solo un marcador: se oculta al enfocar el
 // campo o cuando ya tiene un valor, para que no quede encima de la fecha elegida.
 function sincronizarEtiquetaFecha(campo){
@@ -4182,8 +4202,12 @@ function sucursalActual(){
 
 inicializarVendedorActual();
 const vistaGuardada = caja.leer('gp_vista','escanear');
-const botonVistaGuardada = $(`.barra button[data-ir="${vistaGuardada}"]`) || $('.barra button[data-ir="escanear"]');
-botonVistaGuardada?.click();
+if(vistaGuardada==='cartera'){
+  mostrarCartera();
+}else{
+  const botonVistaGuardada = $(`.barra button[data-ir="${vistaGuardada}"]`) || $('.barra button[data-ir="escanear"]');
+  botonVistaGuardada?.click();
+}
 DB.iniciar();
 setInterval(()=>cerrarEntregasVencidas().catch(errorOperacion),60000);
 setTimeout(ocultarCargaInicial, 9000);
