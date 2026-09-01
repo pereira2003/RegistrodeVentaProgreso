@@ -523,8 +523,15 @@ button{cursor:pointer;border:none;background:none}
 <!-- ================= ESCANEAR ================= -->
 <section class="vista activa" data-vista="escanear">
   <div class="datos-cargando activo" id="datosCargando" aria-live="polite"><i></i>Sincronizando datos</div>
+
+  <div class="rotulo" style="margin-top:0">Buscar sin escanear</div>
+  <div class="fila">
+    <input id="skuManual" placeholder="Ej. 7501234567890 o PTSCA043" style="padding:13px 12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;font-family:var(--dato);letter-spacing:.08em;text-transform:uppercase">
+    <button class="btn plano" style="flex:0 0 96px" id="btnBuscar">Buscar</button>
+  </div>
+
   <div id="menuProductoActivo"></div>
-  <div class="visor" id="visor">
+  <div class="visor" id="visor" style="margin-top:14px">
     <video id="video" playsinline muted></video>
     <canvas id="lienzo"></canvas>
     <div class="reticula" id="reticula" hidden>
@@ -537,23 +544,17 @@ button{cursor:pointer;border:none;background:none}
     </div>
   </div>
 
+  <div style="margin-top:10px" class="fila">
+    <button class="btn ambar" id="btnCam">Escanear crédito</button>
+    <button class="btn plano" id="btnCamEntrega">Escanear entrega y devolución</button>
+  </div>
+
   <div class="rotulo">Vendedor activo</div>
   <div class="fila">
     <select id="selVendedor" style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;font-family:var(--dato)"></select>
   </div>
   <div class="rotulo" id="solActivoRotulo" hidden>Este vendedor solicitó</div>
   <div id="solActivoLista" class="sol-lista-vendedor"></div>
-
-  <div style="margin-top:10px" class="fila">
-    <button class="btn ambar" id="btnCam">Escanear crédito</button>
-    <button class="btn plano" id="btnCamEntrega">Escanear entrega y devolución</button>
-  </div>
-
-  <div class="rotulo">Buscar sin escanear</div>
-  <div class="fila">
-    <input id="skuManual" placeholder="Ej. 7501234567890 o PTSCA043" style="padding:13px 12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff;font-family:var(--dato);letter-spacing:.08em;text-transform:uppercase">
-    <button class="btn plano" style="flex:0 0 96px" id="btnBuscar">Buscar</button>
-  </div>
 
   <div class="rotulo" id="rotuloRecientes">Últimos escaneos</div>
   <div id="recientes"></div>
