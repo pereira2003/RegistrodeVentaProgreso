@@ -320,6 +320,24 @@ button{cursor:pointer;border:none;background:none}
 .sug-marca button:last-child{border-bottom:0}
 .sug-marca button:active{background:var(--rojo-claro)}
 .sug-marca button.nueva{color:var(--ocre);text-transform:none;letter-spacing:0;font-weight:600}
+.sol-lista-vendedor{margin:6px 0 0;border:1px solid var(--suave);border-radius:var(--r);
+  background:var(--papel);box-shadow:var(--duro);overflow:hidden}
+.sol-lista-vendedor:empty{display:none}
+#solListaTodas:not(:empty){border:1px solid var(--suave);border-radius:var(--r);
+  background:var(--papel);box-shadow:var(--duro);overflow:hidden}
+.sol-lista-vendedor .vacio-sug{padding:10px 12px;font-size:12px;color:var(--tinta-3)}
+.sol-fila{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid var(--suave)}
+.sol-fila:last-child{border-bottom:0}
+.sol-fila .sol-txt{flex:1;min-width:0}
+.sol-fila .sol-txt b{font-family:var(--display);font-size:14px;font-weight:700;display:block;line-height:1.25}
+.sol-fila .sol-txt span{font-family:var(--dato);font-size:10.5px;color:var(--tinta-3);display:block;margin-top:3px}
+.sol-fila.entregada .sol-txt b{text-decoration:line-through;color:var(--tinta-3)}
+.sol-fila .sol-acc{display:flex;flex-direction:column;gap:5px;flex:0 0 auto}
+.sol-fila .sol-acc button{font-family:var(--dato);font-size:9px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;padding:6px 9px;border-radius:8px;border:1px solid currentColor;
+  background:none;cursor:pointer;white-space:nowrap}
+.sol-fila .sol-acc .ok{color:#3a5c52}
+.sol-fila .sol-acc .del{color:#8a6a3f}
 .product-swipe{
   position:relative;overflow:hidden;border-radius:18px;margin-bottom:10px;background:transparent;
   isolation:isolate;z-index:1;
@@ -578,6 +596,35 @@ button{cursor:pointer;border:none;background:none}
   <div id="listaProd"></div>
 </section>
 
+<!-- ================= SOLICITUDES ================= -->
+<section class="vista" data-vista="solicitudes">
+  <div class="rotulo">Nueva solicitud</div>
+  <div class="tarjeta pad">
+    <div class="campo"><label>Vendedor</label>
+      <select id="solVendedor"></select></div>
+    <div class="campo marca-combo"><label>Producto que necesita</label>
+      <input id="solProducto" placeholder="Escribe el producto" autocomplete="off" spellcheck="false"
+        oninput="sugerirProductosSolicitud(this.value)" onfocus="sugerirProductosSolicitud(this.value)"
+        onblur="setTimeout(cerrarSugerenciasSolicitud,150)">
+      <div id="solSugerencias" class="sug-marca"></div></div>
+    <div class="dosc">
+      <div class="campo"><label>Cantidad</label>
+        <input id="solCantidad" type="number" inputmode="numeric" min="1" step="1" value="1"></div>
+      <div class="campo"><label>Nota (opcional)</label>
+        <input id="solNota" placeholder="Cliente, zona, color…"></div>
+    </div>
+    <button class="btn suave" type="button" onclick="agregarSolicitud()">Agregar solicitud</button>
+  </div>
+
+  <div class="rotulo">Ver solicitudes de</div>
+  <select id="solFiltroVendedor" class="filtro-control" onchange="mostrarSolicitudesVendedor()"></select>
+  <div id="solListaVendedor" class="sol-lista-vendedor"></div>
+
+  <div class="rotulo">Todas las solicitudes</div>
+  <button class="btn plano chico" id="btnLimpiarSolicitudes" type="button" style="width:100%;margin-bottom:12px">Borrar las entregadas</button>
+  <div id="solListaTodas"></div>
+</section>
+
 <!-- ================= VENTAS ================= -->
 <section class="vista" data-vista="ventas">
   <div class="vista-tope">
@@ -691,6 +738,9 @@ button{cursor:pointer;border:none;background:none}
   <button data-ir="productos">
     <svg viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0v10l-8 4m8-14l-8 4m0 10L4 17V7m8 10V11M4 7l8 4"/></svg>
     Productos</button>
+  <button data-ir="solicitudes">
+    <svg viewBox="0 0 24 24"><path d="M9 4h6v3H9zM8 5H6v15h12V5h-2M9 12l2 2 4-4"/></svg>
+    Solicitud</button>
   <button data-ir="ventas">
     <svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-5 3 3 5-7"/></svg>
     Ventas</button>
@@ -853,7 +903,7 @@ const SEMILLA = [
 ];
 
 const DB = {
-  modo:'local', productos:[], ventas:[], entregas:[], vendedores:[], zonas:[], fb:null,
+  modo:'local', productos:[], ventas:[], entregas:[], vendedores:[], zonas:[], solicitudes:[], fb:null,
 
   async iniciar(){
     if(CFG.firebase){
@@ -869,10 +919,12 @@ const DB = {
     this.entregas  = caja.leer('gp_entregas', []);
     this.vendedores = caja.leer('gp_vendedores', CFG.vendedores.slice());
     this.zonas      = caja.leer('gp_zonas', CFG.zonas.slice());
+    this.solicitudes = caja.leer('gp_solicitudes', []);
     caja.guardar('gp_productos', this.productos);
     caja.guardar('gp_entregas', this.entregas);
     caja.guardar('gp_vendedores', this.vendedores);
     caja.guardar('gp_zonas', this.zonas);
+    caja.guardar('gp_solicitudes', this.solicitudes);
     sello('Modo prueba','local');
     await cerrarEntregasVencidas();
     pintarTodo();
@@ -919,6 +971,11 @@ const DB = {
       caja.guardar('gp_zonas', this.zonas);
       pintarTodo();
     });
+    f.onSnapshot(f.collection(bd,'solicitudes'), s=>{
+      this.solicitudes = s.docs.map(d=>({id:d.id,...d.data()}));
+      caja.guardar('gp_solicitudes', this.solicitudes);
+      pintarTodo();
+    });
   },
 
   async migrarDatosLocales(){
@@ -935,6 +992,7 @@ const DB = {
     };
     await migrarColeccion('ventas', caja.leer('gp_ventas', []), v=>String(v.id||'').trim());
     await migrarColeccion('entregas', caja.leer('gp_entregas', []), e=>String(e.creado||'').trim());
+    await migrarColeccion('solicitudes', caja.leer('gp_solicitudes', []), s=>String(s.creado||'').trim());
   },
 
   async sembrar(lista=SEMILLA){ for(const p of lista) await this.agregarProducto(p); },
@@ -1018,6 +1076,39 @@ const DB = {
         pintarTodo();
       }
     },
+
+  async guardarSolicitud(s){
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; await f.setDoc(f.doc(bd,'solicitudes',s.creado), s);
+    }else{
+      this.solicitudes=(this.solicitudes||[]).filter(x=>x.creado!==s.creado);
+      this.solicitudes.push(s);
+      caja.guardar('gp_solicitudes',this.solicitudes); pintarTodo();
+    }
+  },
+
+  async eliminarSolicitud(creado){
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; await f.deleteDoc(f.doc(bd,'solicitudes',creado));
+      this.solicitudes=(this.solicitudes||[]).filter(x=>x.creado!==creado);
+      caja.guardar('gp_solicitudes', this.solicitudes); pintarTodo();
+    }else{
+      this.solicitudes=(this.solicitudes||[]).filter(x=>x.creado!==creado);
+      caja.guardar('gp_solicitudes',this.solicitudes); pintarTodo();
+    }
+  },
+
+  async limpiarSolicitudes(soloEntregadas=true){
+    const quedan = soloEntregadas ? (this.solicitudes||[]).filter(s=>!s.entregada) : [];
+    if(this.modo==='firebase'){
+      const {f,bd}=this.fb; const snap=await f.getDocs(f.collection(bd,'solicitudes'));
+      const conservar=new Set(quedan.map(s=>s.creado));
+      await Promise.all(snap.docs.filter(d=>!conservar.has(d.id)).map(d=>f.deleteDoc(d.ref)));
+      this.solicitudes=quedan; caja.guardar('gp_solicitudes', this.solicitudes); pintarTodo();
+    }else{
+      this.solicitudes=quedan; caja.guardar('gp_solicitudes',this.solicitudes); pintarTodo();
+    }
+  },
 
   async actualizarProducto(p, skuAnterior=''){
     if(this.modo==='firebase'){
@@ -1212,6 +1303,7 @@ $$('.barra button').forEach(b=>b.addEventListener('click',()=>{
   $$('.vista').forEach(v=>v.classList.toggle('activa', v.dataset.vista===b.dataset.ir));
   window.scrollTo(0,0);
   if(b.dataset.ir==='etiquetas') pintarEtiquetas();
+  if(b.dataset.ir==='solicitudes') pintarSolicitudes();
 }));
 
 function abrirHoja(html){
@@ -2977,6 +3069,105 @@ function cerrarSugerenciasMarca(){
   if(cont) cont.innerHTML = '';
 }
 
+/* ============================================================
+   SOLICITUDES DE PRODUCTO
+   ============================================================ */
+function sugerirProductosSolicitud(texto){
+  const cont = $('#solSugerencias');
+  if(!cont) return;
+  const q = String(texto||'').trim().toLowerCase();
+  if(q.length < 2){ cont.innerHTML=''; return; }
+  const lista = (DB.productos||[]).filter(p=>
+    ((p.nombre||'')+' '+(p.marca||'')+' '+(p.sku||'')).toLowerCase().includes(q)
+  ).slice(0,8);
+  cont.innerHTML = lista.map(p=>`<button type="button" data-nombre="${esc(p.nombre)}">${esc(p.nombre)}${p.marca?` · ${esc((p.marca||'').toUpperCase())}`:''}</button>`).join('');
+  cont.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('mousedown', e=>e.preventDefault());
+    b.addEventListener('click', ()=>{ const inp=$('#solProducto'); if(inp) inp.value=b.dataset.nombre; cerrarSugerenciasSolicitud(); });
+  });
+}
+function cerrarSugerenciasSolicitud(){ const c=$('#solSugerencias'); if(c) c.innerHTML=''; }
+
+async function agregarSolicitud(){
+  const vendedor = $('#solVendedor')?.value || '';
+  const producto = $('#solProducto')?.value.trim() || '';
+  const cantidad = Math.max(1, Math.round(+($('#solCantidad')?.value||1)));
+  const nota = $('#solNota')?.value.trim() || '';
+  if(!vendedor){ brindis('Elige un vendedor'); return; }
+  if(!producto){ brindis('Escribe el producto que se necesita'); $('#solProducto')?.focus(); return; }
+  const s = { creado:new Date().toISOString(), fecha:hoy(), vendedor, producto, cantidad, nota, entregada:false, entregadaFecha:null };
+  try{
+    await DB.guardarSolicitud(s);
+    $('#solProducto').value=''; $('#solNota').value=''; $('#solCantidad').value='1';
+    cerrarSugerenciasSolicitud();
+    brindis('Solicitud agregada');
+  }catch(e){ errorOperacion(e); }
+}
+
+function alternarSolicitudEntregada(creado){
+  const s = (DB.solicitudes||[]).find(x=>x.creado===creado);
+  if(!s) return;
+  DB.guardarSolicitud({ ...s, entregada:!s.entregada, entregadaFecha: !s.entregada ? hoy() : null }).catch(errorOperacion);
+}
+
+function eliminarSolicitud(creado){
+  if(!confirm('¿Eliminar esta solicitud?')) return;
+  DB.eliminarSolicitud(creado).catch(errorOperacion);
+}
+
+function ordenarSolicitudes(arr){
+  return [...arr].sort((a,b)=>
+    (a.entregada?1:0)-(b.entregada?1:0) ||
+    String(b.creado||'').localeCompare(String(a.creado||''))
+  );
+}
+
+function filaSolicitudHTML(s, conVendedor){
+  const meta = [
+    conVendedor ? esc(s.vendedor) : '',
+    s.nota ? esc(s.nota) : '',
+    s.creado ? fechaCompleta(s.creado) : '',
+    s.entregada ? 'Entregada' : ''
+  ].filter(Boolean).join(' · ');
+  return `<div class="sol-fila ${s.entregada?'entregada':''}">
+    <div class="sol-txt"><b>${esc(s.producto)} ×${s.cantidad||1}</b>${meta?`<span>${meta}</span>`:''}</div>
+    <div class="sol-acc">
+      <button type="button" class="ok" onclick="alternarSolicitudEntregada('${s.creado}')">${s.entregada?'Reabrir':'Entregada'}</button>
+      <button type="button" class="del" onclick="eliminarSolicitud('${s.creado}')">Eliminar</button>
+    </div>
+  </div>`;
+}
+
+function mostrarSolicitudesVendedor(){
+  const cont = $('#solListaVendedor');
+  if(!cont) return;
+  const v = $('#solFiltroVendedor')?.value || '';
+  if(!v){ cont.innerHTML=''; return; }
+  const lista = ordenarSolicitudes((DB.solicitudes||[]).filter(s=>s.vendedor===v));
+  cont.innerHTML = lista.length
+    ? lista.map(s=>filaSolicitudHTML(s,false)).join('')
+    : `<div class="vacio-sug">${esc(v)} no tiene solicitudes.</div>`;
+}
+
+function pintarSolicitudes(){
+  const selNuevo = $('#solVendedor');
+  if(selNuevo) selNuevo.innerHTML = vendedorOptions(selNuevo.value);
+  const selFiltro = $('#solFiltroVendedor');
+  if(selFiltro){
+    const prev = selFiltro.value;
+    selFiltro.innerHTML = `<option value="">— Elige un vendedor —</option>` + vendedorOptions('');
+    if([...selFiltro.options].some(o=>o.value===prev)) selFiltro.value = prev;
+  }
+  const todas = ordenarSolicitudes(DB.solicitudes||[]);
+  const cont = $('#solListaTodas');
+  if(cont){
+    cont.innerHTML = todas.length
+      ? todas.map(s=>filaSolicitudHTML(s,true)).join('')
+      : `<div class="vacio"><b>Sin solicitudes</b>Cuando un vendedor pida un producto aparece aquí.</div>`;
+  }
+  mostrarSolicitudesVendedor();
+}
+
 const sinAcentos = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 
 /* Palabras clave por categoría (sin acentos). Se revisa de la más específica
@@ -3799,6 +3990,9 @@ function mostrarCartera(){
 }
 $('#btnIrCartera')?.addEventListener('click', mostrarCartera);
 $('#btnVolverVentas')?.addEventListener('click', ()=>$('.barra button[data-ir="ventas"]')?.click());
+$('#btnLimpiarSolicitudes')?.addEventListener('click', ()=>{
+  if(confirm('¿Borrar las solicitudes ya entregadas?')) DB.limpiarSolicitudes(true).catch(errorOperacion);
+});
 
 // La etiqueta "Seleccione fecha" es solo un marcador: se oculta al enfocar el
 // campo o cuando ya tiene un valor, para que no quede encima de la fecha elegida.
@@ -4191,7 +4385,7 @@ function pintarTodo(){
   requestAnimationFrame(()=>{
     repintadoPendiente = false;
     inicializarVendedorActual();
-    pintarProductos(); pintarVentas(); pintarCartera(); pintarEntregas(); pintarRecientes(); pintarMenuProductoActivo();
+    pintarProductos(); pintarVentas(); pintarCartera(); pintarEntregas(); pintarSolicitudes(); pintarRecientes(); pintarMenuProductoActivo();
   });
 }
 

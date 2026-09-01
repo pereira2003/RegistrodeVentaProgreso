@@ -49,5 +49,10 @@ service cloud.firestore {
     match /entregas/{id} {
       allow read, write: if autenticado();
     }
+
+    // Solicitudes de producto que hacen los vendedores.
+    match /solicitudes/{id} {
+      allow read, write: if autenticado();
+    }
   }
 }
