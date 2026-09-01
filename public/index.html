@@ -180,7 +180,7 @@ button{cursor:pointer;border:none;background:none}
 .btn.ambar{background:var(--arena);color:var(--tinta)}
 .btn.oscuro{background:var(--oscuro);color:#fff;border-color:var(--oscuro)}
 #btnImprimir{background:var(--oscuro);color:#fff;border-color:var(--oscuro)}
-#btnCam,#btnCamEntrega{
+#btnCam,#btnCamEntrega,.btn.suave{
   background:var(--ocre-claro);color:var(--ocre);border-color:var(--ocre);
   font-family:var(--dato);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:11px;
 }
@@ -1345,8 +1345,8 @@ function seleccionarTipoEscaneo(modo){
       lee todas las simbologías: numéricas (EAN-13, EAN-8, UPC-A, UPC-E, ITF, GS1 DataBar) y
       alfanuméricas (Code 128, Code 39, Code 93, Codabar, Data Matrix, PDF417, Aztec).</div>
     <div class="fila" style="margin-top:14px">
-      <button class="btn oscuro" onclick="seleccionarFormaVenta('${modo}','qr')">Código QR</button>
-      <button class="btn oscuro" onclick="seleccionarFormaVenta('${modo}','barra')">Código de barras</button>
+      <button class="btn suave" onclick="seleccionarFormaVenta('${modo}','qr')">Código QR</button>
+      <button class="btn suave" onclick="seleccionarFormaVenta('${modo}','barra')">Código de barras</button>
     </div>`);
 }
 
