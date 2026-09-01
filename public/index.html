@@ -305,6 +305,17 @@ button{cursor:pointer;border:none;background:none}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sug-entrega .sc{font-family:var(--dato);font-size:10.5px;color:var(--tinta-3);flex:0 0 auto}
 .sug-entrega .vacio-sug{padding:10px 12px;font-size:12.5px;color:var(--tinta-3)}
+.marca-combo{position:relative}
+.sug-marca{position:absolute;left:0;right:0;top:100%;z-index:6;margin-top:4px;
+  max-height:200px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  border:1px solid var(--suave);border-radius:var(--r);background:var(--papel);box-shadow:var(--duro)}
+.sug-marca:empty{display:none}
+.sug-marca button{display:block;width:100%;text-align:left;padding:9px 12px;border:0;
+  border-bottom:1px solid var(--suave);background:var(--papel);color:var(--tinta);cursor:pointer;
+  font-family:var(--dato);font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.sug-marca button:last-child{border-bottom:0}
+.sug-marca button:active{background:var(--rojo-claro)}
+.sug-marca button.nueva{color:var(--ocre);text-transform:none;letter-spacing:0;font-weight:600}
 .product-swipe{
   position:relative;overflow:hidden;border-radius:18px;margin-bottom:10px;background:transparent;
   isolation:isolate;z-index:1;
@@ -2928,8 +2939,32 @@ function marcasActuales(actual=''){
   return [...set].sort((a,b)=>a.localeCompare(b,'es'));
 }
 
-function opcionesMarca(actual=''){
-  return marcasActuales(actual).map(m=>`<option value="${esc(m)}"></option>`).join('');
+function sugerirMarcas(texto){
+  const cont = $('#marcaSugerencias');
+  if(!cont) return;
+  const q = String(texto||'').trim();
+  const ql = q.toLowerCase();
+  const todas = marcasActuales();
+  const lista = ql ? todas.filter(m=>m.toLowerCase().includes(ql)) : todas;
+  const filas = lista.slice(0,40).map(m=>`<button type="button" data-marca="${esc(m)}">${esc(m)}</button>`);
+  if(q && !todas.some(m=>m.toLowerCase()===ql)){
+    const nueva = q.toUpperCase();
+    filas.push(`<button type="button" class="nueva" data-marca="${esc(nueva)}">+ Usar “${esc(nueva)}” como marca nueva</button>`);
+  }
+  cont.innerHTML = filas.join('');
+  cont.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('mousedown', e=>e.preventDefault());
+    b.addEventListener('click', ()=>{
+      const inp = $('#pMarca');
+      if(inp) inp.value = b.dataset.marca;
+      cerrarSugerenciasMarca();
+    });
+  });
+}
+
+function cerrarSugerenciasMarca(){
+  const cont = $('#marcaSugerencias');
+  if(cont) cont.innerHTML = '';
 }
 
 const sinAcentos = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
@@ -2991,10 +3026,12 @@ function abrirFormularioProducto(p = null){
         oninput="sugerirCategoria(this.value)"></div>
       <div class="campo"><label>Color</label><input id="pColor" value="${esc(p ? p.color || '' : '')}" placeholder="Ej. Negro"></div>
       <div class="dosc">
-        <div class="campo"><label>Marca</label>
-          <input id="pMarca" list="listaMarcas" value="${esc(p ? (p.marca||'').toUpperCase() : '')}" placeholder="Escribe o elige una marca"
-            autocapitalize="characters" spellcheck="false" style="text-transform:uppercase">
-          <datalist id="listaMarcas">${opcionesMarca(p ? p.marca : '')}</datalist></div>
+        <div class="campo marca-combo"><label>Marca</label>
+          <input id="pMarca" value="${esc(p ? (p.marca||'').toUpperCase() : '')}" placeholder="Escribe o elige una marca"
+            autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-transform:uppercase"
+            oninput="sugerirMarcas(this.value)" onfocus="sugerirMarcas(this.value)"
+            onblur="setTimeout(cerrarSugerenciasMarca,150)">
+          <div id="marcaSugerencias" class="sug-marca"></div></div>
         <div class="campo"><label>Categoría</label>
           <select id="pCat" onchange="this.dataset.tocado='1'">
             ${opcionesCategoria(p ? p.categoria : '')}
