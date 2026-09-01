@@ -1078,12 +1078,11 @@ const DB = {
     },
 
   async guardarSolicitud(s){
+    this.solicitudes=[...(this.solicitudes||[]).filter(x=>x.creado!==s.creado), s];
+    caja.guardar('gp_solicitudes',this.solicitudes);
+    pintarTodo();
     if(this.modo==='firebase'){
       const {f,bd}=this.fb; await f.setDoc(f.doc(bd,'solicitudes',s.creado), s);
-    }else{
-      this.solicitudes=(this.solicitudes||[]).filter(x=>x.creado!==s.creado);
-      this.solicitudes.push(s);
-      caja.guardar('gp_solicitudes',this.solicitudes); pintarTodo();
     }
   },
 
@@ -3089,19 +3088,25 @@ function sugerirProductosSolicitud(texto){
 function cerrarSugerenciasSolicitud(){ const c=$('#solSugerencias'); if(c) c.innerHTML=''; }
 
 async function agregarSolicitud(){
-  const vendedor = $('#solVendedor')?.value || '';
+  const vendedor = $('#solVendedor')?.value.trim() || '';
   const producto = $('#solProducto')?.value.trim() || '';
-  const cantidad = Math.max(1, Math.round(+($('#solCantidad')?.value||1)));
+  const cantidad = Math.max(1, Math.round(+($('#solCantidad')?.value||1)) || 1);
   const nota = $('#solNota')?.value.trim() || '';
   if(!vendedor){ brindis('Elige un vendedor'); return; }
   if(!producto){ brindis('Escribe el producto que se necesita'); $('#solProducto')?.focus(); return; }
   const s = { creado:new Date().toISOString(), fecha:hoy(), vendedor, producto, cantidad, nota, entregada:false, entregadaFecha:null };
+  if($('#solProducto')) $('#solProducto').value='';
+  if($('#solNota')) $('#solNota').value='';
+  if($('#solCantidad')) $('#solCantidad').value='1';
+  cerrarSugerenciasSolicitud();
+  brindis('Solicitud agregada');
   try{
     await DB.guardarSolicitud(s);
-    $('#solProducto').value=''; $('#solNota').value=''; $('#solCantidad').value='1';
-    cerrarSugerenciasSolicitud();
-    brindis('Solicitud agregada');
-  }catch(e){ errorOperacion(e); }
+  }catch(e){
+    DB.solicitudes = (DB.solicitudes||[]).filter(x=>x.creado!==s.creado);
+    pintarSolicitudes();
+    errorOperacion(e);
+  }
 }
 
 function alternarSolicitudEntregada(creado){
