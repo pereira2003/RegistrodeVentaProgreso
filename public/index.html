@@ -2986,7 +2986,7 @@ function abrirFormularioProducto(p = null){
             placeholder="Ej. 3 (funda + sábana + forro)"></div>
       </div>
     </div>
-    <button class="btn ambar" style="margin-top:14px" onclick="guardarProducto('${editando ? p.sku : ''}')">${editando ? 'Actualizar producto' : 'Guardar producto'}</button>
+    <button class="btn suave" style="margin-top:14px" onclick="guardarProducto('${editando ? p.sku : ''}')">${editando ? 'Actualizar producto' : 'Guardar producto'}</button>
   `);
   // Al editar, o si ya trae categoría, no se sobrescribe automáticamente
   if(editando || (p && p.categoria)) { const s=$('#pCat'); if(s) s.dataset.tocado='1'; }
