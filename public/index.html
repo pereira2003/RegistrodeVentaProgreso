@@ -3071,7 +3071,7 @@ function formAbono(id){
             ${c.estado==='pagada'?'Pagada':venc?'Vencida':'Pendiente'}</span></div>
         <div class="val">${money(c.monto)}${c.pagado?`<small>Abonado ${money(c.pagado)}</small>`:''}</div>
       </div>`;}).join('')}</div>
-    <button class="btn ambar" style="margin-top:14px" onclick="aplicarAbono('${v.id}')">Guardar abono</button>
+    <button class="btn suave" style="margin-top:14px" onclick="aplicarAbono('${v.id}')">Guardar abono</button>
   `);
 }
 
@@ -3647,7 +3647,7 @@ function detalleVenta(id){
           <dt>Saldo pendiente</dt><dd>${money(v.saldo)}</dd>
         </dl>
       </div>
-      <button class="btn ambar" onclick="formAbono('${v.id}')">Registrar abono</button>`:''}
+      <button class="btn suave" onclick="formAbono('${v.id}')">Registrar abono</button>`:''}
   `);
 }
 
