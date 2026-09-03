@@ -105,6 +105,25 @@ button{cursor:pointer;border:none;background:none}
 .marca span{display:block;font-family:var(--dato);font-weight:500;font-size:9px;letter-spacing:.18em;
   text-transform:uppercase;color:var(--tinta-3);margin-top:7px}
 .tope .der{margin-left:auto;display:flex;align-items:center;gap:7px}
+.campana{position:relative;padding:6px;background:none;border:0;color:var(--tinta-2);line-height:0;cursor:pointer}
+.campana svg{width:23px;height:23px}
+.campana:active{transform:translateY(1px)}
+.campana-badge{position:absolute;top:1px;right:1px;min-width:15px;height:15px;padding:0 3px;
+  border-radius:999px;background:#c15b3c;color:#fff;font-family:var(--dato);font-size:9px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;line-height:1}
+.campana-badge[hidden]{display:none}
+.noti-lista{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.noti-fila{display:flex;gap:11px;align-items:flex-start;text-align:left;width:100%;
+  padding:11px 12px;border:1px solid var(--suave);border-left:3px solid var(--tinta-3);
+  border-radius:var(--r);background:var(--papel);box-shadow:var(--duro);cursor:pointer}
+.noti-fila:active{background:var(--rojo-claro)}
+.noti-fila .noti-ico{font-size:16px;line-height:1.2;flex:0 0 auto}
+.noti-fila .noti-txt{min-width:0}
+.noti-fila .noti-txt b{display:block;font-family:var(--display);font-size:13.5px;font-weight:700;line-height:1.3}
+.noti-fila .noti-txt span{display:block;font-family:var(--dato);font-size:10.5px;color:var(--tinta-3);margin-top:3px}
+.noti-vencido,.noti-agotado{border-left-color:#c15b3c}
+.noti-porvencer,.noti-stockbajo{border-left-color:var(--ocre)}
+.noti-agenda{border-left-color:#4A6E8C}
 .pastilla{
   display:flex;align-items:center;gap:6px;
   font-family:var(--dato);font-size:10px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;
@@ -539,6 +558,12 @@ button{cursor:pointer;border:none;background:none}
 
 <header class="tope">
   <div class="marca">Grupo Progreso<span>Registro de ventas</span></div>
+  <div class="der">
+    <button class="campana" id="btnCampana" type="button" aria-label="Notificaciones">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M9.5 20a2.5 2.5 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="campana-badge" id="campanaBadge" hidden></span>
+    </button>
+  </div>
 </header>
 
 <!-- ================= ESCANEAR ================= -->
@@ -3388,6 +3413,103 @@ function actualizarAlertaSolicitudes(){
   badge.textContent = n > 99 ? '99+' : String(n);
 }
 
+/* ============================================================
+   NOTIFICACIONES  (campana del encabezado)
+   ============================================================ */
+const ICONO_NOTI = { vencido:'⚠️', porvencer:'⏳', agenda:'📅', agotado:'📦', stockbajo:'📉' };
+const STOCK_BAJO = 3;
+
+function calcularNotificaciones(){
+  const notis = [];
+  const ahora = Date.now();
+  const hoyStr = hoy();
+  const d1 = new Date(); d1.setDate(d1.getDate()+1);
+  const mananaStr = `${d1.getFullYear()}-${String(d1.getMonth()+1).padStart(2,'0')}-${String(d1.getDate()).padStart(2,'0')}`;
+
+  (DB.entregas||[]).forEach(e=>{
+    if(e.noDevuelto){
+      const n = (e.noDevueltoItems||[]).reduce((t,i)=>t+(i.cantidad||1),0);
+      notis.push({ tipo:'vencido', prio:0,
+        texto:`Entrega no devuelta · ${e.vendor||'Sin vendedor'}`,
+        sub:`${n} producto(s) sin devolver desde ${fechaCompleta(e.noDevueltoFecha||e.creado)}`,
+        accion:`irAEntrega('${e.creado}')` });
+      return;
+    }
+    if(e.ventaGenerada) return;
+    const ini = Date.parse(e.entregaCreado||e.creado||'');
+    if(!ini) return;
+    const h = (ahora-ini)/3600000;
+    const hayItems = (e.entregados||[]).length || (e.vendidos||[]).length;
+    if(hayItems && h >= HORAS_CIERRE_VENTA-2 && h < HORAS_CIERRE_VENTA){
+      notis.push({ tipo:'porvencer', prio:1,
+        texto:`Entrega por cerrarse · ${e.vendor||'Sin vendedor'}`,
+        sub:`En ~${Math.max(1,Math.ceil((HORAS_CIERRE_VENTA-h)*60))} min lo no devuelto pasa a venta`,
+        accion:`irAEntrega('${e.creado}')` });
+    }
+  });
+
+  (DB.agendas||[]).forEach(a=>{
+    if(a.estado!=='pendiente') return;
+    if(a.fecha===hoyStr || a.fecha===mananaStr){
+      const n = (a.items||[]).reduce((t,i)=>t+(i.cantidad||1),0);
+      notis.push({ tipo:'agenda', prio:2,
+        texto:`Entrega agendada ${a.fecha===hoyStr?'hoy':'mañana'} · ${a.vendedor||''}`,
+        sub:`${n} producto(s) reservados${a.zona?' · '+a.zona:''}`,
+        accion:`abrirAgenda()` });
+    }
+  });
+
+  (DB.productos||[]).forEach(p=>{
+    const s = p.stock||0;
+    if(s===0){
+      notis.push({ tipo:'agotado', prio:0, texto:`Agotado · ${p.nombre}`,
+        sub:`${p.sku} — sin existencia`, accion:`irAProducto('${p.sku}')` });
+    }else if(s<=STOCK_BAJO){
+      notis.push({ tipo:'stockbajo', prio:3, texto:`Poca existencia · ${p.nombre}`,
+        sub:`Quedan ${s} ${s===1?'unidad':'unidades'}`, accion:`irAProducto('${p.sku}')` });
+    }
+  });
+
+  return notis.sort((a,b)=>a.prio-b.prio);
+}
+
+function actualizarCampana(){
+  const badge = $('#campanaBadge');
+  if(!badge) return;
+  const n = calcularNotificaciones().length;
+  badge.textContent = n > 99 ? '99+' : String(n);
+  badge.hidden = !n;
+}
+
+function abrirNotificaciones(){
+  const notis = calcularNotificaciones();
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Notificaciones</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    ${notis.length ? `<div class="noti-lista">${notis.map(n=>`
+      <button type="button" class="noti-fila noti-${n.tipo}" onclick="cerrarHoja(); ${n.accion}">
+        <span class="noti-ico">${ICONO_NOTI[n.tipo]||'•'}</span>
+        <span class="noti-txt"><b>${esc(n.texto)}</b><span>${esc(n.sub)}</span></span>
+      </button>`).join('')}</div>`
+    : `<div class="vacio"><b>Todo al día</b>No hay avisos pendientes.</div>`}
+  `);
+}
+$('#btnCampana')?.addEventListener('click', abrirNotificaciones);
+
+function irAEntrega(creado){
+  const b = $('.barra button[data-ir="entregas"]');
+  if(b && !b.classList.contains('on')) b.click();
+  setTimeout(()=>editarEntrega(creado), 60);
+}
+function irAProducto(sku){
+  const b = $('.barra button[data-ir="productos"]');
+  if(b && !b.classList.contains('on')) b.click();
+  skuBuscado = sku;
+  const f = $('#filtroProd'); if(f) f.value = '';
+  pintarProductos();
+  const p = DB.buscar(sku);
+  if(p) setTimeout(()=>fichaProducto(p), 80);
+}
+
 const sinAcentos = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 
 /* Palabras clave por categoría (sin acentos). Se revisa de la más específica
@@ -4845,7 +4967,7 @@ function pintarTodo(){
   requestAnimationFrame(()=>{
     repintadoPendiente = false;
     inicializarVendedorActual();
-    pintarProductos(); pintarVentas(); pintarCartera(); pintarEntregas(); pintarSolicitudes(); pintarAgendas(); pintarRecientes(); pintarMenuProductoActivo();
+    pintarProductos(); pintarVentas(); pintarCartera(); pintarEntregas(); pintarSolicitudes(); pintarAgendas(); pintarRecientes(); pintarMenuProductoActivo(); actualizarCampana();
   });
 }
 
@@ -4868,6 +4990,7 @@ if(vistaGuardada==='cartera'){
 DB.iniciar();
 setInterval(()=>cerrarEntregasVencidas().catch(errorOperacion),60000);
 setInterval(()=>convertirAgendasVencidas().catch(errorOperacion),60000);
+setInterval(actualizarCampana,60000);
 setTimeout(ocultarCargaInicial, 9000);
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').then(reg=>{
