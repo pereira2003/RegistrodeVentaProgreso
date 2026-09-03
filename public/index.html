@@ -342,6 +342,12 @@ button{cursor:pointer;border:none;background:none}
   background:none;cursor:pointer;white-space:nowrap}
 .sol-fila .sol-acc .ok{color:#3a5c52}
 .sol-fila .sol-acc .del{color:#8a6a3f}
+.sol-fila .sol-check{flex:0 0 16px;width:16px;height:16px;margin-top:2px;accent-color:var(--verde)}
+.sol-selall{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--suave);
+  font-family:var(--dato);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--tinta-2);cursor:pointer}
+.sol-selall input{width:16px;height:16px;accent-color:var(--verde)}
+.sol-entregar{margin:10px;width:calc(100% - 20px)}
 .agenda-fila{border:1px solid var(--suave);border-radius:var(--r);background:var(--papel);
   box-shadow:var(--duro);padding:12px;margin-bottom:10px}
 .agenda-cab{display:flex;flex-direction:column;gap:3px}
@@ -1483,7 +1489,7 @@ const NOMBRE_FORMATO = {QR_CODE:'QR', DATA_MATRIX:'Data Matrix', AZTEC:'Aztec', 
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
 let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
-const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [], vendidos: [], entregaCreado: null, devolucionCreado: null };
+const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
 let entregaEditando=null;
 let entregaSeleccionando=false;
 let entregaSeleccion=new Set();
@@ -1512,8 +1518,9 @@ function aplicarVendedorActual(vendedor){
 function mostrarSolicitudesActivo(){
   const cont = $('#solActivoLista');
   if(!cont) return;
-  const lista = ordenarSolicitudes((DB.solicitudes||[]).filter(s=>s.vendedor===vendedorActual && !s.entregada));
-  cont.innerHTML = lista.map(s=>filaSolicitudHTML(s,false)).join('');
+  const v = vendedorActual || '';
+  const lista = ordenarSolicitudes((DB.solicitudes||[]).filter(s=>s.vendedor===v && !s.entregada));
+  cont.innerHTML = lista.length ? bloqueSolicitudesVendedor(v, lista, 'solActivoLista') : '';
   const rot = $('#solActivoRotulo');
   if(rot) rot.hidden = !lista.length;
 }
@@ -2271,6 +2278,7 @@ function cambiarVendedorEntrega(vendedor){
     entregaActual.items=[];
     entregaActual.devueltos=[];
     entregaActual.vendidos=[];
+    entregaActual.solicitudesOrigen=[];
     entregaActual.entregaCreado=null;
     entregaActual.devolucionCreado=null;
     entregaSeleccionando=false; entregaSeleccion.clear();
@@ -2435,10 +2443,16 @@ async function guardarEntrega(){
   DB.entregas = registradas;
   await DB.guardarEntrega(registroGuardar);
   caja.guardar('gp_entregas', DB.entregas);
+  // Solicitudes que originaron esta entrega quedan marcadas como entregadas
+  for(const c of (entregaActual.solicitudesOrigen||[])){
+    const s=(DB.solicitudes||[]).find(x=>x.creado===c);
+    if(s && !s.entregada) await DB.guardarSolicitud({ ...s, entregada:true, entregadaFecha:hoy() });
+  }
   brindis(`Entrega guardada para ${vendedor}`);
   entregaActual.items = [];
   entregaActual.devueltos = [];
   entregaActual.vendidos = [];
+  entregaActual.solicitudesOrigen = [];
   entregaActual.entregaCreado = null;
   entregaActual.devolucionCreado = null;
   entregaEditando=null;
@@ -2457,6 +2471,7 @@ function editarEntrega(creado){
   entregaActual.items=(registro.entregados||[]).map(item=>({...item}));
   entregaActual.devueltos=(registro.devueltos||[]).map(item=>({...item}));
   entregaActual.vendidos=(registro.vendidos||[]).map(item=>({...item}));
+  entregaActual.solicitudesOrigen=[];
   entregaActual.entregaCreado=registro.entregaCreado||registro.creado||null;
   entregaActual.devolucionCreado=registro.devolucionCreado||((registro.devueltos||[]).length ? registro.creado : null);
   mostrarHojaEntrega();
@@ -3225,20 +3240,74 @@ function ordenarSolicitudes(arr){
   );
 }
 
-function filaSolicitudHTML(s, conVendedor){
+function filaSolicitudHTML(s, conVendedor, conCheck){
   const meta = [
     conVendedor ? esc(s.vendedor) : '',
     s.nota ? esc(s.nota) : '',
     s.creado ? fechaCompleta(s.creado) : '',
     s.entregada ? 'Entregada' : ''
   ].filter(Boolean).join(' · ');
+  const chk = conCheck && !s.entregada
+    ? `<input type="checkbox" class="sol-check" data-creado="${s.creado}" aria-label="Seleccionar">`
+    : (conCheck ? '<span style="flex:0 0 16px"></span>' : '');
   return `<div class="sol-fila ${s.entregada?'entregada':''}">
+    ${chk}
     <div class="sol-txt"><b>${esc(s.producto)} ×${s.cantidad||1}</b>${meta?`<span>${meta}</span>`:''}</div>
     <div class="sol-acc">
       <button type="button" class="ok" onclick="alternarSolicitudEntregada('${s.creado}')">${s.entregada?'Reabrir':'Entregada'}</button>
       <button type="button" class="del" onclick="eliminarSolicitud('${s.creado}')">Eliminar</button>
     </div>
   </div>`;
+}
+
+function solToggleTodos(chk, contId){
+  const cont = $('#'+contId); if(!cont) return;
+  cont.querySelectorAll('.sol-check').forEach(c=>{ c.checked = chk.checked; });
+}
+
+function entregarSolicitudesSeleccionadas(contId, vendedor){
+  const cont = $('#'+contId); if(!cont) return;
+  const creados = [...cont.querySelectorAll('.sol-check:checked')].map(c=>c.dataset.creado);
+  if(!creados.length){ brindis('Seleccioná al menos una solicitud'); return; }
+  entregarSolicitudes(vendedor, creados);
+}
+
+/* Carga las solicitudes elegidas en la hoja de Entrega y devolución */
+function entregarSolicitudes(vendedor, creados){
+  const sols = (DB.solicitudes||[]).filter(s=>creados.includes(s.creado) && !s.entregada);
+  if(!sols.length){ brindis('Nada para entregar'); return; }
+  aplicarVendedorActual(vendedor);
+  entregaActual.vendor = vendedor;
+  if(!zonasActuales().includes(entregaActual.zona)) entregaActual.zona = zonasActuales()[0] || '';
+  entregaActual.solicitudesOrigen = entregaActual.solicitudesOrigen || [];
+  let agregados = 0; const sinMatch = [];
+  for(const s of sols){
+    const q = String(s.producto||'').toLowerCase();
+    const p = DB.buscar(s.producto) || (DB.productos||[]).find(x=>
+      ((x.nombre||'')+' '+(x.marca||'')+' '+(x.sku||'')).toLowerCase().includes(q));
+    if(!p){ sinMatch.push(s.producto); continue; }
+    const ya = entregaActual.items.find(it=>it.sku===p.sku);
+    if(ya) ya.cantidad = (ya.cantidad||1) + (s.cantidad||1);
+    else entregaActual.items.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:Number(p.contado)||0, cantidad:s.cantidad||1 });
+    if(!entregaActual.solicitudesOrigen.includes(s.creado)) entregaActual.solicitudesOrigen.push(s.creado);
+    agregados++;
+  }
+  entregaActual.entregaCreado = entregaActual.entregaCreado || new Date().toISOString();
+  cerrarHoja();
+  const bEsc = $('.barra button[data-ir="escanear"]');
+  if(bEsc && !bEsc.classList.contains('on')) bEsc.click();
+  mostrarHojaEntrega();
+  brindis(sinMatch.length
+    ? `${agregados} agregado(s). Sin producto en catálogo: ${sinMatch.join(', ')}`
+    : `${agregados} producto(s) para entregar a ${vendedor}`);
+}
+
+function bloqueSolicitudesVendedor(v, lista, contId){
+  const pend = lista.filter(s=>!s.entregada);
+  return `
+    ${pend.length ? `<label class="sol-selall"><input type="checkbox" onchange="solToggleTodos(this,'${contId}')"> Seleccionar todo</label>` : ''}
+    ${lista.map(s=>filaSolicitudHTML(s,false,true)).join('')}
+    ${pend.length ? `<button class="btn suave sol-entregar" type="button" onclick="entregarSolicitudesSeleccionadas('${contId}','${esc(v)}')">Entregar seleccionadas</button>` : ''}`;
 }
 
 function mostrarSolicitudesVendedor(){
@@ -3248,7 +3317,7 @@ function mostrarSolicitudesVendedor(){
   if(!v){ cont.innerHTML=''; return; }
   const lista = ordenarSolicitudes((DB.solicitudes||[]).filter(s=>s.vendedor===v));
   cont.innerHTML = lista.length
-    ? lista.map(s=>filaSolicitudHTML(s,false)).join('')
+    ? bloqueSolicitudesVendedor(v, lista, 'solListaVendedor')
     : `<div class="vacio-sug">${esc(v)} no tiene solicitudes.</div>`;
 }
 
