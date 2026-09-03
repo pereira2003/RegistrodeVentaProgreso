@@ -2066,7 +2066,7 @@ function gestionarVendedores(){
       <div class="item" style="padding:10px 12px">
         <div class="cont"><h4>${esc(v)}</h4></div>
         <div style="display:flex;gap:6px"><button class="btn suave chico" onclick="editarVendedor(${i})">Actualizar</button>
-          <button class="btn peligro chico" onclick="eliminarVendedor(${i})">Eliminar</button></div>
+          <button class="btn suave chico" style="color:var(--tinta)" onclick="eliminarVendedor(${i})">Eliminar</button></div>
       </div>`).join('') : '<div class="vacio"><b>No hay vendedores</b>Agrega el primero.</div>'}</div>`);
 }
 
@@ -2112,7 +2112,7 @@ function gestionarZonas(){
       <div class="item" style="padding:10px 12px">
         <div class="cont"><h4>${esc(z)}</h4></div>
         <div style="display:flex;gap:6px"><button class="btn suave chico" onclick="editarZona(${i})">Actualizar</button>
-          <button class="btn peligro chico" onclick="eliminarZona(${i})">Eliminar</button></div>
+          <button class="btn suave chico" style="color:var(--tinta)" onclick="eliminarZona(${i})">Eliminar</button></div>
       </div>`).join('') : '<div class="vacio"><b>No hay zonas</b>Agrega la primera.</div>'}</div>`);
 }
 
