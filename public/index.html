@@ -598,6 +598,13 @@ button{cursor:pointer;border:none;background:none}
 
 <!-- ================= PRODUCTOS ================= -->
 <section class="vista" data-vista="productos">
+  <div class="vista-tope">
+    <div class="rotulo">Catálogo</div>
+    <button class="icono-desnudo con-texto" id="btnIrEtiquetas" type="button" aria-label="Etiquetas">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M4 4h7l9 9-7 7-9-9V4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="8.5" cy="8.5" r="1.4" fill="currentColor"/></svg>
+      <span>Etiquetas</span>
+    </button>
+  </div>
   <div class="buscador-productos">
     <input id="filtroProd" placeholder="Buscar por nombre, marca o código"
       style="width:100%;padding:12px;border:1px solid var(--linea);border-radius:var(--r);background:#fff">
@@ -702,6 +709,10 @@ button{cursor:pointer;border:none;background:none}
 <!-- ================= ETIQUETAS ================= -->
 <section class="vista" data-vista="etiquetas">
   <div class="no-print">
+    <div class="vista-tope">
+      <div class="rotulo">Etiquetas</div>
+      <button class="btn plano chico" id="btnVolverProductos" type="button" style="flex:0 0 auto">← Productos</button>
+    </div>
     <div class="aviso" style="margin-bottom:4px">
       <b>Imprime y pega.</b> Cada etiqueta lleva el código QR del producto. Al escanearlo, el vendedor
       abre la ficha y registra la venta en el mismo momento.
@@ -769,9 +780,6 @@ button{cursor:pointer;border:none;background:none}
   <button data-ir="ventas">
     <svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-5 3 3 5-7"/></svg>
     Ventas</button>
-  <button data-ir="etiquetas">
-    <svg viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9V4z"/><circle cx="8" cy="8" r="1.4"/></svg>
-    Etiquetas</button>
 </nav>
 
 <div class="velo" id="velo"></div>
@@ -4163,6 +4171,17 @@ function mostrarCartera(){
 }
 $('#btnIrCartera')?.addEventListener('click', mostrarCartera);
 $('#btnVolverVentas')?.addEventListener('click', ()=>$('.barra button[data-ir="ventas"]')?.click());
+
+/* Etiquetas vive dentro de "Productos": se abre con el icono de la esquina. */
+function mostrarEtiquetas(){
+  $$('.vista').forEach(v=>v.classList.toggle('activa', v.dataset.vista==='etiquetas'));
+  $$('.barra button').forEach(x=>x.classList.toggle('on', x.dataset.ir==='productos'));
+  caja.guardar('gp_vista','etiquetas');
+  window.scrollTo(0,0);
+  pintarEtiquetas();
+}
+$('#btnIrEtiquetas')?.addEventListener('click', mostrarEtiquetas);
+$('#btnVolverProductos')?.addEventListener('click', ()=>$('.barra button[data-ir="productos"]')?.click());
 $('#btnLimpiarSolicitudes')?.addEventListener('click', ()=>{
   if(confirm('¿Borrar las solicitudes ya entregadas?')) DB.limpiarSolicitudes(true).catch(errorOperacion);
 });
@@ -4801,6 +4820,8 @@ inicializarVendedorActual();
 const vistaGuardada = caja.leer('gp_vista','escanear');
 if(vistaGuardada==='cartera'){
   mostrarCartera();
+}else if(vistaGuardada==='etiquetas'){
+  mostrarEtiquetas();
 }else{
   const botonVistaGuardada = $(`.barra button[data-ir="${vistaGuardada}"]`) || $('.barra button[data-ir="escanear"]');
   botonVistaGuardada?.click();
