@@ -1032,6 +1032,13 @@ const DB = {
         if(id && !existentes.has(id)) await f.setDoc(f.doc(bd,nombre,id), documento);
       }
     };
+    // Productos añadidos sin conexión (modo prueba) que aún no están en Firebase.
+    // Se excluyen los de ejemplo (SEMILLA) para no ensuciar el catálogo real.
+    const semillaSkus = new Set(SEMILLA.map(p=>p.sku));
+    const productosLocales = (caja.leer('gp_productos', []) || [])
+      .filter(p=>p && p.sku && !semillaSkus.has(p.sku))
+      .map(({id, ...resto})=>resto);
+    await migrarColeccion('productos', productosLocales, p=>String(p.sku||'').trim());
     await migrarColeccion('ventas', caja.leer('gp_ventas', []), v=>String(v.id||'').trim());
     await migrarColeccion('entregas', caja.leer('gp_entregas', []), e=>String(e.creado||'').trim());
     await migrarColeccion('solicitudes', caja.leer('gp_solicitudes', []), s=>String(s.creado||'').trim());
