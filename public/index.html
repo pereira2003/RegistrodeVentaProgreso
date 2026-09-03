@@ -466,6 +466,7 @@ button{cursor:pointer;border:none;background:none}
   display:flex;padding-bottom:env(safe-area-inset-bottom);
 }
 .barra button{
+  position:relative;
   flex:1;padding:10px 2px 11px;display:flex;flex-direction:column;align-items:center;gap:4px;
   font-family:var(--dato);font-size:9px;font-weight:500;letter-spacing:.06em;
   text-transform:uppercase;color:var(--tinta-3);
@@ -473,6 +474,12 @@ button{cursor:pointer;border:none;background:none}
 .barra button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;
   stroke-linecap:round;stroke-linejoin:round}
 .barra button.on{color:var(--tinta);background:var(--rojo-claro)}
+.barra-badge{
+  position:absolute;top:5px;left:50%;margin-left:6px;
+  min-width:15px;height:15px;padding:0 3px;border-radius:999px;
+  background:var(--verde);color:#fff;font-family:var(--dato);font-size:9px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;line-height:1;letter-spacing:0;
+}
 
 /* ---------- Etiquetas imprimibles ---------- */
 .sel-lista{max-height:280px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin:0 -4px}
@@ -3367,6 +3374,18 @@ function pintarSolicitudes(){
   }
   mostrarSolicitudesVendedor();
   mostrarSolicitudesActivo();
+  actualizarAlertaSolicitudes();
+}
+
+/* Alerta en la pestaña Solicitud: cantidad de pedidos pendientes de entregar */
+function actualizarAlertaSolicitudes(){
+  const btn = $('.barra button[data-ir="solicitudes"]');
+  if(!btn) return;
+  const n = (DB.solicitudes||[]).filter(s=>!s.entregada).length;
+  let badge = btn.querySelector('.barra-badge');
+  if(!n){ if(badge) badge.remove(); return; }
+  if(!badge){ badge = document.createElement('span'); badge.className = 'barra-badge'; btn.appendChild(badge); }
+  badge.textContent = n > 99 ? '99+' : String(n);
 }
 
 const sinAcentos = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
