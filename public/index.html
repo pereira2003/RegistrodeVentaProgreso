@@ -115,7 +115,8 @@ button{cursor:pointer;border:none;background:none}
 .noti-lista{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .noti-fila{display:flex;gap:11px;align-items:flex-start;text-align:left;width:100%;
   padding:11px 12px;border:1px solid var(--suave);border-left:3px solid var(--tinta-3);
-  border-radius:var(--r);background:var(--papel);box-shadow:var(--duro);cursor:pointer}
+  border-radius:var(--r);background:var(--papel);box-shadow:var(--duro);cursor:pointer;
+  -webkit-touch-callout:none;user-select:none}
 .noti-fila:active{background:var(--rojo-claro)}
 .noti-fila .noti-ico{flex:0 0 auto;line-height:0;color:var(--tinta-2);margin-top:1px}
 .noti-fila .noti-ico svg{width:20px;height:20px}
@@ -3443,19 +3444,19 @@ function calcularNotificaciones(){
   const mananaStr = `${d1.getFullYear()}-${String(d1.getMonth()+1).padStart(2,'0')}-${String(d1.getDate()).padStart(2,'0')}`;
 
   (DB.solicitudes||[]).filter(s=>!s.entregada).forEach(s=>{
-    notis.push({ key:'sol:'+s.creado, tipo:'solicitud', prio:1,
+    notis.push({ key:'sol:'+s.creado, tipo:'solicitud', prio:1, data:s,
       texto:`Pedido de ${s.vendedor||'un vendedor'}`,
       sub:`${s.producto} ×${s.cantidad||1}${s.nota?' · '+s.nota:''}`,
-      accion:`irASolicitudes('${esc(s.vendedor||'')}')` });
+      abrir:()=>irASolicitudes(s.vendedor||'') });
   });
 
   (DB.entregas||[]).forEach(e=>{
     if(e.noDevuelto){
       const n = (e.noDevueltoItems||[]).reduce((t,i)=>t+(i.cantidad||1),0);
-      notis.push({ key:'venc:'+e.creado, tipo:'vencido', prio:0,
+      notis.push({ key:'venc:'+e.creado, tipo:'vencido', prio:0, data:e,
         texto:`Entrega no devuelta · ${e.vendor||'Sin vendedor'}`,
         sub:`${n} producto(s) sin devolver desde ${fechaCompleta(e.noDevueltoFecha||e.creado)}`,
-        accion:`irAEntrega('${e.creado}')` });
+        abrir:()=>irAEntrega(e.creado) });
       return;
     }
     if(e.ventaGenerada) return;
@@ -3464,10 +3465,10 @@ function calcularNotificaciones(){
     const h = (ahora-ini)/3600000;
     const hayItems = (e.entregados||[]).length || (e.vendidos||[]).length;
     if(hayItems && h >= HORAS_CIERRE_VENTA-2 && h < HORAS_CIERRE_VENTA){
-      notis.push({ key:'porv:'+e.creado, tipo:'porvencer', prio:1,
+      notis.push({ key:'porv:'+e.creado, tipo:'porvencer', prio:1, data:e,
         texto:`Entrega por cerrarse · ${e.vendor||'Sin vendedor'}`,
         sub:`En ~${Math.max(1,Math.ceil((HORAS_CIERRE_VENTA-h)*60))} min lo no devuelto pasa a venta`,
-        accion:`irAEntrega('${e.creado}')` });
+        abrir:()=>irAEntrega(e.creado) });
     }
   });
 
@@ -3475,21 +3476,21 @@ function calcularNotificaciones(){
     if(a.estado!=='pendiente') return;
     if(a.fecha===hoyStr || a.fecha===mananaStr){
       const n = (a.items||[]).reduce((t,i)=>t+(i.cantidad||1),0);
-      notis.push({ key:'agen:'+a.creado, tipo:'agenda', prio:2,
+      notis.push({ key:'agen:'+a.creado, tipo:'agenda', prio:2, data:a,
         texto:`Entrega agendada ${a.fecha===hoyStr?'hoy':'mañana'} · ${a.vendedor||''}`,
         sub:`${n} producto(s) reservados${a.zona?' · '+a.zona:''}`,
-        accion:`abrirAgenda()` });
+        abrir:()=>abrirAgenda() });
     }
   });
 
   (DB.productos||[]).forEach(p=>{
     const s = p.stock||0;
     if(s===0){
-      notis.push({ key:'agot:'+p.sku, tipo:'agotado', prio:0, texto:`Agotado · ${p.nombre}`,
-        sub:`${p.sku} — sin existencia`, accion:`irAProducto('${p.sku}')` });
+      notis.push({ key:'agot:'+p.sku, tipo:'agotado', prio:0, data:p, texto:`Agotado · ${p.nombre}`,
+        sub:`${p.sku} — sin existencia`, abrir:()=>irAProducto(p.sku) });
     }else if(s<=STOCK_BAJO){
-      notis.push({ key:'baja:'+p.sku, tipo:'stockbajo', prio:3, texto:`Poca existencia · ${p.nombre}`,
-        sub:`Quedan ${s} ${s===1?'unidad':'unidades'}`, accion:`irAProducto('${p.sku}')` });
+      notis.push({ key:'baja:'+p.sku, tipo:'stockbajo', prio:3, data:p, texto:`Poca existencia · ${p.nombre}`,
+        sub:`Quedan ${s} ${s===1?'unidad':'unidades'}`, abrir:()=>irAProducto(p.sku) });
     }
   });
 
@@ -3536,21 +3537,93 @@ function pedirPermisoNoti(){
   });
 }
 
+let notisActuales = [];
 function abrirNotificaciones(){
-  const notis = calcularNotificaciones();
+  notisActuales = calcularNotificaciones();
   const puedeActivar = ('Notification' in window) && Notification.permission==='default';
   abrirHoja(`
     <div class="hoja-tope"><h2>Notificaciones</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     ${puedeActivar ? `<button class="btn suave" type="button" style="margin-bottom:12px" onclick="pedirPermisoNoti()">Activar avisos en este teléfono</button>` : ''}
-    ${notis.length ? `<div class="noti-lista">${notis.map(n=>`
-      <button type="button" class="noti-fila noti-${n.tipo}" onclick="cerrarHoja(); ${n.accion}">
+    ${notisActuales.length ? `<div class="noti-lista">${notisActuales.map((n,i)=>`
+      <button type="button" class="noti-fila noti-${n.tipo}" data-idx="${i}">
         <span class="noti-ico">${ICONO_NOTI[n.tipo]||'•'}</span>
         <span class="noti-txt"><b>${esc(n.texto)}</b><span>${esc(n.sub)}</span></span>
-      </button>`).join('')}</div>`
+      </button>`).join('')}</div>
+      <div class="aviso" style="margin-top:10px;font-size:11px">Tocá para abrir · mantené apretado para una vista previa</div>`
     : `<div class="vacio"><b>Todo al día</b>No hay avisos pendientes.</div>`}
   `);
+  $('#hojaCont').querySelectorAll('.noti-fila').forEach(bindNotiPress);
 }
 $('#btnCampana')?.addEventListener('click', abrirNotificaciones);
+
+function bindNotiPress(el){
+  const n = notisActuales[+el.dataset.idx];
+  if(!n) return;
+  let t=0, x0=0, y0=0, movido=false, largo=false;
+  const limpiar = ()=>{ clearTimeout(t); };
+  el.addEventListener('pointerdown', e=>{
+    movido=false; largo=false; x0=e.clientX; y0=e.clientY;
+    t=setTimeout(()=>{ largo=true; mostrarPreviewNoti(n); }, 420);
+  });
+  el.addEventListener('pointermove', e=>{
+    if(Math.abs(e.clientX-x0)>10 || Math.abs(e.clientY-y0)>10){ movido=true; limpiar(); }
+  });
+  el.addEventListener('pointerup', ()=>{ limpiar(); if(!largo && !movido){ cerrarHoja(); n.abrir?.(); } });
+  el.addEventListener('pointercancel', limpiar);
+  el.addEventListener('contextmenu', e=>e.preventDefault());
+}
+
+function listarItemsNoti(arr){
+  return (arr||[]).map(i=>`${esc(i.nombre)} ×${i.cantidad||1}`).join(', ') || '—';
+}
+
+function previewNotiHTML(n){
+  const d = n.data || {};
+  if(n.tipo==='solicitud'){
+    return `<b>${esc(d.producto)} ×${d.cantidad||1}</b>
+      <div>Vendedor: ${esc(d.vendedor||'—')}</div>
+      ${d.nota?`<div>Nota: ${esc(d.nota)}</div>`:''}
+      <div>Pedido: ${fechaCompleta(d.creado)}</div>`;
+  }
+  if(n.tipo==='vencido'){
+    return `<b>${esc(d.vendor||'Sin vendedor')}</b> · ${esc(d.zona||'—')}
+      <div>No devuelto: ${listarItemsNoti(d.noDevueltoItems)}</div>
+      <div>Entregado: ${fechaCompleta(d.entregaCreado||d.creado)}</div>
+      <div>Marcado: ${fechaCompleta(d.noDevueltoFecha||d.creado)}</div>`;
+  }
+  if(n.tipo==='porvencer'){
+    return `<b>${esc(d.vendor||'Sin vendedor')}</b> · ${esc(d.zona||'—')}
+      <div>Entregado: ${listarItemsNoti(d.entregados)}</div>
+      <div>Hora de entrega: ${fechaHora(d.entregaCreado||d.creado)}</div>`;
+  }
+  if(n.tipo==='agenda'){
+    return `<b>${fechaCompleta(d.fecha)}</b> · ${esc(d.vendedor||'—')} · ${esc(d.zona||'—')}
+      <div>${listarItemsNoti(d.items)}</div>`;
+  }
+  // agotado / stockbajo
+  return `<b>${esc(d.nombre)}</b>
+    <div>${esc(d.sku)}${d.marca?' · '+esc((d.marca||'').toUpperCase()):''}</div>
+    <div>Existencia: ${d.stock ?? 0}</div>
+    <div>Contado ${money(d.contado)} · Crédito ${money(d.credito)}</div>`;
+}
+
+let previewNotiActual = null;
+function mostrarPreviewNoti(n){
+  if(navigator.vibrate) navigator.vibrate(15);
+  previewNotiActual = n;
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Vista previa</h2><button class="cerrar" onclick="abrirNotificaciones()">✕</button></div>
+    <div class="noti-fila noti-${n.tipo}" style="cursor:default">
+      <span class="noti-ico">${ICONO_NOTI[n.tipo]||'•'}</span>
+      <span class="noti-txt"><b>${esc(n.texto)}</b><span>${esc(n.sub)}</span></span>
+    </div>
+    <div class="aviso" style="margin-top:12px;line-height:1.7">${previewNotiHTML(n)}</div>
+    <div class="fila" style="margin-top:14px">
+      <button class="btn plano" type="button" onclick="abrirNotificaciones()">Volver</button>
+      <button class="btn suave" type="button" onclick="cerrarHoja(); previewNotiActual && previewNotiActual.abrir && previewNotiActual.abrir()">Abrir</button>
+    </div>
+  `);
+}
 
 function irASolicitudes(vendedor){
   const b = $('.barra button[data-ir="solicitudes"]');
