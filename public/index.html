@@ -302,7 +302,7 @@ button{cursor:pointer;border:none;background:none}
 .item .val small{display:block;font-family:var(--dato);font-weight:500;font-size:10px;color:var(--tinta-3);
   margin-top:3px;letter-spacing:.03em}
 .sug-entrega{margin:-6px 0 14px;border:1px solid var(--suave);border-radius:var(--r);
-  background:var(--papel);overflow:hidden;box-shadow:var(--duro)}
+  background:var(--papel);overflow-y:auto;max-height:280px;box-shadow:var(--duro);-webkit-overflow-scrolling:touch}
 .sug-entrega:empty{display:none}
 .sug-entrega button{display:flex;width:100%;gap:10px;align-items:baseline;text-align:left;
   padding:10px 12px;border-bottom:1px solid var(--suave);background:var(--papel);color:var(--tinta)}
@@ -2258,10 +2258,10 @@ function buscarSugerenciasEntrega(texto){
   const cont = $('#entregaSugerencias');
   if(!cont) return;
   const q = String(texto||'').toLowerCase().trim();
-  if(q.length < 2){ cont.innerHTML=''; return; }
+  if(!q){ cont.innerHTML=''; return; }
   const lista = (DB.productos||[]).filter(p=>
     ((p.nombre||'')+' '+(p.marca||'')+' '+(p.sku||'')+' '+(p.codigoBarras||'')).toLowerCase().includes(q)
-  ).slice(0,6);
+  ).slice(0,60);
   if(!lista.length){
     cont.innerHTML = `<div class="vacio-sug">Sin coincidencias para "${esc(texto.trim())}"</div>`;
     return;
@@ -2793,7 +2793,7 @@ function pintarRecientes(){
   const cont = $('#recientes');
   const q = (filtroReciente||'').toLowerCase();
   const lista = q
-    ? (DB.productos||[]).filter(p=>((p.nombre||'')+' '+(p.marca||'')+' '+(p.sku||'')+' '+(p.codigoBarras||'')).toLowerCase().includes(q)).slice(0,20)
+    ? (DB.productos||[]).filter(p=>((p.nombre||'')+' '+(p.marca||'')+' '+(p.sku||'')+' '+(p.codigoBarras||'')).toLowerCase().includes(q))
     : recientes;
   const rot = $('#rotuloRecientes');
   if(rot) rot.textContent = q ? `Resultados (${lista.length})` : 'Últimos escaneos';
@@ -3195,7 +3195,7 @@ function sugerirProductosSolicitud(texto){
   if(!q){ cont.innerHTML=''; return; }
   const lista = (DB.productos||[]).filter(p=>
     ((p.nombre||'')+' '+(p.marca||'')+' '+(p.sku||'')).toLowerCase().includes(q)
-  ).slice(0,10);
+  ).slice(0,60);
   if(!lista.length){
     cont.innerHTML = `<div class="vacio-sug">Se pedirá “${esc(texto.trim())}” (no está en el catálogo)</div>`;
     return;
@@ -4310,7 +4310,7 @@ function sugerirProductosAgenda(texto){
   const q = String(texto||'').trim().toLowerCase();
   if(!q){ cont.innerHTML=''; return; }
   const lista = (DB.productos||[]).filter(p=>
-    ((p.nombre||'')+' '+(p.marca||'')+' '+(p.sku||'')).toLowerCase().includes(q)).slice(0,10);
+    ((p.nombre||'')+' '+(p.marca||'')+' '+(p.sku||'')).toLowerCase().includes(q)).slice(0,60);
   if(!lista.length){ cont.innerHTML = `<div class="vacio-sug">Sin coincidencias</div>`; return; }
   cont.innerHTML = lista.map(p=>`<button type="button" data-sku="${esc(p.sku)}">${esc(p.nombre)} · <span style="color:var(--tinta-3)">${p.stock||0} disp.</span></button>`).join('');
   cont.querySelectorAll('button').forEach(b=>{
