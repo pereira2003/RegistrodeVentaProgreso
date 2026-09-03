@@ -2065,7 +2065,7 @@ function gestionarVendedores(){
     <div id="listaVendedores">${vendedores.length ? vendedores.map((v,i)=>`
       <div class="item" style="padding:10px 12px">
         <div class="cont"><h4>${esc(v)}</h4></div>
-        <div style="display:flex;gap:6px"><button class="btn plano chico" style="padding:6px 10px;font-size:11px" onclick="editarVendedor(${i})">Actualizar</button>
+        <div style="display:flex;gap:6px"><button class="btn suave chico" style="padding:6px 10px;font-size:11px" onclick="editarVendedor(${i})">Actualizar</button>
           <button class="btn plano chico" style="padding:6px 10px;font-size:11px" onclick="eliminarVendedor(${i})">Eliminar</button></div>
       </div>`).join('') : '<div class="vacio"><b>No hay vendedores</b>Agrega el primero.</div>'}</div>`);
 }
@@ -2111,7 +2111,7 @@ function gestionarZonas(){
     <div id="listaZonas">${zonas.length ? zonas.map((z,i)=>`
       <div class="item" style="padding:10px 12px">
         <div class="cont"><h4>${esc(z)}</h4></div>
-        <div style="display:flex;gap:6px"><button class="btn plano chico" style="padding:6px 10px;font-size:11px" onclick="editarZona(${i})">Actualizar</button>
+        <div style="display:flex;gap:6px"><button class="btn suave chico" style="padding:6px 10px;font-size:11px" onclick="editarZona(${i})">Actualizar</button>
           <button class="btn plano chico" style="padding:6px 10px;font-size:11px" onclick="eliminarZona(${i})">Eliminar</button></div>
       </div>`).join('') : '<div class="vacio"><b>No hay zonas</b>Agrega la primera.</div>'}</div>`);
 }
