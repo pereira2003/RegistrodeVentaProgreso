@@ -1025,28 +1025,37 @@ const DB = {
   },
 
   async migrarDatosLocales(){
-    const {f,bd}=this.fb;
-    const migrarColeccion = async (nombre, filas, idDe) => {
-      if(!filas?.length) return;
-      const snap = await f.getDocs(f.collection(bd,nombre));
-      const existentes = new Set(snap.docs.map(doc=>doc.id));
-      for(const fila of filas){
-        const id = idDe(fila);
-        const documento = typeof fila==='string' ? {nombre:fila} : fila;
-        if(id && !existentes.has(id)) await f.setDoc(f.doc(bd,nombre,id), documento);
-      }
-    };
-    // Productos añadidos sin conexión (modo prueba) que aún no están en Firebase.
-    // Se excluyen los de ejemplo (SEMILLA) para no ensuciar el catálogo real.
-    const semillaSkus = new Set(SEMILLA.map(p=>p.sku));
-    const productosLocales = (caja.leer('gp_productos', []) || [])
-      .filter(p=>p && p.sku && !semillaSkus.has(p.sku))
-      .map(({id, ...resto})=>resto);
-    await migrarColeccion('productos', productosLocales, p=>String(p.sku||'').trim());
-    await migrarColeccion('ventas', caja.leer('gp_ventas', []), v=>String(v.id||'').trim());
-    await migrarColeccion('entregas', caja.leer('gp_entregas', []), e=>String(e.creado||'').trim());
-    await migrarColeccion('solicitudes', caja.leer('gp_solicitudes', []), s=>String(s.creado||'').trim());
-    await migrarColeccion('agendas', caja.leer('gp_agendas', []), a=>String(a.creado||'').trim());
+    // La migración es de una sola vez y nunca debe impedir la conexión:
+    // cualquier error se registra y se sigue.
+    if(caja.leer('gp_migrado', false)) return;
+    try{
+      const {f,bd}=this.fb;
+      const migrarColeccion = async (nombre, filas, idDe) => {
+        if(!filas?.length) return;
+        const snap = await f.getDocs(f.collection(bd,nombre));
+        const existentes = new Set(snap.docs.map(doc=>doc.id));
+        for(const fila of filas){
+          const id = idDe(fila);
+          const documento = typeof fila==='string' ? {nombre:fila} : fila;
+          if(id && !existentes.has(id)){
+            try{ await f.setDoc(f.doc(bd,nombre,id), documento); }
+            catch(e){ console.warn('migrar', nombre, id, e); }
+          }
+        }
+      };
+      const semillaSkus = new Set(SEMILLA.map(p=>p.sku));
+      const productosLocales = (caja.leer('gp_productos', []) || [])
+        .filter(p=>p && p.sku && !semillaSkus.has(p.sku))
+        .map(({id, ...resto})=>resto);
+      await migrarColeccion('productos', productosLocales, p=>String(p.sku||'').trim());
+      await migrarColeccion('ventas', caja.leer('gp_ventas', []), v=>String(v.id||'').trim());
+      await migrarColeccion('entregas', caja.leer('gp_entregas', []), e=>String(e.creado||'').trim());
+      await migrarColeccion('solicitudes', caja.leer('gp_solicitudes', []), s=>String(s.creado||'').trim());
+      await migrarColeccion('agendas', caja.leer('gp_agendas', []), a=>String(a.creado||'').trim());
+    }catch(e){
+      console.warn('migrarDatosLocales:', e);
+    }
+    caja.guardar('gp_migrado', true);
   },
 
   async sembrar(lista=SEMILLA){ for(const p of lista) await this.agregarProducto(p); },
