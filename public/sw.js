@@ -1,6 +1,6 @@
 /* Service worker: guarda la app en el teléfono para que abra sin internet.
    Sube el número de versión cada vez que cambies index.html. */
-const VERSION = 'gp-ventas-v94';
+const VERSION = 'gp-ventas-v95';
 const BASICOS = [
   './',
   './index.html',
@@ -63,6 +63,17 @@ self.addEventListener('fetch', e => {
         return r;
       }).catch(() => guardado);
       return guardado || red;
+    })
+  );
+});
+
+// Al tocar una notificación del sistema: abrir/enfocar la app.
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
+      for (const c of cs) { if ('focus' in c) return c.focus(); }
+      if (self.clients.openWindow) return self.clients.openWindow('./');
     })
   );
 });

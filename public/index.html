@@ -3416,8 +3416,10 @@ function actualizarAlertaSolicitudes(){
 /* ============================================================
    NOTIFICACIONES  (campana del encabezado)
    ============================================================ */
-const ICONO_NOTI = { vencido:'⚠️', porvencer:'⏳', agenda:'📅', agotado:'📦', stockbajo:'📉' };
+const ICONO_NOTI = { solicitud:'📝', vencido:'⚠️', porvencer:'⏳', agenda:'📅', agotado:'📦', stockbajo:'📉' };
 const STOCK_BAJO = 3;
+let notiVistas = new Set(caja.leer('gp_noti_vistas', []));
+let campanaIniciada = false;
 
 function calcularNotificaciones(){
   const notis = [];
@@ -3426,10 +3428,17 @@ function calcularNotificaciones(){
   const d1 = new Date(); d1.setDate(d1.getDate()+1);
   const mananaStr = `${d1.getFullYear()}-${String(d1.getMonth()+1).padStart(2,'0')}-${String(d1.getDate()).padStart(2,'0')}`;
 
+  (DB.solicitudes||[]).filter(s=>!s.entregada).forEach(s=>{
+    notis.push({ key:'sol:'+s.creado, tipo:'solicitud', prio:1,
+      texto:`Pedido de ${s.vendedor||'un vendedor'}`,
+      sub:`${s.producto} ×${s.cantidad||1}${s.nota?' · '+s.nota:''}`,
+      accion:`irASolicitudes('${esc(s.vendedor||'')}')` });
+  });
+
   (DB.entregas||[]).forEach(e=>{
     if(e.noDevuelto){
       const n = (e.noDevueltoItems||[]).reduce((t,i)=>t+(i.cantidad||1),0);
-      notis.push({ tipo:'vencido', prio:0,
+      notis.push({ key:'venc:'+e.creado, tipo:'vencido', prio:0,
         texto:`Entrega no devuelta · ${e.vendor||'Sin vendedor'}`,
         sub:`${n} producto(s) sin devolver desde ${fechaCompleta(e.noDevueltoFecha||e.creado)}`,
         accion:`irAEntrega('${e.creado}')` });
@@ -3441,7 +3450,7 @@ function calcularNotificaciones(){
     const h = (ahora-ini)/3600000;
     const hayItems = (e.entregados||[]).length || (e.vendidos||[]).length;
     if(hayItems && h >= HORAS_CIERRE_VENTA-2 && h < HORAS_CIERRE_VENTA){
-      notis.push({ tipo:'porvencer', prio:1,
+      notis.push({ key:'porv:'+e.creado, tipo:'porvencer', prio:1,
         texto:`Entrega por cerrarse · ${e.vendor||'Sin vendedor'}`,
         sub:`En ~${Math.max(1,Math.ceil((HORAS_CIERRE_VENTA-h)*60))} min lo no devuelto pasa a venta`,
         accion:`irAEntrega('${e.creado}')` });
@@ -3452,7 +3461,7 @@ function calcularNotificaciones(){
     if(a.estado!=='pendiente') return;
     if(a.fecha===hoyStr || a.fecha===mananaStr){
       const n = (a.items||[]).reduce((t,i)=>t+(i.cantidad||1),0);
-      notis.push({ tipo:'agenda', prio:2,
+      notis.push({ key:'agen:'+a.creado, tipo:'agenda', prio:2,
         texto:`Entrega agendada ${a.fecha===hoyStr?'hoy':'mañana'} · ${a.vendedor||''}`,
         sub:`${n} producto(s) reservados${a.zona?' · '+a.zona:''}`,
         accion:`abrirAgenda()` });
@@ -3462,10 +3471,10 @@ function calcularNotificaciones(){
   (DB.productos||[]).forEach(p=>{
     const s = p.stock||0;
     if(s===0){
-      notis.push({ tipo:'agotado', prio:0, texto:`Agotado · ${p.nombre}`,
+      notis.push({ key:'agot:'+p.sku, tipo:'agotado', prio:0, texto:`Agotado · ${p.nombre}`,
         sub:`${p.sku} — sin existencia`, accion:`irAProducto('${p.sku}')` });
     }else if(s<=STOCK_BAJO){
-      notis.push({ tipo:'stockbajo', prio:3, texto:`Poca existencia · ${p.nombre}`,
+      notis.push({ key:'baja:'+p.sku, tipo:'stockbajo', prio:3, texto:`Poca existencia · ${p.nombre}`,
         sub:`Quedan ${s} ${s===1?'unidad':'unidades'}`, accion:`irAProducto('${p.sku}')` });
     }
   });
@@ -3474,17 +3483,51 @@ function calcularNotificaciones(){
 }
 
 function actualizarCampana(){
+  const notis = calcularNotificaciones();
   const badge = $('#campanaBadge');
-  if(!badge) return;
-  const n = calcularNotificaciones().length;
-  badge.textContent = n > 99 ? '99+' : String(n);
-  badge.hidden = !n;
+  if(badge){
+    badge.textContent = notis.length > 99 ? '99+' : String(notis.length);
+    badge.hidden = !notis.length;
+  }
+  const activas = new Set(notis.map(n=>n.key));
+  const primeraVez = !campanaIniciada;
+  campanaIniciada = true;
+  if(!primeraVez || notiVistas.size){
+    const nuevas = notis.filter(n=>!notiVistas.has(n.key));
+    if(nuevas.length) mostrarNotiSistema(nuevas);
+  }
+  notiVistas = activas;
+  caja.guardar('gp_noti_vistas', [...activas]);
+}
+
+function mostrarNotiSistema(lista){
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+  const titulo = lista.length===1 ? lista[0].texto : `${lista.length} avisos nuevos`;
+  const cuerpo = lista.length===1 ? lista[0].sub : lista.slice(0,4).map(n=>'• '+n.texto).join('\n');
+  const opciones = { body:cuerpo, tag:'gp-noti', renotify:true, icon:'icono-192.png', badge:'icono-192.png' };
+  try{
+    if(navigator.serviceWorker?.ready){
+      navigator.serviceWorker.ready.then(reg=>reg.showNotification('Grupo Progreso', opciones)).catch(()=>{});
+    }else{
+      new Notification('Grupo Progreso', opciones);
+    }
+  }catch(e){}
+}
+
+function pedirPermisoNoti(){
+  if(!('Notification' in window)){ brindis('Este dispositivo no admite avisos'); return; }
+  Notification.requestPermission().then(p=>{
+    brindis(p==='granted' ? 'Avisos del teléfono activados' : 'Avisos no activados');
+    abrirNotificaciones();
+  });
 }
 
 function abrirNotificaciones(){
   const notis = calcularNotificaciones();
+  const puedeActivar = ('Notification' in window) && Notification.permission==='default';
   abrirHoja(`
     <div class="hoja-tope"><h2>Notificaciones</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    ${puedeActivar ? `<button class="btn suave" type="button" style="margin-bottom:12px" onclick="pedirPermisoNoti()">Activar avisos en este teléfono</button>` : ''}
     ${notis.length ? `<div class="noti-lista">${notis.map(n=>`
       <button type="button" class="noti-fila noti-${n.tipo}" onclick="cerrarHoja(); ${n.accion}">
         <span class="noti-ico">${ICONO_NOTI[n.tipo]||'•'}</span>
@@ -3494,6 +3537,13 @@ function abrirNotificaciones(){
   `);
 }
 $('#btnCampana')?.addEventListener('click', abrirNotificaciones);
+
+function irASolicitudes(vendedor){
+  const b = $('.barra button[data-ir="solicitudes"]');
+  if(b && !b.classList.contains('on')) b.click();
+  const sel = $('#solFiltroVendedor');
+  if(sel && vendedor){ setTimeout(()=>{ sel.value = vendedor; mostrarSolicitudesVendedor(); }, 60); }
+}
 
 function irAEntrega(creado){
   const b = $('.barra button[data-ir="entregas"]');
