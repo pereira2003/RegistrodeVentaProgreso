@@ -982,8 +982,11 @@ const DB = {
     this.fb = {f, bd};
     await this.migrarDatosLocales();
     f.onSnapshot(f.collection(bd,'productos'), s=>{
-      this.productos = s.docs.map(d=>({id:d.id,...d.data()}));
-      caja.guardar('gp_productos', this.productos);
+      const lista = s.docs.map(d=>({id:d.id,...d.data()}));
+      // Un snapshot vacío desde caché no debe borrar el catálogo ya cargado
+      if(!lista.length && this.productos.length && s.metadata.fromCache){ ocultarCargaInicial(); return; }
+      this.productos = lista;
+      if(lista.length) caja.guardar('gp_productos', lista);   // no pisar el respaldo local con una lista vacía
       pintarTodo();
       ocultarCargaInicial();
     });
