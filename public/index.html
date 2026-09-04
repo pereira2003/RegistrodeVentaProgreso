@@ -2609,7 +2609,7 @@ function bindSwipeEntrega(card){
     const dx=e.clientX-inicio, dy=e.clientY-inicioY;
     if(intencion===0){
       if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
-      if(Math.abs(dx)>Math.abs(dy)+2){intencion=1;arrastrando=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);}
+      if(Math.abs(dx)>Math.abs(dy)*1.5){intencion=1;arrastrando=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);}
       else{intencion=-1;return;}
     }
     if(!arrastrando)return;
@@ -3115,7 +3115,7 @@ function bindSwipeReciente(card){
     const dx=e.clientX-inicio, dy=e.clientY-inicioY;
     if(intencion===0){
       if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
-      if(Math.abs(dx)>Math.abs(dy)+2){intencion=1;arrastrando=true;movido=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);}
+      if(Math.abs(dx)>Math.abs(dy)*1.5){intencion=1;arrastrando=true;movido=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);}
       else{intencion=-1;return;}
     }
     if(arrastrando&&e.clientX<inicio){actual=e.clientX;mover(actual-inicio);}
@@ -4061,7 +4061,7 @@ function bindSwipeVenta(card){
     const dy = e.clientY - startY;
     if(intent === 0){
       if(Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      if(Math.abs(dx) > Math.abs(dy) + 2){
+      if(Math.abs(dx) > Math.abs(dy) * 1.5){
         intent = 1;
         dragging = true;
         cont.classList.add('arrastrando');
@@ -4345,7 +4345,7 @@ function bindSwipeCartera(card){
     const dx=e.clientX-startX, dy=e.clientY-startY;
     if(intent===0){
       if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
-      if(Math.abs(dx)>Math.abs(dy)+2){intent=1;dragging=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);}
+      if(Math.abs(dx)>Math.abs(dy)*1.5){intent=1;dragging=true;cont.classList.add('arrastrando');cont.setPointerCapture?.(e.pointerId);}
       else{intent=-1;return;}
     }
     if(dragging && e.clientX<startX){currentX=e.clientX; setOffset(currentX-startX);}
@@ -5321,7 +5321,7 @@ function bindSwipeEntregaLista(card){
     const dy = e.clientY - startY;
     if(intent === 0){
       if(Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      if(Math.abs(dx) > Math.abs(dy) + 2){
+      if(Math.abs(dx) > Math.abs(dy) * 1.5){
         intent = 1;
         dragging = true;
         cont.classList.add('arrastrando');
