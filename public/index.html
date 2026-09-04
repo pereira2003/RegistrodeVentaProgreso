@@ -39,6 +39,7 @@
   --dato:'DM Mono',ui-monospace,'SF Mono',Menlo,monospace;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body.sin-seleccion,body.sin-seleccion *{user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important}
 [hidden]{display:none!important}
 html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden}
 html{-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
@@ -1505,7 +1506,9 @@ function abrirHoja(html){
   h.classList.add('abierta'); $('#velo').classList.add('abierto');
   h.scrollTop=0;
 }
-function cerrarHoja(){ $('#hoja').classList.remove('abierta'); $('#velo').classList.remove('abierto'); }
+function cerrarHoja(){ $('#hoja').classList.remove('abierta'); $('#velo').classList.remove('abierto'); document.body.classList.remove('sin-seleccion'); }
+document.addEventListener('pointerup', ()=>document.body.classList.remove('sin-seleccion'));
+document.addEventListener('pointercancel', ()=>document.body.classList.remove('sin-seleccion'));
 $('#velo').addEventListener('click',cerrarHoja);
 
 (function arrastreHoja(){
@@ -3596,16 +3599,22 @@ function bindNotiPress(el){
   const n = notisActuales[+el.dataset.idx];
   if(!n) return;
   let t=0, x0=0, y0=0, movido=false, largo=false;
-  const limpiar = ()=>{ clearTimeout(t); };
+  const soltar = ()=>{ clearTimeout(t); document.body.classList.remove('sin-seleccion'); };
   el.addEventListener('pointerdown', e=>{
     movido=false; largo=false; x0=e.clientX; y0=e.clientY;
-    t=setTimeout(()=>{ largo=true; mostrarPreviewNoti(n); }, 1000);
+    document.body.classList.add('sin-seleccion');
+    t=setTimeout(()=>{
+      largo=true;
+      try{ window.getSelection().removeAllRanges(); }catch(_){}
+      document.body.classList.remove('sin-seleccion');
+      mostrarPreviewNoti(n);
+    }, 1000);
   });
   el.addEventListener('pointermove', e=>{
-    if(Math.abs(e.clientX-x0)>10 || Math.abs(e.clientY-y0)>10){ movido=true; limpiar(); }
+    if(Math.abs(e.clientX-x0)>10 || Math.abs(e.clientY-y0)>10){ movido=true; soltar(); }
   });
-  el.addEventListener('pointerup', ()=>{ limpiar(); if(!largo && !movido){ cerrarHoja(); n.abrir?.(); } });
-  el.addEventListener('pointercancel', limpiar);
+  el.addEventListener('pointerup', ()=>{ const g=largo; soltar(); if(!g && !movido){ cerrarHoja(); n.abrir?.(); } });
+  el.addEventListener('pointercancel', soltar);
   el.addEventListener('contextmenu', e=>e.preventDefault());
 }
 
