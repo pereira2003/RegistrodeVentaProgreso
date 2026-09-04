@@ -2341,11 +2341,18 @@ async function eliminarVendedor(indice){
   await DB.eliminarVendedor(nombre); gestionarVendedores(); brindis('Vendedor eliminado');
 }
 
+let zonaFiltroDia = 'todas';   // filtro de la pantalla "Gestionar zonas": qué día mostrar
+
 function gestionarZonas(){
   const zonas=zonasDetalle();
   const hoy=diaDeHoy();
+  const conIndice = zonas.map((z,i)=>({...z,i}));
+  const filtro = zonaFiltroDia;
   abrirHoja(`
     <div class="hoja-tope"><h2>Gestionar zonas</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    <div class="campo" style="margin-bottom:14px"><label>Buscar zonas por día</label>
+      <select id="filtroZonasDia" onchange="zonaFiltroDia=this.value; gestionarZonas()">${opcionesDia(filtro)}</select>
+    </div>
     <div class="tarjeta pad">
       <div class="dosc">
         <div class="campo" style="margin-bottom:0"><label>Nueva zona</label>
@@ -2359,10 +2366,11 @@ function gestionarZonas(){
       </div>
       <button class="btn suave" style="margin-top:10px" onclick="agregarZona()">Agregar zona</button>
     </div>
-    <button class="btn plano chico" style="width:100%;margin-bottom:14px" onclick="cargarPlantillaZonas()">Cargar plantilla de zonas por día</button>
+    <button class="btn plano chico" style="width:100%;margin:14px 0 14px" onclick="cargarPlantillaZonas()">Cargar plantilla de zonas por día</button>
     <div class="rotulo">Zonas registradas</div>
     <div id="listaZonas">${zonas.length ? DIAS.concat([{id:'',etiqueta:'Sin día'}]).map(d=>{
-      const deEsteDia = zonas.map((z,i)=>({...z,i})).filter(z=>z.dia===d.id);
+      if(filtro!=='todas' && d.id!==filtro) return '';
+      const deEsteDia = conIndice.filter(z=>z.dia===d.id);
       if(!deEsteDia.length) return '';
       return `<div class="rotulo" style="margin-top:14px${d.id===hoy?';color:var(--ocre)':''}">${esc(d.etiqueta)}${d.id===hoy?' · HOY':''}</div>
         ${deEsteDia.map(z=>`
@@ -2371,7 +2379,7 @@ function gestionarZonas(){
           <div style="display:flex;gap:6px"><button class="btn suave chico" style="padding:6px 10px;font-size:11px;font-family:var(--texto);text-transform:none;letter-spacing:.01em;font-weight:600" onclick="editarZona(${z.i})">Actualizar</button>
             <button class="btn plano chico" style="padding:6px 10px;font-size:11px" onclick="eliminarZona(${z.i})">Eliminar</button></div>
         </div>`).join('')}`;
-    }).join('') : '<div class="vacio"><b>No hay zonas</b>Agrega la primera.</div>'}</div>`);
+    }).join('') || '<div class="vacio"><b>Sin zonas para este día</b>Prueba con otro día o agrega una.</div>' : '<div class="vacio"><b>No hay zonas</b>Agrega la primera.</div>'}</div>`);
 }
 
 async function agregarZona(){
