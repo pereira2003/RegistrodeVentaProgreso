@@ -47,7 +47,7 @@ body{
   font-family:var(--texto);background:var(--fondo);color:var(--tinta);
   font-size:14px;line-height:1.55;
   padding-bottom:calc(74px + env(safe-area-inset-bottom));
-  overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;
+  -webkit-overflow-scrolling:touch;
 }
 h1,h2,h3,h4{font-family:var(--display);margin:0;letter-spacing:-.015em;font-weight:700}
 button,input,select,textarea{font-family:inherit;font-size:16px;color:inherit}
@@ -96,10 +96,9 @@ button{cursor:pointer;border:none;background:none}
 
 /* ---------- Encabezado ---------- */
 .tope{
-  position:sticky;top:0;z-index:40;background:rgba(252,250,248,.94);color:var(--tinta);
+  position:sticky;top:0;z-index:40;background:var(--fondo);color:var(--tinta);
   padding:calc(16px + env(safe-area-inset-top)) 20px 15px;
   display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--suave);
-  backdrop-filter:blur(12px);
 }
 .marca{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:-.02em;
   line-height:1;white-space:nowrap}
@@ -477,7 +476,7 @@ button{cursor:pointer;border:none;background:none}
   position:fixed;left:0;right:0;bottom:0;z-index:61;background:var(--fondo);
   border-top:1px solid var(--suave);max-height:92vh;max-height:92dvh;
   overflow-y:auto;overflow-x:hidden;display:none;
-  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+  -webkit-overflow-scrolling:touch;
   padding:0 14px calc(22px + env(safe-area-inset-bottom));
   animation:sube .2s cubic-bezier(.2,.8,.3,1);
 }
@@ -505,8 +504,8 @@ button{cursor:pointer;border:none;background:none}
 
 /* ---------- Barra inferior ---------- */
 .barra{
-  position:fixed;left:0;right:0;bottom:0;z-index:50;background:rgba(255,255,255,.96);
-  border-top:1px solid var(--suave);backdrop-filter:blur(12px);
+  position:fixed;left:0;right:0;bottom:0;z-index:50;background:#fff;
+  border-top:1px solid var(--suave);
   display:flex;padding-bottom:env(safe-area-inset-bottom);
 }
 .barra button{
@@ -535,7 +534,7 @@ button{cursor:pointer;border:none;background:none}
 }
 
 /* ---------- Etiquetas imprimibles ---------- */
-.sel-lista{max-height:280px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin:0 -4px}
+.sel-lista{max-height:280px;overflow-y:auto;-webkit-overflow-scrolling:touch;margin:0 -4px}
 .sel-fila{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--suave)}
 .sel-fila:last-child{border-bottom:0}
 .sel-fila input{width:20px;height:20px;flex:0 0 auto;accent-color:var(--rojo)}
