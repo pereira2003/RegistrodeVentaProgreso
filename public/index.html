@@ -651,6 +651,8 @@ button{cursor:pointer;border:none;background:none}
     <div class="filtro-fecha"><label id="etiquetaFiltroEntregasFecha" for="filtroEntregasFecha">Seleccione fecha</label><input id="filtroEntregasFecha" class="filtro-control" type="month" aria-label="Seleccione fecha"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarEntregas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
+  <div class="rotulo">Ruta de hoy</div>
+  <button class="btn ambar chico" id="btnZonasHoy" style="width:100%;margin-bottom:14px">Ver zonas de hoy</button>
   <div class="rotulo">Administrar</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px">
     <button class="btn plano chico" id="btnGestionVendedores" style="width:100%;margin:0">Gestionar vendedores</button>
@@ -872,7 +874,90 @@ const CFG = {
   // Cuando escribas las tuyas, aparece un campo para elegirla al registrar la venta.
   sucursales: [],
   vendedores: ['Abrahan','Katherine','José','Marielos'],
-  zonas: ['Zona Norte','Zona Sur','Zona Centro','Zona Este'],
+  // Cada zona lleva el día de la semana en que se visita (ver DIAS más abajo).
+  // dia:'' = sin día asignado (la zona sigue apareciendo en los selectores, pero no en "Zonas de hoy").
+  zonas: [
+    {nombre:'Zona San Jose Santo Tomas', dia:'lunes'},
+    {nombre:'Zona San Antonio Abad #2', dia:'lunes'},
+    {nombre:'Zona Cusca #3', dia:'lunes'},
+
+    {nombre:'Zona P. de la Libertad #1', dia:'martes'},
+    {nombre:'Zona P. de la Libertad #2', dia:'martes'},
+    {nombre:'Zona J. de San Bartolo #1', dia:'martes'},
+    {nombre:'Zona Santo Tomas #1', dia:'martes'},
+    {nombre:'Zona El Carmen S/M', dia:'martes'},
+    {nombre:'Zona Los Angeles Apopa', dia:'martes'},
+    {nombre:'Zona Cuyultitan', dia:'martes'},
+    {nombre:'Zona El Majahual', dia:'martes'},
+    {nombre:'Zona Emanuel Santa Tecla', dia:'martes'},
+    {nombre:'Zona Mexicanos #1', dia:'martes'},
+    {nombre:'Zona Santiago Tex. #2', dia:'martes'},
+    {nombre:'Zona El Morral', dia:'martes'},
+    {nombre:'Zona Olocuilta #1', dia:'martes'},
+    {nombre:'Zona Olocuilta #2', dia:'martes'},
+
+    {nombre:'Zona Antiguo Cuscatlan', dia:'miercoles'},
+    {nombre:'Zona Ciudad Delgado', dia:'miercoles'},
+    {nombre:'Zona Las Isletas', dia:'miercoles'},
+    {nombre:'Zona Santa Tecla', dia:'miercoles'},
+    {nombre:'Zona El Granjero', dia:'miercoles'},
+    {nombre:'Zona La Palma', dia:'miercoles'},
+    {nombre:'Zona Villa Patricia C.D.', dia:'miercoles'},
+    {nombre:'Zona Chintuc #1', dia:'miercoles'},
+    {nombre:'Zona San Marcelino #1', dia:'miercoles'},
+    {nombre:'Zona Ticsa #1', dia:'miercoles'},
+    {nombre:'Zona San Marcos #1', dia:'miercoles'},
+    {nombre:'Zona Popotlan #1', dia:'miercoles'},
+    {nombre:'Zona Monserrat', dia:'miercoles'},
+    {nombre:'Zona Achiotal', dia:'miercoles'},
+
+    {nombre:'Zona El Chilamate', dia:'jueves'},
+    {nombre:'Zona Modelo', dia:'jueves'},
+    {nombre:'Zona Harrison', dia:'jueves'},
+    {nombre:'Zona Cimas de San Bartolo', dia:'jueves'},
+    {nombre:'Zona Montemaria', dia:'jueves'},
+    {nombre:'Zona Jacaranda Lourdes', dia:'jueves'},
+    {nombre:'Zona San Patricio', dia:'jueves'},
+    {nombre:'Zona Cucumacayan #1', dia:'jueves'},
+    {nombre:'Zona Popotlan #2', dia:'jueves'},
+    {nombre:'Zona Ciudad Futura', dia:'jueves'},
+    {nombre:'Zona San Antonio Abad #1', dia:'jueves'},
+    {nombre:'Zona Ticsa #2', dia:'jueves'},
+    {nombre:'Zona Los Alpes San Marcos', dia:'jueves'},
+    {nombre:'Zona California', dia:'jueves'},
+    {nombre:'Zona San Jose Las Flores', dia:'jueves'},
+
+    {nombre:'Zona Panchimalco', dia:'viernes'},
+    {nombre:'Zona San Ramon', dia:'viernes'},
+    {nombre:'Zona Montelimar', dia:'viernes'},
+    {nombre:'Zona El Boqueron', dia:'viernes'},
+    {nombre:'Zona Loma Linda Zaragoza', dia:'viernes'},
+    {nombre:'Zona Santiago Tex #1', dia:'viernes'},
+    {nombre:'Zona Santiago Tex #3', dia:'viernes'},
+    {nombre:'Zona La Luz', dia:'viernes'},
+    {nombre:'Zona Cusca #2', dia:'viernes'},
+    {nombre:'Zona Amatepec', dia:'viernes'},
+    {nombre:'Zona Altavista', dia:'viernes'},
+    {nombre:'Zona San Marcos #2', dia:'viernes'},
+    {nombre:'Zona San Marcos #3', dia:'viernes'},
+
+    {nombre:'Zona Ciudad Obrera Arce #3', dia:'sabado'},
+    {nombre:'Zona Ciudad Obrera #4', dia:'sabado'},
+    {nombre:'Zona Sapotitan #2', dia:'sabado'},
+    {nombre:'Zona Planes de Renderos', dia:'sabado'},
+    {nombre:'Zona Nuevo Cuscatlan', dia:'sabado'},
+    {nombre:'Zona La Reforma', dia:'sabado'},
+    {nombre:'Zona Cuapa', dia:'sabado'},
+    {nombre:'Zona Apulo', dia:'sabado'},
+    {nombre:'Zona San Jose Villanueva', dia:'sabado'},
+    {nombre:'Zona Brisas de Zaragoza', dia:'sabado'},
+    {nombre:'Zona San Francisco', dia:'sabado'},
+    {nombre:'Zona For You #1', dia:'sabado'},
+    {nombre:'Zona Dolores', dia:'sabado'},
+    {nombre:'Zona Europa', dia:'sabado'},
+    {nombre:'Zona Santa Maria', dia:'sabado'},
+    {nombre:'Zona San Diego', dia:'sabado'}
+  ],
   // Prima: porcentaje del total que el cliente paga al momento de la compra.
   // 0.10 = 10 %. El resto se reparte en partes iguales entre los meses del plazo.
   primaPct: 0.10,
@@ -899,6 +984,19 @@ const CFG = {
    ============================================================ */
 const $  = (s,c=document)=>c.querySelector(s);
 const $$ = (s,c=document)=>[...c.querySelectorAll(s)];
+// Días de reparto (lunes a sábado). id = clave interna, etiqueta = texto visible.
+const DIAS = [
+  {id:'lunes',     etiqueta:'Lunes'},
+  {id:'martes',    etiqueta:'Martes'},
+  {id:'miercoles', etiqueta:'Miércoles'},
+  {id:'jueves',    etiqueta:'Jueves'},
+  {id:'viernes',   etiqueta:'Viernes'},
+  {id:'sabado',    etiqueta:'Sábado'}
+];
+const diaEtiqueta = id => DIAS.find(d=>d.id===id)?.etiqueta || 'Sin día';
+function diaDeHoy(){
+  return ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'][new Date().getDay()];
+}
 const money = n => new Intl.NumberFormat('es-PA',{style:'currency',currency:'USD'}).format(n||0);
 const bibliotecas = {};
 function cargarBiblioteca(nombre, archivo){
@@ -1073,7 +1171,7 @@ const DB = {
       pintarTodo();
     });
     f.onSnapshot(f.collection(bd,'zonas'), s=>{
-      this.zonas = s.docs.map(d=>d.data().nombre).filter(Boolean);
+      this.zonas = s.docs.map(d=>({nombre:d.data().nombre, dia:d.data().dia||''})).filter(z=>z.nombre);
       caja.guardar('gp_zonas', this.zonas);
       pintarTodo();
     });
@@ -1138,7 +1236,7 @@ const DB = {
 
   async sembrarVendedores(){ for(const nombre of CFG.vendedores) await this.guardarVendedor(nombre); },
 
-  async sembrarZonas(){ for(const nombre of CFG.zonas) await this.guardarZona(nombre); },
+  async sembrarZonas(){ for(const z of CFG.zonas) await this.guardarZona(z.nombre, '', z.dia); },
 
   async guardarVendedor(nombre, anterior=''){
     const id = nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-');
@@ -1159,15 +1257,16 @@ const DB = {
     }else{ this.vendedores=this.vendedores.filter(v=>v!==nombre); caja.guardar('gp_vendedores',this.vendedores); pintarTodo(); }
   },
 
-  async guardarZona(nombre, anterior=''){
+  async guardarZona(nombre, anterior='', dia=''){
     const id = nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-');
     if(this.modo==='firebase'){
       const {f,bd}=this.fb;
       if(anterior && anterior!==nombre) await f.deleteDoc(f.doc(bd,'zonas',anterior.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-')));
-      await f.setDoc(f.doc(bd,'zonas',id),{nombre});
+      await f.setDoc(f.doc(bd,'zonas',id),{nombre, dia});
     }else{
-      const lista=this.zonas.length?this.zonas:CFG.zonas.slice();
-      const i=anterior?lista.indexOf(anterior):-1; if(i>=0) lista[i]=nombre; else lista.push(nombre);
+      const lista=(this.zonas.length?this.zonas:CFG.zonas.slice()).map(z=>typeof z==='string'?{nombre:z,dia:''}:z);
+      const i=anterior?lista.findIndex(z=>z.nombre===anterior):-1;
+      if(i>=0) lista[i]={nombre,dia}; else lista.push({nombre,dia});
       this.zonas=lista; caja.guardar('gp_zonas',lista); pintarTodo();
     }
   },
@@ -1175,7 +1274,7 @@ const DB = {
   async eliminarZona(nombre){
     if(this.modo==='firebase'){
       const {f,bd}=this.fb; const id=nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-'); await f.deleteDoc(f.doc(bd,'zonas',id));
-    }else{ this.zonas=this.zonas.filter(z=>z!==nombre); caja.guardar('gp_zonas',this.zonas); pintarTodo(); }
+    }else{ this.zonas=this.zonas.filter(z=>(typeof z==='string'?z:z.nombre)!==nombre); caja.guardar('gp_zonas',this.zonas); pintarTodo(); }
   },
 
   async guardarEntrega(e){
@@ -1463,8 +1562,46 @@ async function cerrarEntregasVencidas(){
 function vendedoresActuales(){
   return DB.modo==='firebase' ? (DB.vendedores||[]) : caja.leer('gp_vendedores', CFG.vendedores.slice());
 }
+// Lista completa {nombre, dia} — usar esta para gestión y para filtrar por día.
+function zonasDetalle(){
+  const lista = DB.modo==='firebase' ? (DB.zonas||[]) : caja.leer('gp_zonas', CFG.zonas.slice());
+  return lista.map(z => typeof z==='string' ? {nombre:z, dia:''} : {nombre:z.nombre, dia:z.dia||''});
+}
+// Solo los nombres — las de hoy primero, para que los selectores (p. ej. al registrar
+// una entrega) propongan la zona de la ruta del día antes que el resto.
 function zonasActuales(){
-  return DB.modo==='firebase' ? (DB.zonas||[]) : caja.leer('gp_zonas', CFG.zonas.slice());
+  const hoy = diaDeHoy();
+  const detalle = zonasDetalle();
+  return [...detalle.filter(z=>z.dia===hoy), ...detalle.filter(z=>z.dia!==hoy)].map(z=>z.nombre);
+}
+// Nombres de las zonas cuyo día coincide con hoy.
+function zonasDeHoy(){
+  const hoy = diaDeHoy();
+  return zonasDetalle().filter(z=>z.dia===hoy).map(z=>z.nombre);
+}
+// Nombres de zona para un día dado ('todas' = sin filtrar por día).
+function zonasPorDia(dia){
+  const detalle = zonasDetalle();
+  if(dia==='todas') return detalle.map(z=>z.nombre);
+  return detalle.filter(z=>z.dia===dia).map(z=>z.nombre);
+}
+// <option> de días para los formularios "elige el día y luego la zona".
+function opcionesDia(seleccionado){
+  const hoy = diaDeHoy();
+  return DIAS.map(d=>`<option value="${d.id}" ${d.id===seleccionado?'selected':''}>${esc(d.etiqueta)}${d.id===hoy?' (hoy)':''}</option>`).join('')
+    + `<option value="todas" ${seleccionado==='todas'?'selected':''}>Todas las zonas</option>`;
+}
+// Día que debe quedar seleccionado al abrir/actualizar un formulario con zona:
+// respeta la elección explícita del usuario (_dia); si no la hay, usa el día de
+// la zona ya elegida; y si tampoco hay zona, cae en el día de hoy (o "todas" los domingos).
+function diaSeleccionParaZona(registro){
+  if(registro._dia && (registro._dia==='todas' || DIAS.some(d=>d.id===registro._dia))) return registro._dia;
+  if(registro.zona){
+    const z = zonasDetalle().find(z=>z.nombre===registro.zona);
+    if(z) return z.dia || 'todas';
+  }
+  const hoy = diaDeHoy();
+  return DIAS.some(d=>d.id===hoy) ? hoy : 'todas';
 }
 
 function sello(txt,tipo){
@@ -1595,7 +1732,7 @@ const NOMBRE_FORMATO = {QR_CODE:'QR', DATA_MATRIX:'Data Matrix', AZTEC:'Aztec', 
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
 let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
-const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0] || '', items: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
+const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0]?.nombre || '', _dia: '', items: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
 let entregaEditando=null;
 let entregaSeleccionando=false;
 let entregaSeleccion=new Set();
@@ -2205,66 +2342,116 @@ async function eliminarVendedor(indice){
 }
 
 function gestionarZonas(){
-  const zonas=zonasActuales();
+  const zonas=zonasDetalle();
+  const hoy=diaDeHoy();
   abrirHoja(`
     <div class="hoja-tope"><h2>Gestionar zonas</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="tarjeta pad">
-      <div class="campo" style="margin-bottom:8px"><label>Nueva zona</label>
-        <input id="nuevaZona" placeholder="Nombre de la zona"></div>
-      <button class="btn suave" onclick="agregarZona()">Agregar zona</button>
+      <div class="dosc">
+        <div class="campo" style="margin-bottom:0"><label>Nueva zona</label>
+          <input id="nuevaZona" placeholder="Nombre de la zona"></div>
+        <div class="campo" style="margin-bottom:0"><label>Día</label>
+          <select id="nuevaZonaDia">
+            <option value="">Sin día</option>
+            ${DIAS.map(d=>`<option value="${d.id}" ${d.id===hoy?'selected':''}>${d.etiqueta}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <button class="btn suave" style="margin-top:10px" onclick="agregarZona()">Agregar zona</button>
     </div>
+    <button class="btn plano chico" style="width:100%;margin-bottom:14px" onclick="cargarPlantillaZonas()">Cargar plantilla de zonas por día</button>
     <div class="rotulo">Zonas registradas</div>
-    <div id="listaZonas">${zonas.length ? zonas.map((z,i)=>`
-      <div class="item" style="padding:10px 12px">
-        <div class="cont"><h4>${esc(z)}</h4></div>
-        <div style="display:flex;gap:6px"><button class="btn suave chico" style="padding:6px 10px;font-size:11px;font-family:var(--texto);text-transform:none;letter-spacing:.01em;font-weight:600" onclick="editarZona(${i})">Actualizar</button>
-          <button class="btn plano chico" style="padding:6px 10px;font-size:11px" onclick="eliminarZona(${i})">Eliminar</button></div>
-      </div>`).join('') : '<div class="vacio"><b>No hay zonas</b>Agrega la primera.</div>'}</div>`);
+    <div id="listaZonas">${zonas.length ? DIAS.concat([{id:'',etiqueta:'Sin día'}]).map(d=>{
+      const deEsteDia = zonas.map((z,i)=>({...z,i})).filter(z=>z.dia===d.id);
+      if(!deEsteDia.length) return '';
+      return `<div class="rotulo" style="margin-top:14px${d.id===hoy?';color:var(--ocre)':''}">${esc(d.etiqueta)}${d.id===hoy?' · HOY':''}</div>
+        ${deEsteDia.map(z=>`
+        <div class="item" style="padding:10px 12px">
+          <div class="cont"><h4>${esc(z.nombre)}</h4></div>
+          <div style="display:flex;gap:6px"><button class="btn suave chico" style="padding:6px 10px;font-size:11px;font-family:var(--texto);text-transform:none;letter-spacing:.01em;font-weight:600" onclick="editarZona(${z.i})">Actualizar</button>
+            <button class="btn plano chico" style="padding:6px 10px;font-size:11px" onclick="eliminarZona(${z.i})">Eliminar</button></div>
+        </div>`).join('')}`;
+    }).join('') : '<div class="vacio"><b>No hay zonas</b>Agrega la primera.</div>'}</div>`);
 }
 
 async function agregarZona(){
   const nombre=$('#nuevaZona').value.trim(); if(!nombre){brindis('Escribe el nombre de la zona');return;}
-  const lista=zonasActuales();
-  if(lista.some(z=>z.toLowerCase()===nombre.toLowerCase())){brindis('Esa zona ya existe');return;}
-  await DB.guardarZona(nombre); gestionarZonas(); brindis('Zona agregada');
+  const dia=$('#nuevaZonaDia').value;
+  const lista=zonasDetalle();
+  if(lista.some(z=>z.nombre.toLowerCase()===nombre.toLowerCase())){brindis('Esa zona ya existe');return;}
+  await DB.guardarZona(nombre,'',dia); gestionarZonas(); brindis('Zona agregada');
 }
 
 async function editarZona(indice){
-  const lista=zonasActuales(), anterior=lista[indice]; if(!anterior)return;
-  const nombre=prompt('Nuevo nombre de la zona',anterior)?.trim(); if(!nombre||nombre===anterior)return;
-  if(lista.some((z,i)=>i!==indice&&z.toLowerCase()===nombre.toLowerCase())){brindis('Esa zona ya existe');return;}
-  if(entregaActual.zona===anterior) entregaActual.zona=nombre;
-  await DB.guardarZona(nombre,anterior); gestionarZonas(); brindis('Zona actualizada');
+  const lista=zonasDetalle(), actual=lista[indice]; if(!actual)return;
+  const nombre=prompt('Nuevo nombre de la zona',actual.nombre)?.trim(); if(!nombre)return;
+  if(lista.some((z,i)=>i!==indice&&z.nombre.toLowerCase()===nombre.toLowerCase())){brindis('Esa zona ya existe');return;}
+  const opciones=DIAS.map((d,i)=>`${i+1}) ${d.etiqueta}`).join('\n');
+  const entrada=prompt(`Día para "${nombre}":\n${opciones}\n0) Sin día\n\nEscribe el número`, String(DIAS.findIndex(d=>d.id===actual.dia)+1 || 0));
+  if(entrada===null) return;
+  const n=parseInt(entrada,10);
+  const dia = (n>=1 && n<=DIAS.length) ? DIAS[n-1].id : '';
+  if(entregaActual.zona===actual.nombre) entregaActual.zona=nombre;
+  await DB.guardarZona(nombre,actual.nombre,dia); gestionarZonas(); brindis('Zona actualizada');
 }
 
 async function eliminarZona(indice){
-  const lista=zonasActuales(), nombre=lista[indice]; if(!nombre)return;
-  if(!confirm(`¿Eliminar la zona "${nombre}"?`))return;
-  lista.splice(indice,1); if(entregaActual.zona===nombre) entregaActual.zona=lista[0]||'';
-  await DB.eliminarZona(nombre); gestionarZonas(); brindis('Zona eliminada');
+  const lista=zonasDetalle(), zona=lista[indice]; if(!zona)return;
+  if(!confirm(`¿Eliminar la zona "${zona.nombre}"?`))return;
+  if(entregaActual.zona===zona.nombre) entregaActual.zona=zonasActuales().find(n=>n!==zona.nombre)||'';
+  await DB.eliminarZona(zona.nombre); gestionarZonas(); brindis('Zona eliminada');
+}
+
+async function cargarPlantillaZonas(){
+  if(!confirm(`Se agregarán/actualizarán ${CFG.zonas.length} zonas con su día asignado (Lunes a Sábado). Las zonas que ya tengas con el mismo nombre quedarán con el día de la plantilla; las demás no se tocan. ¿Continuar?`)) return;
+  await DB.sembrarZonas();
+  gestionarZonas();
+  brindis('Plantilla de zonas cargada');
+}
+
+function mostrarZonasHoy(){
+  const hoy=diaDeHoy();
+  const zonas=zonasDetalle().filter(z=>z.dia===hoy);
+  const esLaborable=DIAS.some(d=>d.id===hoy);
+  abrirHoja(`
+    <div class="hoja-tope"><h2>Zonas de hoy · ${esc(diaEtiqueta(hoy))}</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
+    ${!esLaborable ? '<div class="vacio"><b>Hoy es domingo</b>No hay zonas asignadas para hoy.</div>'
+      : zonas.length ? `<div id="listaZonasHoy">${zonas.map(z=>`
+        <div class="item" style="padding:10px 12px"><div class="cont"><h4>${esc(z.nombre)}</h4></div></div>`).join('')}</div>`
+      : `<div class="vacio"><b>Sin zonas para ${esc(diaEtiqueta(hoy))}</b>Asigna el día a tus zonas desde "Gestionar zonas".</div>`}
+  `);
 }
 
 function mostrarHojaEntrega(){
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || '';
-  const zonas = zonasActuales();
-  const zona = entregaActual.zona || zonas[0] || '';
+  const dia = diaSeleccionParaZona(entregaActual);
+  const zonas = zonasPorDia(dia);
+  const zona = (entregaActual.zona && zonas.includes(entregaActual.zona)) ? entregaActual.zona : (zonas[0] || '');
+  entregaActual.zona = zona;
+  entregaActual._dia = dia;
   const items = entregaActual.items || [];
   const devueltos = entregaActual.devueltos || [];
   const vendidos = entregaActual.vendidos || [];
   abrirHoja(`
     <div class="hoja-tope"><h2>Entrega y devolución</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="tarjeta pad">
+      <div class="campo" style="margin-bottom:10px">
+        <label>Vendedor</label>
+        <select id="entregaVendor" onchange="cambiarVendedorEntrega(this.value)">
+          ${vendedorOptions(vendedor)}
+        </select>
+      </div>
       <div class="dosc" style="margin-bottom:0">
         <div class="campo" style="margin-bottom:0">
-          <label>Vendedor</label>
-          <select id="entregaVendor" onchange="cambiarVendedorEntrega(this.value)">
-            ${vendedorOptions(vendedor)}
+          <label>Día</label>
+          <select id="entregaDia" onchange="entregaActual._dia=this.value; entregaActual.zona=''; mostrarHojaEntrega()">
+            ${opcionesDia(dia)}
           </select>
         </div>
         <div class="campo" style="margin-bottom:0">
           <label>Zona</label>
-          <select id="entregaZona" onchange="entregaActual.zona=this.value; mostrarHojaEntrega()">
-            ${zonas.map(z=>`<option value="${esc(z)}" ${z===zona?'selected':''}>${esc(z)}</option>`).join('')}
+          <select id="entregaZona" onchange="entregaActual.zona=this.value; mostrarHojaEntrega()" ${zonas.length?'':'disabled'}>
+            ${zonas.length ? zonas.map(z=>`<option value="${esc(z)}" ${z===zona?'selected':''}>${esc(z)}</option>`).join('') : '<option value="">Sin zonas para este día</option>'}
           </select>
         </div>
       </div>
@@ -2574,6 +2761,7 @@ function editarEntrega(creado){
   entregaSeleccionando=false; entregaSeleccion.clear();
   entregaActual.vendor=registro.vendor||vendedoresActuales()[0]||'';
   entregaActual.zona=registro.zona||zonasActuales()[0]||'';
+  entregaActual._dia='';
   entregaActual.items=(registro.entregados||[]).map(item=>({...item}));
   entregaActual.devueltos=(registro.devueltos||[]).map(item=>({...item}));
   entregaActual.vendidos=(registro.vendidos||[]).map(item=>({...item}));
@@ -4504,6 +4692,7 @@ $('#filtroEntregasTipo').addEventListener('change',()=>configurarFiltroFecha('fi
 $('#filtroEntregasFecha').addEventListener('input',pintarEntregas);
 $('#btnGestionVendedores').addEventListener('click',gestionarVendedores);
 $('#btnGestionZonas').addEventListener('click',gestionarZonas);
+$('#btnZonasHoy').addEventListener('click',mostrarZonasHoy);
 $('#filtroCarteraTipo').addEventListener('change',()=>configurarFiltroFecha('filtroCarteraTipo','filtroCarteraFecha',pintarCartera));
 $('#filtroCarteraFecha').addEventListener('input',pintarCartera);
 
@@ -4606,24 +4795,28 @@ function filaAgendaHTML(a){
 function abrirFormAgenda(creado=''){
   const a = creado ? (DB.agendas||[]).find(x=>x.creado===creado) : null;
   agendaBorrador = a
-    ? { creado:a.creado, fecha:a.fecha, vendedor:a.vendedor, zona:a.zona, items:(a.items||[]).map(i=>({...i})) }
-    : { creado:'', fecha:'', vendedor:(vendedoresActuales()[0]||''), zona:(zonasActuales()[0]||''), items:[] };
+    ? { creado:a.creado, fecha:a.fecha, vendedor:a.vendedor, zona:a.zona, _dia:'', items:(a.items||[]).map(i=>({...i})) }
+    : { creado:'', fecha:'', vendedor:(vendedoresActuales()[0]||''), zona:'', _dia:'', items:[] };
   renderFormAgenda();
 }
 
 function renderFormAgenda(){
   const b = agendaBorrador; if(!b) return;
-  const zonas = zonasActuales();
+  const dia = diaSeleccionParaZona(b);
+  const zonas = zonasPorDia(dia);
+  const zona = (b.zona && zonas.includes(b.zona)) ? b.zona : (zonas[0] || '');
   abrirHoja(`
     <div class="hoja-tope"><h2>${b.creado?'Editar':'Nueva'} entrega agendada</h2><button class="cerrar" onclick="cerrarFormAgenda()">✕</button></div>
     <div class="tarjeta pad">
       <div class="campo"><label>Fecha de entrega</label>
         <input id="agFecha" type="date" min="${hoy()}" value="${esc(b.fecha||'')}"></div>
+      <div class="campo"><label>Vendedor</label>
+        <select id="agVendedor">${vendedorOptions(b.vendedor)}</select></div>
       <div class="dosc">
-        <div class="campo"><label>Vendedor</label>
-          <select id="agVendedor">${vendedorOptions(b.vendedor)}</select></div>
-        <div class="campo"><label>Zona</label>
-          <select id="agZona">${zonas.map(z=>`<option ${z===b.zona?'selected':''}>${esc(z)}</option>`).join('')}</select></div>
+        <div class="campo" style="margin-bottom:0"><label>Día</label>
+          <select id="agDia" onchange="actualizarZonasAgenda(this.value)">${opcionesDia(dia)}</select></div>
+        <div class="campo" style="margin-bottom:0"><label>Zona</label>
+          <select id="agZona" ${zonas.length?'':'disabled'}>${zonas.length ? zonas.map(z=>`<option value="${esc(z)}" ${z===zona?'selected':''}>${esc(z)}</option>`).join('') : '<option value="">Sin zonas para este día</option>'}</select></div>
       </div>
       <div class="campo marca-combo" style="margin-bottom:6px"><label>Agregar producto</label>
         <input id="agProducto" placeholder="Escribe el producto" autocomplete="off" spellcheck="false"
@@ -4695,6 +4888,17 @@ function quitarItemAgenda(i){
   if(!agendaBorrador) return;
   agendaBorrador.items.splice(i,1);
   $('#agItems').innerHTML = renderItemsAgenda();
+}
+
+// Al cambiar el día en el formulario de agenda, recarga solo el <select> de zona
+// con las zonas de ese día (sin perder fecha/vendedor/productos ya cargados).
+function actualizarZonasAgenda(dia){
+  const zonas = zonasPorDia(dia);
+  const sel = $('#agZona'); if(!sel) return;
+  sel.disabled = !zonas.length;
+  sel.innerHTML = zonas.length
+    ? zonas.map(z=>`<option value="${esc(z)}">${esc(z)}</option>`).join('')
+    : '<option value="">Sin zonas para este día</option>';
 }
 
 async function guardarAgendaBorrador(){
