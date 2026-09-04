@@ -652,7 +652,7 @@ button{cursor:pointer;border:none;background:none}
   </div>
   <button class="btn plano chico" id="btnLimpiarEntregas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Ruta de hoy</div>
-  <button class="btn ambar chico" id="btnZonasHoy" style="width:100%;margin-bottom:14px">Ver zonas de hoy</button>
+  <button class="btn suave chico" id="btnZonasHoy" style="width:100%;margin-bottom:14px">Ver zonas de hoy</button>
   <div class="rotulo">Administrar</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px">
     <button class="btn plano chico" id="btnGestionVendedores" style="width:100%;margin:0">Gestionar vendedores</button>
@@ -1851,7 +1851,7 @@ function seleccionarFormaVenta(modo, tipo){
     <div class="hoja-tope"><h2>Tipo de venta</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="aviso">¿Cómo se registrará esta venta?</div>
     <div class="fila" style="margin-top:14px">
-      <button class="btn ambar" onclick="iniciarEscaneo('credito','${tipo}','contado'); cerrarHoja()">Al contado</button>
+      <button class="btn suave" onclick="iniciarEscaneo('credito','${tipo}','contado'); cerrarHoja()">Al contado</button>
       <button class="btn plano" onclick="iniciarEscaneo('credito','${tipo}','credito'); cerrarHoja()">A crédito</button>
     </div>`);
 }
