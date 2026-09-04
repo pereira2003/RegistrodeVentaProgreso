@@ -41,7 +41,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body.sin-seleccion,body.sin-seleccion *{user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important}
 [hidden]{display:none!important}
-html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden}
+html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden;touch-action:pan-y}
 html{-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
 body{
   font-family:var(--texto);background:var(--fondo);color:var(--tinta);
@@ -486,7 +486,7 @@ button{cursor:pointer;border:none;background:none}
 .asa{width:44px;height:5px;background:var(--suave);border-radius:100px;margin:8px auto 2px;
   padding:9px 22px;background-clip:content-box;box-sizing:content-box;touch-action:none;cursor:grab}
 .hoja-tope{position:sticky;top:0;background:var(--fondo);padding:8px 0 13px;z-index:2;
-  display:flex;align-items:center;gap:10px;touch-action:none}
+  display:flex;align-items:center;gap:10px;touch-action:pan-y}
 .hoja-tope h2{font-size:19px;flex:1;letter-spacing:-.03em}
 .cerrar{width:34px;height:34px;border-radius:50%;background:var(--papel);
   border:1px solid var(--borde);font-size:17px;line-height:1;color:var(--tinta)}
@@ -1040,6 +1040,11 @@ function ocultarCargaInicial(){
   $('#datosCargando')?.classList.remove('activo');
   $('#cargaInicial')?.classList.add('oculta');
 }
+// Red de seguridad: la pantalla de carga cubre toda la pantalla (z-index alto) mientras
+// se conecta. Si algo falla antes de tiempo (sin red, Firestore bloqueado, un error de
+// JS) nunca debe quedar trabada — eso se sentiría como "no puedo deslizar la pantalla".
+window.addEventListener('error', ocultarCargaInicial);
+window.addEventListener('unhandledrejection', ocultarCargaInicial);
 function mostrarEstadoEscaneo(txt, detalle='Registrando…'){ 
   let pop = document.getElementById('escaneoEstado');
   if(!pop){
@@ -5389,7 +5394,7 @@ DB.iniciar();
 setInterval(()=>cerrarEntregasVencidas().catch(errorOperacion),60000);
 setInterval(()=>convertirAgendasVencidas().catch(errorOperacion),60000);
 setInterval(actualizarCampana,60000);
-setTimeout(ocultarCargaInicial, 9000);
+setTimeout(ocultarCargaInicial, 6000);
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').then(reg=>{
     // Si hay una versión nueva esperando, actívala en cuanto pueda
