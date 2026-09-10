@@ -464,6 +464,10 @@ button{cursor:pointer;border:none;background:none}
 .entrega-tabla-lista{display:flex;flex-direction:column;gap:5px}
 .entrega-tabla-item{display:flex;align-items:flex-start;gap:7px;line-height:1.35}
 .entrega-tabla-cantidad{flex:0 0 auto;min-width:24px;padding:2px 5px;border-radius:5px;background:rgba(85,125,115,.12);color:var(--verde);font-family:var(--dato);font-size:10px;font-weight:700;text-align:center}
+.entrega-original-list{display:flex;flex-direction:column;gap:7px;margin:0;padding:0;list-style:none}
+.entrega-original-list li{display:flex;align-items:center;gap:9px;padding:7px 8px;border:1px solid rgba(85,125,115,.14);border-radius:7px;background:rgba(255,255,255,.62)}
+.entrega-original-list .entrega-original-cantidad{flex:0 0 auto;min-width:30px;padding:3px 6px;border-radius:5px;background:var(--verde-claro);color:var(--verde);font-family:var(--dato);font-size:11px;font-weight:700;text-align:center}
+.entrega-original-list .entrega-original-nombre{font-family:var(--display);font-size:12.5px;font-weight:600;line-height:1.3}
 .marbete{
   display:inline-block;font-family:var(--dato);font-size:9.5px;font-weight:500;letter-spacing:.11em;
   text-transform:uppercase;padding:3px 7px;border-radius:3px;margin-top:7px;
@@ -2572,7 +2576,7 @@ function mostrarHojaEntrega(){
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin productos</b>Escanea uno para agregarlo a la entrega.</div>`}
     ${entregadosIniciales.length ? `<div class="rotulo">Productos entregados originalmente</div>
     <div class="item" style="display:block;padding:10px 12px;background:rgba(226,239,235,.35)">
-      <div class="meta">${entregadosIniciales.map(item=>`${esc(item.nombre)} × ${item.cantidad||1}`).join(', ')}</div>
+      <ol class="entrega-original-list">${entregadosIniciales.map(item=>`<li><span class="entrega-original-cantidad">${item.cantidad||1}</span><span class="entrega-original-nombre">${esc(item.nombre)}</span></li>`).join('')}</ol>
     </div>` : ''}
     ${vendidos.length ? `<div class="rotulo">Productos vendidos</div>
     <div>${vendidos.map((item,i)=>`
