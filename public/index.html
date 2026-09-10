@@ -2669,12 +2669,24 @@ function marcarVendidoEntrega(indice){
 
 function marcarDevueltoEntrega(indice){
   const item=entregaActual.items[indice]; if(!item) return;
+  const cantidadDisponible=item.cantidad||1;
+  let cantidadDevuelta=cantidadDisponible;
+  if(cantidadDisponible>1){
+    const respuesta=prompt(`¿Cuántas unidades de ${item.nombre} devuelven? (1-${cantidadDisponible})`,String(cantidadDisponible));
+    if(respuesta===null) return;
+    cantidadDevuelta=Number.parseInt(respuesta,10);
+    if(!Number.isInteger(cantidadDevuelta)||cantidadDevuelta<1||cantidadDevuelta>cantidadDisponible){
+      brindis(`Escribe una cantidad entre 1 y ${cantidadDisponible}`);
+      return;
+    }
+  }
   entregaActual.devueltos=entregaActual.devueltos||[];
-  fusionarEnLista(entregaActual.devueltos,item,item.cantidad||1);
-  entregaActual.items.splice(indice,1);
+  fusionarEnLista(entregaActual.devueltos,{...item,cantidad:cantidadDevuelta},cantidadDevuelta);
+  if(cantidadDevuelta===cantidadDisponible) entregaActual.items.splice(indice,1);
+  else entregaActual.items[indice].cantidad=cantidadDisponible-cantidadDevuelta;
   entregaActual.devolucionCreado=entregaActual.devolucionCreado||new Date().toISOString();
   mostrarHojaEntrega();
-  brindis(`${item.nombre}: marcado como devuelto`);
+  brindis(`${cantidadDevuelta} ${item.nombre}: marcado como devuelto`);
 }
 
 function marcarTodoVendido(){
