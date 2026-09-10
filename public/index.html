@@ -113,6 +113,15 @@ button{cursor:pointer;border:none;background:none}
   display:flex;align-items:center;justify-content:center;line-height:1}
 .campana-badge[hidden]{display:none}
 .noti-lista{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.noti-filtros{display:flex;gap:7px;overflow-x:auto;padding:2px 0 4px;margin-top:12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.noti-filtros::-webkit-scrollbar{display:none}
+.noti-filtros button{flex:0 0 auto;border:1px solid var(--suave);border-radius:999px;padding:7px 10px;background:var(--papel);color:var(--tinta-2);font-family:var(--dato);font-size:9px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer}
+.noti-filtros button.activo{background:var(--ocre-claro);border-color:var(--ocre);color:var(--ocre)}
+.noti-tiempo-real{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:65;display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--borde);border-left:4px solid var(--ocre);border-radius:10px;background:var(--papel);box-shadow:0 16px 38px rgba(28,24,20,.2);cursor:pointer;animation:aparece .22s ease both}
+.noti-tiempo-real .noti-ico{flex:0 0 auto;line-height:0;color:var(--ocre)}
+.noti-tiempo-real .noti-ico svg{width:19px;height:19px}
+.noti-tiempo-real b{display:block;font-family:var(--display);font-size:12.5px;line-height:1.3}
+.noti-tiempo-real span{display:block;margin-top:3px;color:var(--tinta-3);font-family:var(--dato);font-size:10px}
 .noti-fila{display:flex;gap:11px;align-items:flex-start;text-align:left;width:100%;
   padding:11px 12px;border:1px solid var(--suave);border-left:3px solid var(--tinta-3);
   border-radius:var(--r);background:var(--papel);box-shadow:var(--duro);cursor:pointer;
@@ -3779,6 +3788,13 @@ const ICONO_NOTI = {
 const STOCK_BAJO = 3;
 let notiVistas = new Set(caja.leer('gp_noti_vistas', []));
 let campanaIniciada = false;
+let filtroNoti='todos';
+const FILTROS_NOTI = [
+  {id:'todos', etiqueta:'Todas'}, {id:'vencido', etiqueta:'No devuelto'},
+  {id:'porvencer', etiqueta:'Por cerrar'}, {id:'agotado', etiqueta:'Agotado'},
+  {id:'stockbajo', etiqueta:'Poca existencia'}, {id:'solicitud', etiqueta:'Pedidos'},
+  {id:'agenda', etiqueta:'Agendadas'}
+];
 
 function calcularNotificaciones(){
   const notis = [];
@@ -3853,7 +3869,7 @@ function actualizarCampana(){
   campanaIniciada = true;
   if(!primeraVez || notiVistas.size){
     const nuevas = notis.filter(n=>!notiVistas.has(n.key));
-    if(nuevas.length) mostrarNotiSistema(nuevas);
+    if(nuevas.length){ mostrarNotiSistema(nuevas); mostrarNotiEnPantalla(nuevas[0]); }
   }
   notiVistas = activas;
   caja.guardar('gp_noti_vistas', [...activas]);
@@ -3873,6 +3889,17 @@ function mostrarNotiSistema(lista){
   }catch(e){}
 }
 
+function mostrarNotiEnPantalla(n){
+  document.querySelectorAll('.noti-tiempo-real').forEach(el=>el.remove());
+  const el=document.createElement('button');
+  el.type='button';
+  el.className='noti-tiempo-real';
+  el.innerHTML=`<span class="noti-ico">${ICONO_NOTI[n.tipo]||'•'}</span><span><b>${esc(n.texto)}</b><span>${esc(n.sub)}</span></span>`;
+  el.addEventListener('click',()=>{ el.remove(); n.abrir?.(); });
+  document.body.appendChild(el);
+  el._t=setTimeout(()=>el.remove(),6500);
+}
+
 function pedirPermisoNoti(){
   if(!('Notification' in window)){ brindis('Este dispositivo no admite avisos'); return; }
   Notification.requestPermission().then(p=>{
@@ -3882,12 +3909,15 @@ function pedirPermisoNoti(){
 }
 
 let notisActuales = [];
+function seleccionarFiltroNoti(tipo){ filtroNoti=tipo; abrirNotificaciones(); }
 function abrirNotificaciones(){
-  notisActuales = calcularNotificaciones();
+  const todas=calcularNotificaciones();
+  notisActuales = filtroNoti==='todos' ? todas : todas.filter(n=>n.tipo===filtroNoti);
   const puedeActivar = ('Notification' in window) && Notification.permission==='default';
   abrirHoja(`
     <div class="hoja-tope"><h2>Notificaciones</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     ${puedeActivar ? `<button class="btn suave" type="button" style="margin-bottom:12px" onclick="pedirPermisoNoti()">Activar avisos en este teléfono</button>` : ''}
+    <div class="noti-filtros">${FILTROS_NOTI.map(f=>`<button type="button" class="${filtroNoti===f.id?'activo':''}" onclick="seleccionarFiltroNoti('${f.id}')">${f.etiqueta}</button>`).join('')}</div>
     ${notisActuales.length ? `<div class="noti-lista">${notisActuales.map((n,i)=>`
       <button type="button" class="noti-fila noti-${n.tipo}" data-idx="${i}">
         <span class="noti-ico">${ICONO_NOTI[n.tipo]||'•'}</span>
@@ -5535,7 +5565,7 @@ if(vistaGuardada==='cartera'){
 DB.iniciar();
 setInterval(()=>cerrarEntregasVencidas().catch(errorOperacion),60000);
 setInterval(()=>convertirAgendasVencidas().catch(errorOperacion),60000);
-setInterval(actualizarCampana,60000);
+setInterval(actualizarCampana,15000);
 setTimeout(ocultarCargaInicial, 6000);
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').then(reg=>{
