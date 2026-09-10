@@ -5221,25 +5221,32 @@ $('#btnPdfVentas').addEventListener('click',()=>{
 
 $('#btnPdfEntregas').addEventListener('click',()=>{
   const tipo=$('#filtroEntregasTipo').value, valor=$('#filtroEntregasFecha').value;
-  const entregas=(DB.entregas||[]).filter(e=>coincidePeriodo(e.fecha,tipo,valor)).slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+  const entregas=(DB.entregas||[]).filter(e=>
+    coincidePeriodo(e.fecha,tipo,valor) &&
+    (diaEntregasFiltro==='todos' || diaEntregaDeFecha(e.fecha)===diaEntregasFiltro)
+  ).slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
   const valor_=arr=>(arr||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
+  const cantidad=arr=>(arr||[]).reduce((s,i)=>s+(Number(i.cantidad)||1),0);
   const neto=e=>{
     if((e.vendidos||[]).length) return valor_(e.vendidos);
     return valor_(e.entregados)-valor_(e.devueltos);
   };
   const listar=arr=>(arr||[]).map(i=>`${i.nombre} ×${i.cantidad||1}`).join(', ')||'—';
-  const columnas=[{t:'Fecha'},{t:'Hora entrega'},{t:'Hora devolución'},{t:'Zona'},{t:'Productos entregados'},{t:'Productos vendidos'},{t:'Productos devueltos'},{t:'Neto',num:true}];
+  const columnas=[{t:'Fecha'},{t:'Hora entrega'},{t:'Hora devolución'},{t:'Zona'},{t:'Productos entregados'},{t:'Entregadas',num:true},{t:'Productos vendidos'},{t:'Vendidas',num:true},{t:'Productos devueltos'},{t:'Devueltas',num:true},{t:'Neto',num:true}];
   const grupos=agruparParaPDF(entregas,
     e=>e.vendor||'Sin vendedor',
-    e=>[fecha(e.fecha),hora(e.entregaCreado||e.creado||e.fecha),hora(e.devolucionCreado||((e.devueltos||[]).length?(e.creado||e.fecha):null)),e.zona||'—',listar(e.entregados),listar(e.vendidos),listar(e.devueltos),money(neto(e))],
-    its=>['Subtotal',' ',' ',' ',' ',' ',' ',money(its.reduce((s,e)=>s+neto(e),0))]);
+    e=>[fecha(e.fecha),hora(e.entregaCreado||e.creado||e.fecha),hora(e.devolucionCreado||((e.devueltos||[]).length?(e.creado||e.fecha):null)),e.zona||'—',listar(e.entregados),cantidad(e.entregados)+cantidad(e.vendidos),listar(e.vendidos),cantidad(e.vendidos),listar(e.devueltos),cantidad(e.devueltos),money(neto(e))],
+    its=>['Subtotal',' ',' ',' ', ' ',its.reduce((s,e)=>s+cantidad(e.entregados)+cantidad(e.vendidos),0),' ',its.reduce((s,e)=>s+cantidad(e.vendidos),0),' ',its.reduce((s,e)=>s+cantidad(e.devueltos),0),money(its.reduce((s,e)=>s+neto(e),0))]);
+  const totalEntregadas=entregas.reduce((s,e)=>s+cantidad(e.entregados)+cantidad(e.vendidos),0);
+  const totalVendidas=entregas.reduce((s,e)=>s+cantidad(e.vendidos),0);
+  const totalDevueltas=entregas.reduce((s,e)=>s+cantidad(e.devueltos),0);
   const totalNeto=entregas.reduce((s,e)=>s+neto(e),0);
   descargarTablaPDF({
     documento:'Reporte de entregas y devoluciones',
-    periodo:describirPeriodo(tipo,valor),
-    resumen:[['Entregas',entregas.length],['Vendedores',grupos.length],['Neto entregado',money(totalNeto)]],
+    periodo:describirPeriodo(tipo,valor)+(diaEntregasFiltro!=='todos' ? ` · ${diaEtiqueta(diaEntregasFiltro)}` : ''),
+    resumen:[['Entregas',entregas.length],['Vendedores',grupos.length],['Entregadas',totalEntregadas],['Vendidas',totalVendidas],['Devueltas',totalDevueltas],['Neto entregado',money(totalNeto)]],
     columnas, grupos,
-    totalGeneral:['Total general',' ',' ',' ',' ',' ',' ',money(totalNeto)],
+    totalGeneral:['Total general',' ',' ',' ',' ',totalEntregadas,' ',totalVendidas,' ',totalDevueltas,money(totalNeto)],
     archivo:'entregas'
   });
 });
