@@ -2060,15 +2060,6 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0, fo
     if(capacidades.whiteBalanceMode?.includes('continuous')) mejoras.push({whiteBalanceMode:'continuous'});
     if(mejoras.length) pista.applyConstraints({advanced:mejoras}).catch(()=>{});
     actualizarControlLinterna(capacidades.torch === true);
-    if(capacidades.torch === true){
-      pista.applyConstraints({advanced:[{torch:true}]}).then(()=>{
-        linternaActiva=true;
-        $$('.btn-linterna').forEach(control=>{
-          control.setAttribute('aria-pressed','true');
-          control.textContent='Apagar linterna';
-        });
-      }).catch(()=>{});
-    }
     v.muted=true;
     v.setAttribute('playsinline','');
     v.play().catch(()=>{});
