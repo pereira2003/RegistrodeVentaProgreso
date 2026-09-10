@@ -421,6 +421,9 @@ button{cursor:pointer;border:none;background:none}
 }
 .product-swipe .swipe-content.arrastrando{transition:none;cursor:grabbing;will-change:transform}
 .product-swipe .swipe-content.open{transform:translateX(-132px)}
+.entrega-list-swipe .entrega-detalle{display:none}
+.entrega-list-swipe.expandida .entrega-detalle{display:block}
+.entrega-list-swipe .entrega-resumen{cursor:pointer}
 .entrega-item-swipe .swipe-vender{
   position:absolute;inset:0;border-radius:18px;z-index:1;opacity:0;
   background:#4A6E8C;
@@ -5294,15 +5297,16 @@ function pintarEntregas(){
         <button class="btn-contado" type="button" onclick="editarEntrega('${esc(creado)}')">Actualizar</button>
         <button class="btn-credito" type="button" onclick="eliminarEntrega('${esc(creado)}')">Eliminar</button>
       </div>
-      <div class="swipe-content item" style="display:block; padding:14px 12px; border-left:4px solid rgba(85,125,115,.8); cursor:pointer" onclick="editarEntrega('${esc(creado)}')" title="Editar entrega">
+      <div class="swipe-content item" style="display:block; padding:14px 12px; border-left:4px solid rgba(85,125,115,.8)">
         <div class="cont">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px;">
+          <div class="entrega-resumen" style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:0;" title="Tocar para ver el detalle">
             <div style="flex:1; min-width:0;">
               <div style="font-family:var(--dato); font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3); margin-bottom:6px">Vendedor</div>
               <h4 style="margin:0">${esc(e.vendor)}</h4>
             </div>
             <div class="val" style="margin:0; display:block; text-align:right;">${totalEnt}<small>entregados</small></div>
           </div>
+          <div class="entrega-detalle">
           <div style="margin-top:6px; padding:10px 12px; border:1px solid rgba(85,125,115,.18); border-radius:8px; background:rgba(226,239,235,.35)">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px;">
               <div style="font-family:var(--dato); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--tinta-3);">Entrega</div>
@@ -5337,6 +5341,7 @@ function pintarEntregas(){
               </div>
             </div>
           </div>
+          </div>
         </div>
       </div>
     </div>`;
@@ -5348,7 +5353,7 @@ function pintarEntregas(){
 function bindSwipeEntregaLista(card){
   const cont = card.querySelector('.swipe-content');
   if(!cont) return;
-  let startX=0, startY=0, currentX=0, dragging=false, intent=0;
+  let startX=0, startY=0, currentX=0, dragging=false, intent=0, moved=false;
   let frame=0, pendingOffset=0;
   const setOffset = x => {
     const offset = Math.max(Math.min(x, 0), -132);
@@ -5361,6 +5366,7 @@ function bindSwipeEntregaLista(card){
     startY = e.clientY;
     dragging = false;
     intent = 0;
+    moved = false;
   });
   cont.addEventListener('pointermove', e => {
     if(intent === -1) return;
@@ -5371,6 +5377,7 @@ function bindSwipeEntregaLista(card){
       if(Math.abs(dx) > Math.abs(dy) * 1.5){
         intent = 1;
         dragging = true;
+        moved = true;
         cont.classList.add('arrastrando');
         cont.setPointerCapture?.(e.pointerId);
       }else{
@@ -5394,6 +5401,7 @@ function bindSwipeEntregaLista(card){
   cont.addEventListener('pointerup', finish);
   cont.addEventListener('pointercancel', finish);
   cont.addEventListener('click', e => {
+    if(moved){ moved=false; return; }
     if(cont.classList.contains('open')){
       setOffset(0);
       e.preventDefault();
@@ -5401,7 +5409,7 @@ function bindSwipeEntregaLista(card){
       return;
     }
     const creado = card.dataset.creado;
-    if(creado) editarEntrega(creado);
+    card.classList.toggle('expandida');
   });
 }
 
