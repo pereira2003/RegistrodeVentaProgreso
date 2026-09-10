@@ -1721,9 +1721,9 @@ function avisarCodigoRegistrado(prod, codigo, alContinuar){
 /* ============================================================
    ESCÁNER
    ============================================================ */
-let flujo=null, leyendo=false, leyendoFrame=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo='credito', sesionEscaneo=0;
+let flujo=null, leyendo=false, leyendoFrame=false, iniciandoEscaneo=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo='credito', sesionEscaneo=0;
 let linternaActiva=false;
-const intervaloLectura=80, maxDimensionLectura=1280;
+const intervaloLectura=120, maxDimensionLectura=1280;
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let detectorNativoListo=null, fallosDetector=0;
 let lecturaPrevia={valor:'',formato:'',veces:0,tiempo:0};
@@ -1743,6 +1743,7 @@ const recientes = [];
 let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
 const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0]?.nombre || '', _dia: '', items: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
 let operacionEntrega='entrega';
+let guardandoEntrega=false;
 let entregaEditando=null;
 let entregaSeleccionando=false;
 let entregaSeleccion=new Set();
@@ -2022,7 +2023,9 @@ function confirmarLectura(valor, formato='', sesionActual=sesionEscaneo){
 }
 
 async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0, forzarCamara=false){
-    const sesionActual=++sesionEscaneo;
+  if(iniciandoEscaneo) return;
+  iniciandoEscaneo=true;
+  const sesionActual=++sesionEscaneo;
   modoEscaneo = modo;
   tipoCodigo = tipo;
   tipoVentaEscaneo = tipoVenta;
@@ -2038,18 +2041,21 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0, fo
       prepararLectorZXingManual();
     }
   }catch(e){
+    iniciandoEscaneo=false;
     $('#apagado').innerHTML = '<b>Lectura de barras no disponible</b>Usa Chrome o Edge actualizado en el celular, o escribe el código manualmente.';
     $('#apagado').hidden=false;
     return;
   }
   if(modo==='entrega' && !entregaActual.vendor && vendedoresActuales().length) entregaActual.vendor = vendedoresActuales()[0];
   if(modo==='entrega' && entregaActual.items.length && !forzarCamara){
+    iniciandoEscaneo=false;
     mostrarHojaEntrega();
     return;
   }
-  if(flujo){ apagarCamara(); return; }
+  if(flujo){ iniciandoEscaneo=false; apagarCamara(); return; }
   try{
     flujo = await abrirCamaraCompatible(tipoCodigo==='barra');
+    iniciandoEscaneo=false;
     if(modo==='producto' && sesion!==sesionProducto){ flujo.getTracks().forEach(t=>t.stop()); flujo=null; return; }
     const v=$('#videoProducto')||$('#video'); v.srcObject=flujo;
     const pista=flujo.getVideoTracks()[0];
@@ -2081,6 +2087,7 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0, fo
       esperarVideoParaLeer(v);
     }
   }catch(e){
+    iniciandoEscaneo=false;
     apagarCamara();
     $('#apagado').innerHTML = '<b>No se pudo abrir la cámara</b>La página necesita HTTPS y permiso de cámara. Mientras tanto, escribe el código del producto abajo.';
     $('#visor').classList.remove('encendida');
@@ -2529,7 +2536,7 @@ function mostrarHojaEntrega(){
           </div>
         </div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin devoluciones</b>Si escaneas el mismo producto otra vez, queda aquí.</div>`}
-    <button class="btn suave" style="margin-top:14px" onclick="guardarEntrega()">Guardar</button>
+    <button class="btn suave" id="btnGuardarEntrega" style="margin-top:14px" onclick="guardarEntrega()">Guardar</button>
     <button class="btn plano" style="margin-top:8px" onclick="escanearOtroEnEntrega()">Escanear otro producto</button>
   `);
   $('#hojaCont').querySelectorAll('.entrega-item-swipe').forEach(bindSwipeEntrega);
@@ -2746,6 +2753,11 @@ function marcarSeleccionVendido(){
 }
 
 async function guardarEntrega(){
+  if(guardandoEntrega) return;
+  guardandoEntrega=true;
+  const botonGuardar=$('#btnGuardarEntrega');
+  if(botonGuardar){ botonGuardar.disabled=true; botonGuardar.textContent='Guardando...'; }
+  try{
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
   const zona = entregaActual.zona || zonasActuales()[0] || 'Sin zona';
   const fechaEntrega = hoy();
@@ -2794,6 +2806,10 @@ async function guardarEntrega(){
   entregaSeleccionando=false; entregaSeleccion.clear();
   cerrarHoja();
   pintarEntregas();
+  }catch(e){ errorOperacion(e); }
+  finally{
+    guardandoEntrega=false;
+  }
 }
 
 function editarEntrega(creado){
@@ -3200,6 +3216,7 @@ function agregarRecienteAEntrega(sku){
    VENTA
    ============================================================ */
 let ubicacion = null;
+let guardandoVenta=false;
 
 function formVenta(sku, tipo){
   const p = DB.buscar(sku); if(!p) return;
@@ -3266,7 +3283,7 @@ function formVenta(sku, tipo){
         </select></div>` : ''}
     </div>
 
-    <button class="btn suave" style="margin-top:16px" onclick="confirmarVenta('${p.sku}','${tipo}')">Registrar venta</button>
+    <button class="btn suave" id="btnConfirmarVenta" style="margin-top:16px" onclick="confirmarVenta('${p.sku}','${tipo}')">Registrar venta</button>
     <button class="btn plano" style="margin-top:8px" onclick="cerrarHoja()">Cancelar</button>
   `);
   calcular();
@@ -3403,7 +3420,18 @@ async function confirmarVenta(sku, tipo){
     }
   }
 
-  await DB.guardarVenta(venta);
+  if(guardandoVenta) return;
+  guardandoVenta=true;
+  const botonVenta=$('#btnConfirmarVenta');
+  if(botonVenta){ botonVenta.disabled=true; botonVenta.textContent='Guardando...'; }
+  try{
+    await DB.guardarVenta(venta);
+  }catch(e){
+    errorOperacion(e);
+    return;
+  }finally{
+    guardandoVenta=false;
+  }
   cerrarHoja();
   brindis(tipo==='contado' ? `Venta registrada — ${money(venta.total)}`
                            : `Crédito registrado — ${money(venta.cuotaMensual)}/mes × ${venta.plazo}`);
