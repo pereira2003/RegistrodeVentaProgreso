@@ -3827,7 +3827,7 @@ function calcularNotificaciones(){
     if(hayItems && h >= HORAS_CIERRE_VENTA-2 && h < HORAS_CIERRE_VENTA){
       notis.push({ key:'porv:'+e.creado, tipo:'porvencer', prio:1, data:e,
         texto:`Entrega por cerrarse · ${e.vendor||'Sin vendedor'}`,
-        sub:`En ~${Math.max(1,Math.ceil((HORAS_CIERRE_VENTA-h)*60))} min lo no devuelto pasa a venta`,
+        sub:`Si en ${Math.max(1,Math.ceil((HORAS_CIERRE_VENTA-h)*60))} min no ha devuelto el producto, se marcará como vendido`,
         abrir:()=>irAEntrega(e.creado) });
     }
   });
