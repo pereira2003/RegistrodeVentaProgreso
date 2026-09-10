@@ -1412,10 +1412,10 @@ const DB = {
       const {f,bd}=this.fb;
       await f.setDoc(f.doc(bd,'ventas',v.id), v);
       const p = this.buscar(v.sku);
-      if(p) await f.updateDoc(f.doc(bd,'productos',v.sku),{stock:Math.max(0,(p.stock||0)-(v.cantidad||1))});
+      if(p && !v.stockDescontado) await f.updateDoc(f.doc(bd,'productos',v.sku),{stock:Math.max(0,(p.stock||0)-(v.cantidad||1))});
     }else{
       this.ventas.push(v);
-      const p = this.buscar(v.sku); if(p) p.stock = Math.max(0,(p.stock||0)-(v.cantidad||1));
+      const p = this.buscar(v.sku); if(p && !v.stockDescontado) p.stock = Math.max(0,(p.stock||0)-(v.cantidad||1));
       caja.guardar('gp_ventas',this.ventas); caja.guardar('gp_productos',this.productos);
       pintarTodo();
     }
@@ -1542,7 +1542,8 @@ async function cerrarEntregasVencidas(){
           totalCancelar:0,saldo:0,estado:'pagada',cuotas:[],cliente:'Venta por entrega',
           documento:'',telefono:'',direccion:'',vendedor:entrega.vendor||'Sin vendedor',
           sucursal:sucursalActual(),fecha:entrega.fecha||hoy(),creado:new Date().toISOString(),
-          abonos:[],origen:'entrega',entregaCreado:entrega.creado};
+          abonos:[],origen:'entrega',entregaCreado:entrega.creado,
+          stockDescontado:!!item.stockDescontado};
         if(DB.modo==='firebase') DB.ventas.push(venta);
         await DB.guardarVenta(venta);
       }
@@ -2680,10 +2681,12 @@ function fusionarEnLista(lista,item,cantidad){
   else{ lista.push({...item, cantidad}); }
 }
 
-function marcarVendidoEntrega(indice){
+async function marcarVendidoEntrega(indice){
   const item=entregaActual.items[indice]; if(!item) return;
   entregaActual.vendidos=entregaActual.vendidos||[];
-  fusionarEnLista(entregaActual.vendidos,item,item.cantidad||1);
+  const cantidad=item.cantidad||1;
+  await DB.ajustarStock(item.sku,-cantidad);
+  fusionarEnLista(entregaActual.vendidos,{...item,stockDescontado:true},cantidad);
   entregaActual.items.splice(indice,1);
   mostrarHojaEntrega();
   brindis(`${item.nombre}: marcado como vendido`);
@@ -2711,17 +2714,22 @@ function marcarDevueltoEntrega(indice){
   brindis(`${cantidadDevuelta} ${item.nombre}: marcado como devuelto`);
 }
 
-function marcarTodoVendido(){
+async function marcarTodoVendido(){
   if(!entregaActual.items.length) return;
   entregaActual.vendidos=entregaActual.vendidos||[];
-  entregaActual.items.forEach(item=>fusionarEnLista(entregaActual.vendidos,item,item.cantidad||1));
+  for(const item of entregaActual.items){
+    const cantidad=item.cantidad||1;
+    await DB.ajustarStock(item.sku,-cantidad);
+    fusionarEnLista(entregaActual.vendidos,{...item,stockDescontado:true},cantidad);
+  }
   entregaActual.items=[];
   mostrarHojaEntrega();
   brindis('Todos los productos marcados como vendidos');
 }
 
-function quitarVendidoEntrega(indice){
+async function quitarVendidoEntrega(indice){
   const item=entregaActual.vendidos[indice]; if(!item) return;
+  if(item.stockDescontado) await DB.ajustarStock(item.sku,item.cantidad||1);
   fusionarEnLista(entregaActual.items,item,item.cantidad||1);
   entregaActual.vendidos.splice(indice,1);
   mostrarHojaEntrega();
@@ -2748,11 +2756,15 @@ function alternarSeleccionarTodo(){
   mostrarHojaEntrega();
 }
 
-function marcarSeleccionVendido(){
+async function marcarSeleccionVendido(){
   const elegidos=(entregaActual.items||[]).filter(it=>entregaSeleccion.has(it.sku));
   if(!elegidos.length){ brindis('Selecciona al menos un producto'); return; }
   entregaActual.vendidos=entregaActual.vendidos||[];
-  elegidos.forEach(item=>fusionarEnLista(entregaActual.vendidos,item,item.cantidad||1));
+  for(const item of elegidos){
+    const cantidad=item.cantidad||1;
+    await DB.ajustarStock(item.sku,-cantidad);
+    fusionarEnLista(entregaActual.vendidos,{...item,stockDescontado:true},cantidad);
+  }
   entregaActual.items=(entregaActual.items||[]).filter(it=>!entregaSeleccion.has(it.sku));
   entregaSeleccion.clear();
   entregaSeleccionando=false;
