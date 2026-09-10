@@ -1718,7 +1718,7 @@ function avisarCodigoRegistrado(prod, codigo, alContinuar){
    ============================================================ */
 let flujo=null, leyendo=false, leyendoFrame=false, ultimo=0, modoEscaneo='credito', tipoVentaEscaneo='credito', sesionEscaneo=0;
 let linternaActiva=false;
-const intervaloLectura=80, maxDimensionLectura=960;
+const intervaloLectura=80, maxDimensionLectura=1280;
 let tipoCodigo='qr', detectorBarras=null, lectorBarras=null, controlBarras=null;
 let detectorNativoListo=null, fallosDetector=0;
 let lecturaPrevia={valor:'',formato:'',veces:0,tiempo:0};
@@ -1991,9 +1991,8 @@ function cicloLecturaBarras(video, sesionActual){
         if(codigos && codigos[0]) return {valor:codigos[0].rawValue, formato:codigos[0].format};
       }catch(e){ if(++fallosDetector>=4) detectorBarras=null; }
     }
-    // Con detector nativo funcionando, ZXing manual solo entra de refuerzo tras
-    // 2 s sin lectura (evita recalentar el equipo cuando el nativo basta).
-    if(!nativoRespondio || ahora - inicioBarras > 2000) return decodificarBarrasFrame(video);
+    // El lector manual entra pronto como refuerzo para códigos en movimiento o con poca luz.
+    if(!nativoRespondio || ahora - inicioBarras > 650) return decodificarBarrasFrame(video);
     return null;
   })().then(r=>{
     if(r) confirmarLectura(r.valor, r.formato, sesionActual);
@@ -2049,10 +2048,21 @@ async function iniciarEscaneo(modo, tipo='qr', tipoVenta='credito', sesion=0, fo
     const v=$('#videoProducto')||$('#video'); v.srcObject=flujo;
     const pista=flujo.getVideoTracks()[0];
     const capacidades=pista?.getCapabilities?.() || {};
-    if(capacidades.focusMode?.includes('continuous')){
-      pista.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
-    }
+    const mejoras=[];
+    if(capacidades.focusMode?.includes('continuous')) mejoras.push({focusMode:'continuous'});
+    if(capacidades.exposureMode?.includes('continuous')) mejoras.push({exposureMode:'continuous'});
+    if(capacidades.whiteBalanceMode?.includes('continuous')) mejoras.push({whiteBalanceMode:'continuous'});
+    if(mejoras.length) pista.applyConstraints({advanced:mejoras}).catch(()=>{});
     actualizarControlLinterna(capacidades.torch === true);
+    if(capacidades.torch === true){
+      pista.applyConstraints({advanced:[{torch:true}]}).then(()=>{
+        linternaActiva=true;
+        $$('.btn-linterna').forEach(control=>{
+          control.setAttribute('aria-pressed','true');
+          control.textContent='Apagar linterna';
+        });
+      }).catch(()=>{});
+    }
     v.muted=true;
     v.setAttribute('playsinline','');
     v.play().catch(()=>{});
