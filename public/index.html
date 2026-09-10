@@ -1601,11 +1601,18 @@ function opcionesDia(seleccionado){
   return DIAS.map(d=>`<option value="${d.id}" ${d.id===seleccionado?'selected':''}>${esc(d.etiqueta)}${d.id===hoy?' (hoy)':''}</option>`).join('')
     + `<option value="todas" ${seleccionado==='todas'?'selected':''}>Todas las zonas</option>`;
 }
+function diaDeFechaEntrega(fecha){
+  if(!fecha) return '';
+  const fechaLocal=new Date(`${String(fecha).slice(0,10)}T12:00:00`);
+  return ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'][fechaLocal.getDay()];
+}
 // Día que debe quedar seleccionado al abrir/actualizar un formulario con zona:
-// respeta la elección explícita del usuario (_dia); si no la hay, usa el día de
-// la zona ya elegida; y si tampoco hay zona, cae en el día de hoy (o "todas" los domingos).
+// respeta la elección explícita; si no la hay, toma automáticamente el día de la fecha,
+// y finalmente usa el día de la zona o el día actual.
 function diaSeleccionParaZona(registro){
   if(registro._dia && (registro._dia==='todas' || DIAS.some(d=>d.id===registro._dia))) return registro._dia;
+  const diaFecha=diaDeFechaEntrega(registro.fecha || registro.entregaCreado || hoy());
+  if(diaFecha && DIAS.some(d=>d.id===diaFecha)) return diaFecha;
   if(registro.zona){
     const z = zonasDetalle().find(z=>z.nombre===registro.zona);
     if(z) return z.dia || 'todas';
