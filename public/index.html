@@ -1742,6 +1742,7 @@ let productoPendiente=null, sesionProducto=0;
 const recientes = [];
 let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
 const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0]?.nombre || '', _dia: '', items: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
+let operacionEntrega='entrega';
 let entregaEditando=null;
 let entregaSeleccionando=false;
 let entregaSeleccion=new Set();
@@ -2797,6 +2798,7 @@ async function guardarEntrega(){
   entregaActual.solicitudesOrigen = [];
   entregaActual.entregaCreado = null;
   entregaActual.devolucionCreado = null;
+  operacionEntrega='entrega';
   entregaEditando=null;
   entregaSeleccionando=false; entregaSeleccion.clear();
   cerrarHoja();
@@ -2834,8 +2836,9 @@ function procesarEscaneoEntrega(sku){
   if(!entregaActual.zona && zonasActuales().length) entregaActual.zona = zonasActuales()[0];
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
 
+  const esDevolucion=operacionEntrega==='devolucion';
   const idxActual = entregaActual.items.findIndex(item=>item.sku===p.sku);
-  if(idxActual >= 0){
+  if(!esDevolucion && idxActual >= 0){
     entregaActual.items[idxActual].cantidad=(entregaActual.items[idxActual].cantidad||1)+1;
     brindis(`${p.nombre}: cantidad ${entregaActual.items[idxActual].cantidad}`);
     mostrarHojaEntrega();
@@ -2883,7 +2886,16 @@ function procesarEscaneoEntrega(sku){
       mostrarHojaEntrega();
       return;
     }
+    if(esDevolucion){
+      brindis(`${p.nombre} ya tiene registrada toda su devolución`);
+      return;
+    }
     brindis(`${p.nombre} vuelve a salir en una entrega nueva`);
+  }
+
+  if(esDevolucion){
+    brindis(`${p.nombre} no pertenece a una entrega pendiente de este vendedor`);
+    return;
   }
 
   entregaActual.entregaCreado = entregaActual.entregaCreado || new Date().toISOString();
@@ -5014,8 +5026,8 @@ function iniciarEntregaFlujo(){
     <div class="hoja-tope"><h2>Entrega y devolución</h2><button class="cerrar" onclick="cerrarHoja()">✕</button></div>
     <div class="aviso">¿Registrás la entrega ahora o la dejás agendada para otra fecha?</div>
     <div class="fila" style="margin-top:14px">
-      <button class="btn suave" type="button" onclick="cerrarHoja(); seleccionarTipoEscaneo('entrega')">Entrega ahora</button>
-      <button class="btn suave" type="button" onclick="cerrarHoja(); seleccionarTipoEscaneo('entrega')">Devuelve ahora</button>
+      <button class="btn suave" type="button" onclick="operacionEntrega='entrega'; cerrarHoja(); seleccionarTipoEscaneo('entrega')">Entrega ahora</button>
+      <button class="btn suave" type="button" onclick="operacionEntrega='devolucion'; cerrarHoja(); seleccionarTipoEscaneo('entrega')">Devuelve ahora</button>
     </div>
     <button class="btn plano" type="button" style="margin-top:9px" onclick="abrirFormAgenda()">Agendar entrega</button>`);
 }
