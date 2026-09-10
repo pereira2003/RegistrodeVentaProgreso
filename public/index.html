@@ -1792,7 +1792,7 @@ const NOMBRE_FORMATO = {QR_CODE:'QR', DATA_MATRIX:'Data Matrix', AZTEC:'Aztec', 
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
 let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
-const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0]?.nombre || '', _dia: '', items: [], entregadosIniciales: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
+const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0]?.nombre || '', _dia: '', items: [], entregadosIniciales: [], pendientes: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
 let operacionEntrega='entrega';
 let guardandoEntrega=false;
 let entregaEditando=null;
@@ -2516,6 +2516,7 @@ function mostrarHojaEntrega(){
   entregaActual._dia = dia;
   const items = entregaActual.items || [];
   const entregadosIniciales = entregaActual.entregadosIniciales || [];
+  const pendientes = entregaActual.pendientes || [];
   const devueltos = entregaActual.devueltos || [];
   const vendidos = entregaActual.vendidos || [];
   abrirHoja(`
@@ -2555,7 +2556,8 @@ function mostrarHojaEntrega(){
     <div class="rotulo rotulo-accion">Productos que lleva
       ${items.length ? `<span class="acciones-rotulo">
         <button type="button" class="mini-accion ${entregaSeleccionando?'activa':''}" onclick="alternarSeleccionEntrega()">${entregaSeleccionando?'Cancelar':'Seleccionar'}</button>
-        <button type="button" class="mini-accion" onclick="${entregaSeleccionando?'marcarSeleccionVendido()':'marcarTodoVendido()'}">${entregaSeleccionando?`Marcar (${entregaSeleccion.size})`:'Marcar todo'}</button>
+        <button type="button" class="mini-accion" onclick="${entregaSeleccionando?'marcarSeleccionVendido()':'marcarTodoVendido()'}">${entregaSeleccionando?`Vendido (${entregaSeleccion.size})`:'Marcar todo'}</button>
+        ${entregaSeleccionando ? `<button type="button" class="mini-accion" onclick="marcarSeleccionPendiente()">Pendiente</button>` : ''}
       </span>` : ''}
     </div>
     ${entregaSeleccionando && items.length ? `<label class="sel-todos"><input type="checkbox" ${items.every(it=>entregaSeleccion.has(it.sku))?'checked':''} onchange="alternarSeleccionarTodo()"> Seleccionar todos</label>` : ''}
@@ -2577,6 +2579,10 @@ function mostrarHojaEntrega(){
     ${entregadosIniciales.length ? `<div class="rotulo">Productos entregados originalmente</div>
     <div class="item" style="display:block;padding:10px 12px;background:rgba(226,239,235,.35)">
       <ol class="entrega-original-list">${entregadosIniciales.map(item=>`<li><span class="entrega-original-cantidad">${item.cantidad||1}</span><span class="entrega-original-nombre">${esc(item.nombre)}</span></li>`).join('')}</ol>
+    </div>` : ''}
+    ${pendientes.length ? `<div class="rotulo">Pendientes · no entregados aún</div>
+    <div class="item" style="display:block;padding:10px 12px;background:rgba(247,243,233,.6);border-color:rgba(154,121,85,.28)">
+      <ol class="entrega-original-list">${pendientes.map(item=>`<li><span class="entrega-original-cantidad">${item.cantidad||1}</span><span class="entrega-original-nombre">${esc(item.nombre)}</span></li>`).join('')}</ol>
     </div>` : ''}
     ${vendidos.length ? `<div class="rotulo">Productos vendidos</div>
     <div>${vendidos.map((item,i)=>`
@@ -2661,6 +2667,7 @@ function cambiarVendedorEntrega(vendedor){
     entregaActual.items=[];
     entregaActual.devueltos=[];
     entregaActual.vendidos=[];
+    entregaActual.pendientes=[];
     entregaActual.solicitudesOrigen=[];
     entregaActual.entregaCreado=null;
     entregaActual.devolucionCreado=null;
@@ -2827,6 +2834,18 @@ async function marcarSeleccionVendido(){
   brindis(`${elegidos.length} producto(s) marcados como vendidos`);
 }
 
+function marcarSeleccionPendiente(){
+  const elegidos=(entregaActual.items||[]).filter(item=>entregaSeleccion.has(item.sku));
+  if(!elegidos.length){ brindis('Selecciona al menos un producto'); return; }
+  entregaActual.pendientes=entregaActual.pendientes||[];
+  elegidos.forEach(item=>fusionarEnLista(entregaActual.pendientes,item,item.cantidad||1));
+  entregaActual.items=(entregaActual.items||[]).filter(item=>!entregaSeleccion.has(item.sku));
+  entregaSeleccion.clear();
+  entregaSeleccionando=false;
+  mostrarHojaEntrega();
+  brindis(`${elegidos.length} producto(s) puestos como pendientes`);
+}
+
 async function guardarEntrega(){
   if(guardandoEntrega) return;
   guardandoEntrega=true;
@@ -2836,13 +2855,14 @@ async function guardarEntrega(){
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || 'Sin vendedor';
   const zona = entregaActual.zona || zonasActuales()[0] || 'Sin zona';
   const fechaEntrega = hoy();
-  if(!entregaActual.items.length && !entregaActual.devueltos.length && !(entregaActual.vendidos||[]).length){ brindis('Escanea al menos un producto antes de guardar'); return; }
+  if(!entregaActual.items.length && !entregaActual.devueltos.length && !(entregaActual.vendidos||[]).length && !(entregaActual.pendientes||[]).length){ brindis('Escanea al menos un producto antes de guardar'); return; }
   const registradas = (DB.entregas||[]);
   const agregado = {
     vendor: vendedor,
     zona: zona,
     entregados: (entregaActual.items||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     entregadosIniciales: construirEntregadosIniciales(),
+    pendientes: (entregaActual.pendientes||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     devueltos: (entregaActual.devueltos||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     vendidos: (entregaActual.vendidos||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     fecha: fechaEntrega,
@@ -2873,6 +2893,7 @@ async function guardarEntrega(){
   brindis(`Entrega guardada para ${vendedor}`);
   entregaActual.items = [];
   entregaActual.entregadosIniciales = [];
+  entregaActual.pendientes = [];
   entregaActual.devueltos = [];
   entregaActual.vendidos = [];
   entregaActual.solicitudesOrigen = [];
@@ -2899,6 +2920,7 @@ function editarEntrega(creado){
   entregaActual._dia='';
   entregaActual.items=(registro.entregados||[]).map(item=>({...item}));
   entregaActual.entregadosIniciales=productosEntregadosIniciales(registro);
+  entregaActual.pendientes=(registro.pendientes||[]).map(item=>({...item}));
   entregaActual.devueltos=(registro.devueltos||[]).map(item=>({...item}));
   entregaActual.vendidos=(registro.vendidos||[]).map(item=>({...item}));
   entregaActual.solicitudesOrigen=[];
@@ -2963,6 +2985,7 @@ function procesarEscaneoEntrega(sku){
       entregaActual.entregaCreado = registroAnterior.entregaCreado || registroAnterior.creado;
       entregaActual.items = (registroAnterior.entregados||[]).map(item=>({...item}));
       entregaActual.entregadosIniciales = productosEntregadosIniciales(registroAnterior);
+      entregaActual.pendientes = (registroAnterior.pendientes||[]).map(item=>({...item}));
       entregaActual.devueltos = (registroAnterior.devueltos||[]).map(item=>({...item}));
       entregaActual.vendidos = (registroAnterior.vendidos||[]).map(item=>({...item}));
       const dev = entregaActual.devueltos.find(x=>x.sku===p.sku);
