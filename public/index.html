@@ -792,6 +792,8 @@ button{cursor:pointer;border:none;background:none}
   <div class="rotulo">Créditos activos</div>
   <button class="btn plano chico" id="btnPdfCartera" style="width:100%;margin-bottom:10px">Descargar PDF</button>
   <div id="listaCartera"></div>
+  <div class="rotulo">Ventas por entrega vencida</div>
+  <div id="listaCarteraVencidas"></div>
 </section>
 
 <!-- ================= ETIQUETAS ================= -->
@@ -1585,7 +1587,7 @@ async function cerrarEntregasVencidas(){
           totalCancelar:0,saldo:0,estado:'pagada',cuotas:[],cliente:'Venta por entrega',
           documento:'',telefono:'',direccion:'',vendedor:entrega.vendor||'Sin vendedor',
           sucursal:sucursalActual(),fecha:entrega.fecha||hoy(),creado:new Date().toISOString(),
-          abonos:[],origen:'entrega',entregaCreado:entrega.creado,
+          abonos:[],origen:'entrega',ventaVencida:true,entregaCreado:entrega.creado,
           stockDescontado:!!item.stockDescontado};
         if(DB.modo==='firebase') DB.ventas.push(venta);
         await DB.guardarVenta(venta);
@@ -4505,6 +4507,7 @@ function pintarCartera(){
   const tipoFiltro = $('#filtroCarteraTipo')?.value || 'mes';
   const fechaFiltro = $('#filtroCarteraFecha')?.value || hoy().slice(0,7);
   const act = DB.ventas.filter(v=>v.tipo==='credito' && v.saldo>0 && coincidePeriodo(v.fecha,tipoFiltro,fechaFiltro));
+  const vencidas = DB.ventas.filter(v=>(v.ventaVencida || v.origen==='entrega') && coincidePeriodo(v.fecha,tipoFiltro,fechaFiltro));
   const porCobrar = act.reduce((s,v)=>s+v.saldo,0);
   const vencido = act.reduce((s,v)=>s+v.cuotas.filter(c=>c.estado!=='pagada'&&c.vence<hoy())
     .reduce((t,c)=>t+(c.monto-c.pagado),0),0);
@@ -4514,7 +4517,8 @@ function pintarCartera(){
     <div class="cifra"><em>Créditos activos</em><b>${act.length}</b></div>
     <div class="cifra"><em>Por cobrar</em><b>${money(porCobrar)}</b></div>
     <div class="cifra ${vencido>0?'alerta':''}"><em>Vencido</em><b>${money(vencido)}</b></div>
-    <div class="cifra ${conAtraso.length?'alerta':'bien'}"><em>Clientes en mora</em><b>${conAtraso.length}</b></div>`;
+    <div class="cifra ${conAtraso.length?'alerta':'bien'}"><em>Clientes en mora</em><b>${conAtraso.length}</b></div>
+    <div class="cifra vendido"><em>Ventas vencidas</em><b>${vencidas.length}</b></div>`;
 
   const orden = act.slice().sort((a,b)=>{
     const pa=a.cuotas.find(c=>c.estado!=='pagada'), pb=b.cuotas.find(c=>c.estado!=='pagada');
@@ -4550,6 +4554,24 @@ function pintarCartera(){
     </div>`;}).join('')
   : `<div class="vacio"><b>No hay créditos abiertos</b>Las ventas a plazo aparecerán aquí para su cobro.</div>`;
   $('#listaCartera').querySelectorAll('.cartera-swipe').forEach(bindSwipeCartera);
+  $('#listaCarteraVencidas').innerHTML = vencidas.length ? vencidas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||'')).map(v=>`
+    <div class="product-swipe venta-swipe" data-id="${esc(v.id)}">
+      <div class="swipe-actions">
+        <button class="btn-contado" type="button" onclick="detalleVenta('${esc(v.id)}')">Ver detalle</button>
+        <button class="btn-credito" type="button" onclick="eliminarRegistroVenta('${esc(v.id)}')">Eliminar</button>
+      </div>
+      <div class="swipe-content item">
+        <div class="cont" style="min-width:0;flex:1;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:7px;">
+            <div style="min-width:0;"><h4 style="margin:0;">${esc(v.producto)}</h4><div class="meta">${esc(v.sku)}</div></div>
+            <div class="val" style="margin:0;">${money(v.total)}<small>total</small></div>
+          </div>
+          <div class="meta">${esc(v.vendedor)} · ${v.cantidad||1} unidad${(v.cantidad||1)!==1?'es':''} · ${fechaCompleta(v.fecha)}</div>
+          <span class="marbete m-rojo">Venta por entrega vencida</span>
+        </div>
+      </div>
+    </div>`).join('') : `<div class="vacio"><b>No hay ventas vencidas</b>Las entregas no devueltas aparecerán aquí como venta.</div>`;
+  $('#listaCarteraVencidas').querySelectorAll('.venta-swipe').forEach(bindSwipeVenta);
 }
 
 function bindSwipeCartera(card){
@@ -5474,7 +5496,7 @@ function seleccionarDiaEntregas(dia){
 function pintarEntregas(){
   const tipoFiltro = $('#filtroEntregasTipo')?.value || 'mes';
   const fechaFiltro = $('#filtroEntregasFecha')?.value || hoy().slice(0,7);
-  const entregas = (DB.entregas || []).filter(e=>
+  const entregas = (DB.entregas || []).filter(e=>!e.ventaGenerada &&
     coincidePeriodo(e.fecha,tipoFiltro,fechaFiltro) &&
     (diaEntregasFiltro==='todos' || diaEntregaDeFecha(e.fecha)===diaEntregasFiltro)
   );
