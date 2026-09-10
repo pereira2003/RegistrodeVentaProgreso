@@ -461,6 +461,10 @@ button{cursor:pointer;border:none;background:none}
 .cantidad-control{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:6px}
 .cantidad-control button{width:28px;height:28px;padding:0;border:1px solid var(--linea);border-radius:7px;background:#fff;color:var(--tinta);font-size:18px;line-height:1;cursor:pointer}
 .cantidad-control b{min-width:18px;text-align:center;font-family:var(--dato);font-size:13px}
+.entrega-producto{display:flex;align-items:center;gap:8px}
+.entrega-cantidad{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:24px;padding:0 7px;border-radius:6px;background:var(--ocre-claro);color:var(--ocre);font-family:var(--dato);font-size:12px;font-weight:700}
+.entrega-original-list{display:flex;flex-direction:column;gap:7px;margin:0;padding:0;list-style:none}
+.entrega-original-list li{display:flex;align-items:center;gap:8px}
 .marbete{
   display:inline-block;font-family:var(--dato);font-size:9.5px;font-weight:500;letter-spacing:.11em;
   text-transform:uppercase;padding:3px 7px;border-radius:3px;margin-top:7px;
@@ -2561,7 +2565,7 @@ function mostrarHojaEntrega(){
         </div>
         <div class="swipe-content item" style="padding:10px 12px">
           ${entregaSeleccionando ? `<input type="checkbox" class="chk-item" ${entregaSeleccion.has(item.sku)?'checked':''} onclick="event.stopPropagation()" onchange="alternarItemSeleccion('${item.sku}')">` : ''}
-          <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
+          <div class="cont"><h4 class="entrega-producto"><span class="entrega-cantidad">${item.cantidad||1}</span><span>${esc(item.nombre)}</span></h4><div class="meta">${esc(item.sku)}</div></div>
           <div class="val">${money(item.precio||0)}
             <div class="cantidad-control"><button type="button" onclick="ajustarCantidadEntrega('items',${i},-1)">-</button><b>${item.cantidad||1}</b><button type="button" onclick="ajustarCantidadEntrega('items',${i},1)">+</button></div>
           </div>
@@ -2569,14 +2573,14 @@ function mostrarHojaEntrega(){
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin productos</b>Escanea uno para agregarlo a la entrega.</div>`}
     ${entregadosIniciales.length ? `<div class="rotulo">Productos entregados originalmente</div>
     <div class="item" style="display:block;padding:10px 12px;background:rgba(226,239,235,.35)">
-      <div class="meta">${entregadosIniciales.map(item=>`${esc(item.nombre)} × ${item.cantidad||1}`).join(', ')}</div>
+      <ol class="entrega-original-list">${entregadosIniciales.map(item=>`<li><span class="entrega-cantidad">${item.cantidad||1}</span><span>${esc(item.nombre)}</span></li>`).join('')}</ol>
     </div>` : ''}
     ${vendidos.length ? `<div class="rotulo">Productos vendidos</div>
     <div>${vendidos.map((item,i)=>`
       <div class="product-swipe entrega-item-swipe" data-tipo="vendidos" data-indice="${i}">
         <div class="swipe-actions"><button class="btn-credito" type="button" onclick="quitarVendidoEntrega(${i})">Devolver</button></div>
         <div class="swipe-content item" style="padding:10px 12px; border-color:rgba(74,110,140,.45)">
-          <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
+          <div class="cont"><h4 class="entrega-producto"><span class="entrega-cantidad">${item.cantidad||1}</span><span>${esc(item.nombre)}</span></h4><div class="meta">${esc(item.sku)}</div></div>
           <div class="val">${money(item.precio||0)}
             <div class="cantidad-control"><button type="button" onclick="ajustarCantidadEntrega('vendidos',${i},-1)">-</button><b>${item.cantidad||1}</b><button type="button" onclick="ajustarCantidadEntrega('vendidos',${i},1)">+</button></div>
           </div>
@@ -2587,7 +2591,7 @@ function mostrarHojaEntrega(){
       <div class="product-swipe entrega-item-swipe" data-tipo="devueltos" data-indice="${i}">
         <div class="swipe-actions"><button class="btn-credito" type="button" onclick="borrarItemEntrega('devueltos',${i})">Borrar</button></div>
         <div class="swipe-content item" style="padding:10px 12px; border-color:rgba(216,194,164,.7)">
-          <div class="cont"><h4>${esc(item.nombre)}</h4><div class="meta">${esc(item.sku)}</div></div>
+          <div class="cont"><h4 class="entrega-producto"><span class="entrega-cantidad">${item.cantidad||1}</span><span>${esc(item.nombre)}</span></h4><div class="meta">${esc(item.sku)}</div></div>
           <div class="val">${money(item.precio||0)}
             <div class="cantidad-control"><button type="button" onclick="ajustarCantidadEntrega('devueltos',${i},-1)">-</button><b>${item.cantidad||1}</b><button type="button" onclick="ajustarCantidadEntrega('devueltos',${i},1)">+</button></div>
           </div>
