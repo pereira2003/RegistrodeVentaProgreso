@@ -5215,7 +5215,10 @@ function descargarTablaPDF({documento,periodo='',resumen=[],columnas,grupos,tota
   const generado=fechaHora(new Date().toISOString());
   const cl=i=>columnas[i]&&columnas[i].num?' class="num"':'';
   const thead=`<tr>${columnas.map((c,i)=>`<th${cl(i)}>${esc(c.t)}</th>`).join('')}</tr>`;
-  const fila=(f,extra='')=>`<tr${extra}>${f.map((v,i)=>`<td${cl(i)}>${v&&v.__html?v.html:esc(v)}</td>`).join('')}</tr>`;
+  const fila=(f,extra='')=>`<tr${extra}>${f.map((v,i)=>{
+    const contenido=v&&v.__lista?`<span class="pdf-lista-texto">${esc(v.texto).replace(/\n/g,'<br>')}</span>`:esc(v);
+    return `<td${cl(i)}>${contenido}</td>`;
+  }).join('')}</tr>`;
   const cuerpo=grupos.map(g=>{
     const cab=g.titulo?`<tr class="grupo-fila"><td colspan="${columnas.length}">${esc(g.titulo)} · ${g.filas.length} ${g.filas.length===1?'registro':'registros'}</td></tr>`:'';
     const sub=g.subtotal?fila(g.subtotal,' class="subtotal-fila"'):'';
@@ -5251,10 +5254,7 @@ function descargarTablaPDF({documento,periodo='',resumen=[],columnas,grupos,tota
   tbody td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
   tbody tr{break-inside:avoid}
   tbody tr:nth-child(even) td{background:#FAF7F2}
-  .pdf-lista{display:flex;flex-direction:column;gap:3px;min-width:120px}
-  .pdf-lista-item{display:flex;align-items:flex-start;gap:5px;line-height:1.3}
-  .pdf-lista-cantidad{flex:0 0 auto;min-width:18px;padding:1px 3px;border-radius:3px;background:#E2EFEB;color:#3A5C52;font-size:7.5px;font-weight:700;text-align:center}
-  .pdf-lista-nombre{display:block}
+  .pdf-lista-texto{display:block;white-space:nowrap;line-height:1.45}
   .grupo-fila td{background:#EFE7DB!important;color:#5A3F30;font-weight:700;text-transform:uppercase;letter-spacing:.07em;font-size:8px;padding:7px 8px;border-top:1px solid #C59B6D;border-bottom:1px solid #C59B6D}
   .grupo-fila{break-after:avoid}
   .subtotal-fila td{background:#F6EFE4!important;font-weight:700;border-top:1.5px solid #C59B6D;border-bottom:1.5px solid #C59B6D}
@@ -5368,7 +5368,7 @@ $('#btnPdfEntregas').addEventListener('click',()=>{
   };
   const listar=arr=>{
     if(!(arr||[]).length) return '—';
-    return {__html:`<div class="pdf-lista">${arr.map(i=>`<div class="pdf-lista-item"><span class="pdf-lista-cantidad">${i.cantidad||1}</span><span class="pdf-lista-nombre">${esc(i.nombre)}</span></div>`).join('')}</div>`};
+    return {__lista:true,texto:arr.map(i=>`${i.cantidad||1} · ${i.nombre}`).join('\n')};
   };
   const columnas=[{t:'Fecha'},{t:'Hora entrega'},{t:'Hora devolución'},{t:'Zona'},{t:'Productos entregados'},{t:'Entregadas',num:true},{t:'Productos vendidos'},{t:'Vendidas',num:true},{t:'Productos devueltos'},{t:'Devueltas',num:true},{t:'Neto',num:true}];
   const grupos=agruparParaPDF(entregas,
