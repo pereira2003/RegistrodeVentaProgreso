@@ -1524,6 +1524,33 @@ function expandirUPCE(codigo){
 const HORAS_CIERRE_VENTA = 8;    // a las 8 h lo entregado no devuelto se marca como vendido
 const HORAS_NO_DEVUELTO  = 48;   // a las 48 h lo que sigue afuera se marca "no devuelto"
 
+function productosEntregadosIniciales(registro){
+  if((registro.entregadosIniciales||[]).length) return registro.entregadosIniciales.map(item=>({...item}));
+  const lista=[];
+  const sumar=(arr=[])=>arr.forEach(item=>{
+    const existente=lista.find(x=>x.sku===item.sku);
+    if(existente) existente.cantidad=(existente.cantidad||1)+(item.cantidad||1);
+    else lista.push({...item,cantidad:item.cantidad||1});
+  });
+  sumar(registro.entregados); sumar(registro.vendidos); sumar(registro.devueltos);
+  return lista;
+}
+
+function construirEntregadosIniciales(){
+  const mapa=new Map();
+  const agregar=(arr=[])=>arr.forEach(item=>{
+    const actual=mapa.get(item.sku);
+    const cantidad=(actual?.cantidad||0)+(item.cantidad||1);
+    mapa.set(item.sku,{...(actual||item),cantidad});
+  });
+  agregar(entregaActual.items); agregar(entregaActual.vendidos); agregar(entregaActual.devueltos);
+  for(const item of (entregaActual.entregadosIniciales||[])){
+    const actual=mapa.get(item.sku);
+    if(!actual || (item.cantidad||1)>(actual.cantidad||0)) mapa.set(item.sku,{...item,cantidad:item.cantidad||1});
+  }
+  return [...mapa.values()];
+}
+
 async function cerrarEntregasVencidas(){
   const ahora=Date.now();
   for(const entrega of (DB.entregas||[])){
@@ -1758,7 +1785,7 @@ const NOMBRE_FORMATO = {QR_CODE:'QR', DATA_MATRIX:'Data Matrix', AZTEC:'Aztec', 
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
 let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
-const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0]?.nombre || '', _dia: '', items: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
+const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0]?.nombre || '', _dia: '', items: [], entregadosIniciales: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
 let operacionEntrega='entrega';
 let guardandoEntrega=false;
 let entregaEditando=null;
@@ -2481,6 +2508,7 @@ function mostrarHojaEntrega(){
   entregaActual.zona = zona;
   entregaActual._dia = dia;
   const items = entregaActual.items || [];
+  const entregadosIniciales = entregaActual.entregadosIniciales || [];
   const devueltos = entregaActual.devueltos || [];
   const vendidos = entregaActual.vendidos || [];
   abrirHoja(`
@@ -2539,6 +2567,10 @@ function mostrarHojaEntrega(){
           </div>
         </div>
       </div>`).join('')}</div>` : `<div class="vacio"><b>Sin productos</b>Escanea uno para agregarlo a la entrega.</div>`}
+    ${entregadosIniciales.length ? `<div class="rotulo">Productos entregados originalmente</div>
+    <div class="item" style="display:block;padding:10px 12px;background:rgba(226,239,235,.35)">
+      <div class="meta">${entregadosIniciales.map(item=>`${esc(item.nombre)} × ${item.cantidad||1}`).join(', ')}</div>
+    </div>` : ''}
     ${vendidos.length ? `<div class="rotulo">Productos vendidos</div>
     <div>${vendidos.map((item,i)=>`
       <div class="product-swipe entrega-item-swipe" data-tipo="vendidos" data-indice="${i}">
@@ -2803,6 +2835,7 @@ async function guardarEntrega(){
     vendor: vendedor,
     zona: zona,
     entregados: (entregaActual.items||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
+    entregadosIniciales: construirEntregadosIniciales(),
     devueltos: (entregaActual.devueltos||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     vendidos: (entregaActual.vendidos||[]).map(item=>({ ...item, cantidad: item.cantidad || 1 })),
     fecha: fechaEntrega,
@@ -2832,6 +2865,7 @@ async function guardarEntrega(){
   }
   brindis(`Entrega guardada para ${vendedor}`);
   entregaActual.items = [];
+  entregaActual.entregadosIniciales = [];
   entregaActual.devueltos = [];
   entregaActual.vendidos = [];
   entregaActual.solicitudesOrigen = [];
@@ -2857,6 +2891,7 @@ function editarEntrega(creado){
   entregaActual.zona=registro.zona||zonasActuales()[0]||'';
   entregaActual._dia='';
   entregaActual.items=(registro.entregados||[]).map(item=>({...item}));
+  entregaActual.entregadosIniciales=productosEntregadosIniciales(registro);
   entregaActual.devueltos=(registro.devueltos||[]).map(item=>({...item}));
   entregaActual.vendidos=(registro.vendidos||[]).map(item=>({...item}));
   entregaActual.solicitudesOrigen=[];
@@ -2899,7 +2934,7 @@ function procesarEscaneoEntrega(sku){
 
   const candidatos = (DB.entregas||[]).filter(x=>
     x.vendor===vendedor && !x.ventaGenerada &&
-    (x.entregados||[]).some(item=>item.sku===p.sku)
+    productosEntregadosIniciales(x).some(item=>item.sku===p.sku)
   );
   const registroAnterior = candidatos
     .sort((a,b)=>{
@@ -2909,7 +2944,7 @@ function procesarEscaneoEntrega(sku){
       return String(b.entregaCreado||b.creado||'').localeCompare(String(a.entregaCreado||a.creado||''));
     })[0];
   if(registroAnterior){
-    const entregado = registroAnterior.entregados.find(item=>item.sku===p.sku);
+    const entregado = productosEntregadosIniciales(registroAnterior).find(item=>item.sku===p.sku);
     const devuelto = (registroAnterior.devueltos||[]).find(item=>item.sku===p.sku);
     const cantidadEntregada = entregado.cantidad || 1;
     const cantidadDevuelta = devuelto?.cantidad || 0;
@@ -2920,6 +2955,7 @@ function procesarEscaneoEntrega(sku){
       entregaActual._dia = registroAnterior._dia || '';
       entregaActual.entregaCreado = registroAnterior.entregaCreado || registroAnterior.creado;
       entregaActual.items = (registroAnterior.entregados||[]).map(item=>({...item}));
+      entregaActual.entregadosIniciales = productosEntregadosIniciales(registroAnterior);
       entregaActual.devueltos = (registroAnterior.devueltos||[]).map(item=>({...item}));
       entregaActual.vendidos = (registroAnterior.vendidos||[]).map(item=>({...item}));
       const dev = entregaActual.devueltos.find(x=>x.sku===p.sku);
@@ -5323,9 +5359,9 @@ $('#btnPdfEntregas').addEventListener('click',()=>{
   const columnas=[{t:'Fecha'},{t:'Hora entrega'},{t:'Hora devolución'},{t:'Zona'},{t:'Productos entregados'},{t:'Entregadas',num:true},{t:'Productos vendidos'},{t:'Vendidas',num:true},{t:'Productos devueltos'},{t:'Devueltas',num:true},{t:'Neto',num:true}];
   const grupos=agruparParaPDF(entregas,
     e=>e.vendor||'Sin vendedor',
-    e=>[fecha(e.fecha),hora(e.entregaCreado||e.creado||e.fecha),hora(e.devolucionCreado||((e.devueltos||[]).length?(e.creado||e.fecha):null)),e.zona||'—',listar(e.entregados),cantidad(e.entregados)+cantidad(e.vendidos),listar(e.vendidos),cantidad(e.vendidos),listar(e.devueltos),cantidad(e.devueltos),money(neto(e))],
-    its=>['Subtotal',' ',' ',' ', ' ',its.reduce((s,e)=>s+cantidad(e.entregados)+cantidad(e.vendidos),0),' ',its.reduce((s,e)=>s+cantidad(e.vendidos),0),' ',its.reduce((s,e)=>s+cantidad(e.devueltos),0),money(its.reduce((s,e)=>s+neto(e),0))]);
-  const totalEntregadas=entregas.reduce((s,e)=>s+cantidad(e.entregados)+cantidad(e.vendidos),0);
+    e=>[fecha(e.fecha),hora(e.entregaCreado||e.creado||e.fecha),hora(e.devolucionCreado||((e.devueltos||[]).length?(e.creado||e.fecha):null)),e.zona||'—',listar(productosEntregadosIniciales(e)),cantidad(productosEntregadosIniciales(e)),listar(e.vendidos),cantidad(e.vendidos),listar(e.devueltos),cantidad(e.devueltos),money(neto(e))],
+    its=>['Subtotal',' ',' ',' ', ' ',its.reduce((s,e)=>s+cantidad(productosEntregadosIniciales(e)),0),' ',its.reduce((s,e)=>s+cantidad(e.vendidos),0),' ',its.reduce((s,e)=>s+cantidad(e.devueltos),0),money(its.reduce((s,e)=>s+neto(e),0))]);
+  const totalEntregadas=entregas.reduce((s,e)=>s+cantidad(productosEntregadosIniciales(e)),0);
   const totalVendidas=entregas.reduce((s,e)=>s+cantidad(e.vendidos),0);
   const totalDevueltas=entregas.reduce((s,e)=>s+cantidad(e.devueltos),0);
   const totalNeto=entregas.reduce((s,e)=>s+neto(e),0);
@@ -5388,7 +5424,7 @@ function pintarEntregas(){
     (diaEntregasFiltro==='todos' || diaEntregaDeFecha(e.fecha)===diaEntregasFiltro)
   );
   const contar = arr => (arr||[]).reduce((t,i)=>t+(i.cantidad||1),0);
-  const totalEntregados = entregas.reduce((s,e)=>s + contar(e.entregados) + contar(e.vendidos),0);
+  const totalEntregados = entregas.reduce((s,e)=>s + contar(productosEntregadosIniciales(e)),0);
   const totalVendidos = entregas.reduce((s,e)=>s + contar(e.vendidos),0);
   const totalDevueltos = entregas.reduce((s,e)=>s + contar(e.devueltos),0);
   const totalNoDevueltos = entregas.reduce((s,e)=>s + (e.noDevuelto ? contar(e.noDevueltoItems) : 0),0);
@@ -5408,11 +5444,11 @@ function pintarEntregas(){
 
   $('#listaEntregas').innerHTML = entregas.length ? entregas.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||'')).map(e=>{
     const listaTxt = arr => (arr||[]).map(i=>`${esc(i.nombre)} × ${i.cantidad||1}`).join(', ');
-    const entregados = listaTxt(e.entregados);
+    const entregados = listaTxt(productosEntregadosIniciales(e));
     const vendidos = listaTxt(e.vendidos);
     const devueltos = listaTxt(e.devueltos);
     const cuenta = arr => (arr||[]).reduce((t,i)=>t+(i.cantidad||1),0);
-    const totalEnt = cuenta(e.entregados) + cuenta(e.vendidos);
+    const totalEnt = cuenta(productosEntregadosIniciales(e));
     const totalVen = cuenta(e.vendidos);
     const totalDev = cuenta(e.devueltos);
     const creado = String(e.creado || '');
