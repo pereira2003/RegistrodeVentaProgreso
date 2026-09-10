@@ -435,7 +435,7 @@ button{cursor:pointer;border:none;background:none}
   font-family:var(--dato);font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
   padding:5px 11px;border-radius:999px;cursor:pointer;flex:0 0 auto;
 }
-.entrega-item-swipe .swipe-actions .btn-vendido{background:#4A6E8C;color:#fff;border-color:#4A6E8C;}
+.entrega-item-swipe .swipe-actions .btn-devuelto{background:#4A6E8C;color:#fff;border-color:#4A6E8C;}
 .rotulo-accion .acciones-rotulo{display:flex;gap:6px;flex:0 0 auto}
 .mini-accion.activa{background:#4A6E8C;color:#fff;border-color:#4A6E8C}
 .sel-todos{
@@ -2489,7 +2489,7 @@ function mostrarHojaEntrega(){
       <div class="product-swipe entrega-item-swipe ${entregaSeleccionando&&entregaSeleccion.has(item.sku)?'elegido':''}" data-tipo="entregados" data-indice="${i}">
         <div class="swipe-vender">✓ Vendido</div>
         <div class="swipe-actions">
-          <button class="btn-vendido" type="button" onclick="marcarVendidoEntrega(${i})">Vendido</button>
+          <button class="btn-devuelto" type="button" onclick="marcarDevueltoEntrega(${i})">Devuelto</button>
           <button class="btn-credito" type="button" onclick="borrarItemEntrega('items',${i})">Borrar</button>
         </div>
         <div class="swipe-content item" style="padding:10px 12px">
@@ -2665,6 +2665,16 @@ function marcarVendidoEntrega(indice){
   entregaActual.items.splice(indice,1);
   mostrarHojaEntrega();
   brindis(`${item.nombre}: marcado como vendido`);
+}
+
+function marcarDevueltoEntrega(indice){
+  const item=entregaActual.items[indice]; if(!item) return;
+  entregaActual.devueltos=entregaActual.devueltos||[];
+  fusionarEnLista(entregaActual.devueltos,item,item.cantidad||1);
+  entregaActual.items.splice(indice,1);
+  entregaActual.devolucionCreado=entregaActual.devolucionCreado||new Date().toISOString();
+  mostrarHojaEntrega();
+  brindis(`${item.nombre}: marcado como devuelto`);
 }
 
 function marcarTodoVendido(){
