@@ -1790,8 +1790,16 @@ function inicializarVendedorActual(){
 }
 
 $('#selVendedor').addEventListener('change', (e)=>aplicarVendedorActual(e.target.value));
-$('#btnCam').addEventListener('click', ()=>seleccionarTipoEscaneo('credito'));
-$('#btnCamEntrega').addEventListener('click', ()=>iniciarEntregaFlujo());
+function alternarEscaneoCredito(){
+  if(leyendo && modoEscaneo==='credito'){ apagarCamara(); return; }
+  seleccionarTipoEscaneo('credito');
+}
+function alternarEscaneoEntrega(){
+  if(leyendo && modoEscaneo==='entrega'){ apagarCamara(); return; }
+  iniciarEntregaFlujo();
+}
+$('#btnCam').addEventListener('click', alternarEscaneoCredito);
+$('#btnCamEntrega').addEventListener('click', alternarEscaneoEntrega);
 document.addEventListener('click', e=>{
   if(e.target.matches('.btn-linterna')) alternarLinterna(e.target);
 });
