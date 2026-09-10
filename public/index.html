@@ -2846,11 +2846,17 @@ function procesarEscaneoEntrega(sku){
     return;
   }
 
-  const registroAnterior = (DB.entregas||[]).slice().reverse().find(x=>
-    x.vendor===vendedor && x.zona===entregaActual.zona &&
-    !x.ventaGenerada &&
+  const candidatos = (DB.entregas||[]).filter(x=>
+    x.vendor===vendedor && !x.ventaGenerada &&
     (x.entregados||[]).some(item=>item.sku===p.sku)
   );
+  const registroAnterior = candidatos
+    .sort((a,b)=>{
+      const mismaZonaA = a.zona===entregaActual.zona ? 1 : 0;
+      const mismaZonaB = b.zona===entregaActual.zona ? 1 : 0;
+      if(mismaZonaA!==mismaZonaB) return mismaZonaB-mismaZonaA;
+      return String(b.entregaCreado||b.creado||'').localeCompare(String(a.entregaCreado||a.creado||''));
+    })[0];
   if(registroAnterior){
     const entregado = registroAnterior.entregados.find(item=>item.sku===p.sku);
     const devuelto = (registroAnterior.devueltos||[]).find(item=>item.sku===p.sku);
@@ -2858,9 +2864,13 @@ function procesarEscaneoEntrega(sku){
     const cantidadDevuelta = devuelto?.cantidad || 0;
     if(cantidadDevuelta < cantidadEntregada){
       entregaEditando = registroAnterior.creado;
+      entregaActual.vendor = registroAnterior.vendor || vendedor;
+      entregaActual.zona = registroAnterior.zona || entregaActual.zona;
+      entregaActual._dia = registroAnterior._dia || '';
       entregaActual.entregaCreado = registroAnterior.entregaCreado || registroAnterior.creado;
       entregaActual.items = (registroAnterior.entregados||[]).map(item=>({...item}));
       entregaActual.devueltos = (registroAnterior.devueltos||[]).map(item=>({...item}));
+      entregaActual.vendidos = (registroAnterior.vendidos||[]).map(item=>({...item}));
       const dev = entregaActual.devueltos.find(x=>x.sku===p.sku);
       if(dev){ dev.cantidad = (dev.cantidad||1)+1; } else { entregaActual.devueltos.push({ sku:p.sku, nombre:p.nombre, marca:p.marca||'', precio:p.contado || 0, cantidad:1 }); }
       entregaActual.devolucionCreado = entregaActual.devolucionCreado || new Date().toISOString();
