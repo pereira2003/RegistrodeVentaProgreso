@@ -1805,7 +1805,7 @@ const NOMBRE_FORMATO = {QR_CODE:'QR', DATA_MATRIX:'Data Matrix', AZTEC:'Aztec', 
   RSS_14:'GS1 DataBar', RSS_EXPANDED:'GS1 DataBar Exp.'};
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
-let vendedorActual = caja.leer('gp_vendedor_actual', '');
+let vendedorActual = '';
 const entregaActual = { vendor: vendedorActual || '', zona: CFG.zonas[0]?.nombre || '', _dia: '', items: [], entregadosIniciales: [], pendientes: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
 let operacionEntrega='entrega';
 let guardandoEntrega=false;
