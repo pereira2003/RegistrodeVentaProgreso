@@ -1494,10 +1494,7 @@ const DB = {
   buscar(codigo, vendedor = vendedorActual){
     const claves = variantesCodigo(codigo);
     if(!claves.length) return undefined;
-    const productos = (this.productos||[]).filter(p => {
-      const pv = String(p.vendedor || '').trim();
-      return !vendedor || !pv || pv === String(vendedor).trim();
-    });
+    const productos = this.productos || [];
     const exacto = productos.find(p=>
       claves.includes(normalizarCodigo(p.sku)) || claves.includes(normalizarCodigo(p.codigoBarras)));
     if(exacto) return exacto;
@@ -1629,8 +1626,8 @@ function vendedoresActuales(){
   return DB.modo==='firebase' ? (DB.vendedores||[]) : caja.leer('gp_vendedores', CFG.vendedores.slice());
 }
 function productosActuales(){
-  const target = String(vendedorActual || '').trim();
-  return (DB.productos||[]).filter(p => !target || String(p.vendedor || '').trim() === target);
+  // Mostrar el catálogo completo para evitar ocultar productos por vendedor activo.
+  return DB.productos || [];
 }
 // Lista completa {nombre, dia} — usar esta para gestión y para filtrar por día.
 function zonasDetalle(){
@@ -4913,6 +4910,18 @@ $('#btnCsv').addEventListener('click',()=>{
   brindis('Archivo CSV descargado');
 });
 
+let diaEntregasFiltro='todos';
+const DIAS_ENTREGAS = [
+  {id:'todos', etiqueta:'Todos'},
+  {id:'lunes', etiqueta:'Lun'},
+  {id:'martes', etiqueta:'Mar'},
+  {id:'miercoles', etiqueta:'Mié'},
+  {id:'jueves', etiqueta:'Jue'},
+  {id:'viernes', etiqueta:'Vie'},
+  {id:'sabado', etiqueta:'Sáb'},
+  {id:'domingo', etiqueta:'Dom'}
+];
+
 function configurarFiltroVentas(){
   const tipo = $('#filtroVentasTipo').value;
   $('#filtroVentasTipo').classList.toggle('filtro-placeholder', !tipo);
@@ -5504,17 +5513,6 @@ $('#btnPdfCartera').addEventListener('click',()=>{
 /* ============================================================
    ARRANQUE
    ============================================================ */
-const DIAS_ENTREGAS = [
-  {id:'todos', etiqueta:'Todos'},
-  {id:'lunes', etiqueta:'Lun'},
-  {id:'martes', etiqueta:'Mar'},
-  {id:'miercoles', etiqueta:'Mié'},
-  {id:'jueves', etiqueta:'Jue'},
-  {id:'viernes', etiqueta:'Vie'},
-  {id:'sabado', etiqueta:'Sáb'},
-  {id:'domingo', etiqueta:'Dom'}
-];
-let diaEntregasFiltro='todos';
 function diaEntregaDeFecha(fecha){
   if(!fecha) return '';
   const fechaLocal=new Date(`${fecha}T12:00:00`);
