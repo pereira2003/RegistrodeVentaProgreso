@@ -5525,7 +5525,7 @@ function seleccionarDiaEntregas(dia){
 function pintarEntregas(){
   const tipoFiltro = $('#filtroEntregasTipo')?.value || 'mes';
   const fechaFiltro = $('#filtroEntregasFecha')?.value || hoy().slice(0,7);
-  const entregas = (DB.entregas || []).filter(e=>!e.ventaGenerada &&
+  const entregas = (DB.entregas || []).filter(e=>
     coincidePeriodo(e.fecha || e.entregaCreado || e.creado, tipoFiltro, fechaFiltro) &&
     (diaEntregasFiltro==='todos' || diaEntregaDeFecha(e.fecha || e.entregaCreado || e.creado)===diaEntregasFiltro)
   );
