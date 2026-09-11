@@ -2523,6 +2523,7 @@ function mostrarZonasHoy(){
 
 function mostrarHojaEntrega(){
   const vendedor = entregaActual.vendor || vendedoresActuales()[0] || '';
+  const vendedorBloqueado = !!entregaEditando;
   const dia = diaSeleccionParaZona(entregaActual);
   const zonas = zonasPorDia(dia);
   const zona = (entregaActual.zona && zonas.includes(entregaActual.zona)) ? entregaActual.zona : (zonas[0] || '');
@@ -2538,7 +2539,7 @@ function mostrarHojaEntrega(){
     <div class="tarjeta pad">
       <div class="campo" style="margin-bottom:10px">
         <label>Vendedor</label>
-        <select id="entregaVendor" onchange="cambiarVendedorEntrega(this.value)">
+        <select id="entregaVendor" onchange="cambiarVendedorEntrega(this.value)" ${vendedorBloqueado ? 'disabled' : ''} ${vendedorBloqueado ? 'title="Este vendedor ya está registrado y no puede cambiarse"' : ''}>
           ${vendedorOptions(vendedor)}
         </select>
       </div>
