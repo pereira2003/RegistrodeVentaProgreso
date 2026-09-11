@@ -1136,6 +1136,8 @@ const DB = {
         console.warn('Firebase no disponible:',e);
         this.modo='local';
         this.fb=null;
+        sello('Firebase','off');
+        brindis('Firebase no disponible. Activa "Anonymous" en Authentication y revisa la configuración de CFG.firebase.');
       }
     }
     this.productos = (caja.leer('gp_productos', null) || SEMILLA.slice()).map(p => ({
