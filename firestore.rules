@@ -1,63 +1,42 @@
 rules_version = '2';
 
 // Reglas de seguridad de Firestore.
-// Publícalas con:  firebase deploy --only firestore:rules
-//
-// Modelo: cada empleado tiene un documento en /usuarios/{uid} con { rol: "vendedor" | "admin" }.
-// Crea esos documentos a mano desde la consola de Firebase la primera vez.
+// Para esta versión, la app carga directamente con la configuración del proyecto,
+// sin depender de Auth anónima.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function autenticado() {
-      return request.auth != null;
-    }
-
-    function rol() {
-      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol;
-    }
-
-    function esAdmin() {
-      return autenticado() && rol() == 'admin';
-    }
-
-    // Perfiles: cada quien lee el suyo; solo el admin los modifica.
     match /usuarios/{uid} {
-      allow read: if autenticado() && (request.auth.uid == uid || esAdmin());
-      allow write: if esAdmin();
+      allow read, write: if true;
     }
 
-    // Catálogo compartido: los dispositivos autenticados anónimamente sincronizan el catálogo.
     match /productos/{sku} {
-      allow read, write: if autenticado();
+      allow read, write: if true;
     }
 
-    // Ventas compartidas entre los dispositivos del equipo.
     match /ventas/{id} {
-      allow read, write: if autenticado();
+      allow read, write: if true;
     }
 
-    // Vendedores y entregas se sincronizan entre los dispositivos del equipo.
     match /vendedores/{id} {
-      allow read, write: if autenticado();
+      allow read, write: if true;
     }
 
     match /zonas/{id} {
-      allow read, write: if autenticado();
+      allow read, write: if true;
     }
 
     match /entregas/{id} {
-      allow read, write: if autenticado();
+      allow read, write: if true;
     }
 
-    // Solicitudes de producto que hacen los vendedores.
     match /solicitudes/{id} {
-      allow read, write: if autenticado();
+      allow read, write: if true;
     }
 
-    // Entregas agendadas (reservan producto hasta su fecha).
     match /agendas/{id} {
-      allow read, write: if autenticado();
+      allow read, write: if true;
     }
   }
 }

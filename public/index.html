@@ -1167,10 +1167,7 @@ const DB = {
     const base = 'https://www.gstatic.com/firebasejs/10.12.2/';
     const {initializeApp} = await import(base+'firebase-app.js');
     const f = await import(base+'firebase-firestore.js');
-    const a = await import(base+'firebase-auth.js');
     const app = initializeApp(CFG.firebase);
-    const auth = a.getAuth(app);
-    await a.signInAnonymously(auth);
     let bd;
     try{
       bd = f.initializeFirestore(app,{localCache:f.persistentLocalCache({tabManager:f.persistentMultipleTabManager()})});
