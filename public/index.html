@@ -1805,28 +1805,32 @@ const NOMBRE_FORMATO = {QR_CODE:'QR', DATA_MATRIX:'Data Matrix', AZTEC:'Aztec', 
   RSS_14:'GS1 DataBar', RSS_EXPANDED:'GS1 DataBar Exp.'};
 let productoPendiente=null, sesionProducto=0;
 const recientes = [];
-let vendedorActual = caja.leer('gp_vendedor_actual', CFG.vendedores[0] || '');
-const entregaActual = { vendor: vendedorActual || CFG.vendedores[0] || '', zona: CFG.zonas[0]?.nombre || '', _dia: '', items: [], entregadosIniciales: [], pendientes: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
+let vendedorActual = caja.leer('gp_vendedor_actual', '');
+const entregaActual = { vendor: vendedorActual || '', zona: CFG.zonas[0]?.nombre || '', _dia: '', items: [], entregadosIniciales: [], pendientes: [], devueltos: [], vendidos: [], solicitudesOrigen: [], entregaCreado: null, devolucionCreado: null };
 let operacionEntrega='entrega';
 let guardandoEntrega=false;
 let entregaEditando=null;
 let entregaSeleccionando=false;
 let entregaSeleccion=new Set();
 
-function vendedorOptions(selected=''){
+function vendedorOptions(selected='', { placeholder='', incluirPlaceholder=false } = {}){
   const lista=vendedoresActuales();
   if(!lista.length) return '';
-  return lista.map(v=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(v)}</option>`).join('');
+  const opciones = lista.map(v=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(v)}</option>`).join('');
+  if(!incluirPlaceholder) return opciones;
+  return `<option value="" ${selected ? '' : 'selected'}>${esc(placeholder || 'Seleccione un vendedor')}</option>${opciones}`;
 }
 
 function aplicarVendedorActual(vendedor){
   const lista=vendedoresActuales();
-  const value = lista.includes(vendedor) ? vendedor : (lista[0] || '');
+  const value = (vendedor && lista.includes(vendedor)) ? vendedor : '';
   vendedorActual = value;
   entregaActual.vendor = value;
   caja.guardar('gp_vendedor_actual', value);
   const selectorEscaneo = $('#selVendedor');
-  if(selectorEscaneo){ selectorEscaneo.innerHTML = vendedorOptions(value); }
+  if(selectorEscaneo){
+    selectorEscaneo.innerHTML = vendedorOptions(value, { placeholder:'Seleccione el vendedor', incluirPlaceholder:true });
+  }
   const selectorVenta = $('#vVendedor');
   if(selectorVenta){ selectorVenta.value = value; }
   const selectorEntrega = $('#entregaVendor');
@@ -1837,7 +1841,14 @@ function aplicarVendedorActual(vendedor){
 function mostrarSolicitudesActivo(){
   const cont = $('#solActivoLista');
   if(!cont) return;
-  const v = vendedorActual || '';
+  const selectorEscaneo = $('#selVendedor');
+  const v = selectorEscaneo ? (selectorEscaneo.value || '') : (vendedorActual || '');
+  if(!v){
+    cont.innerHTML = '';
+    const rot = $('#solActivoRotulo');
+    if(rot) rot.hidden = true;
+    return;
+  }
   const lista = ordenarSolicitudes((DB.solicitudes||[]).filter(s=>s.vendedor===v && !s.entregada));
   cont.innerHTML = lista.length ? bloqueSolicitudesVendedor(v, lista, 'solActivoLista') : '';
   const rot = $('#solActivoRotulo');
@@ -1847,9 +1858,7 @@ function mostrarSolicitudesActivo(){
 function inicializarVendedorActual(){
   const lista=vendedoresActuales();
   if(!lista.length) return;
-  if(!vendedorActual || !lista.includes(vendedorActual)){
-    vendedorActual = lista[0];
-  }
+  vendedorActual = vendedorActual && lista.includes(vendedorActual) ? vendedorActual : '';
   entregaActual.vendor = vendedorActual;
   aplicarVendedorActual(vendedorActual);
 }
