@@ -663,11 +663,11 @@ button{cursor:pointer;border:none;background:none}
 <section class="vista" data-vista="entregas">
   <div class="rotulo">Filtrar entregas</div>
   <div class="filtro-fila" style="margin-bottom:8px">
-    <select id="filtroEntregasTipo" class="filtro-control filtro-placeholder filtro-tipo">
-      <option value="" disabled selected>Seleccione el filtro</option>
-      <option value="mes">Por mes</option><option value="dia">Por día</option><option value="año">Por año</option>
+    <select id="filtroEntregasTipo" class="filtro-control filtro-tipo">
+      <option value="dia" selected>Por día</option>
+      <option value="mes">Por mes</option><option value="año">Por año</option>
     </select>
-    <div class="filtro-fecha"><label id="etiquetaFiltroEntregasFecha" for="filtroEntregasFecha">Seleccione fecha</label><input id="filtroEntregasFecha" class="filtro-control" type="month" aria-label="Seleccione fecha"></div>
+    <div class="filtro-fecha"><label id="etiquetaFiltroEntregasFecha" for="filtroEntregasFecha">Seleccione fecha</label><input id="filtroEntregasFecha" class="filtro-control" type="date" aria-label="Seleccione fecha"></div>
   </div>
   <button class="btn plano chico" id="btnLimpiarEntregas" style="width:100%;margin-bottom:14px">Limpiar registros</button>
   <div class="rotulo">Ruta de hoy</div>
@@ -1138,7 +1138,10 @@ const DB = {
         this.fb=null;
       }
     }
-    this.productos = caja.leer('gp_productos', null) || SEMILLA.slice();
+    this.productos = (caja.leer('gp_productos', null) || SEMILLA.slice()).map(p => ({
+      ...p,
+      vendedor: String(p.vendedor || vendedorActual || CFG.vendedores[0] || '').trim()
+    }));
     this.ventas    = caja.leer('gp_ventas', []);
     this.entregas  = caja.leer('gp_entregas', []);
     this.vendedores = caja.leer('gp_vendedores', CFG.vendedores.slice());
@@ -1173,7 +1176,10 @@ const DB = {
     this.fb = {f, bd};
     await this.migrarDatosLocales();
     f.onSnapshot(f.collection(bd,'productos'), s=>{
-      const lista = s.docs.map(d=>({id:d.id,...d.data()}));
+      const lista = s.docs.map(d=>({id:d.id,...d.data()})).map(p => ({
+        ...p,
+        vendedor: String(p.vendedor || vendedorActual || CFG.vendedores[0] || '').trim()
+      }));
       // Un snapshot vacío desde caché no debe borrar el catálogo ya cargado
       if(!lista.length && this.productos.length && s.metadata.fromCache){ ocultarCargaInicial(); return; }
       this.productos = lista;
@@ -1252,12 +1258,13 @@ const DB = {
   async sembrar(lista=SEMILLA){ for(const p of lista) await this.agregarProducto(p); },
 
   async agregarProducto(p){
+    const producto = { ...p, vendedor: String(p.vendedor || vendedorActual || CFG.vendedores[0] || '').trim() };
     if(this.modo==='firebase'){
-      const {f,bd}=this.fb; await f.setDoc(f.doc(bd,'productos',p.sku), p);
-      this.productos = [...this.productos.filter(item=>item.sku!==p.sku), p];
+      const {f,bd}=this.fb; await f.setDoc(f.doc(bd,'productos',producto.sku), producto);
+      this.productos = [...this.productos.filter(item=>item.sku!==producto.sku), producto];
       pintarTodo();
     }else{
-      this.productos.push(p); caja.guardar('gp_productos',this.productos); pintarTodo();
+      this.productos.push(producto); caja.guardar('gp_productos',this.productos); pintarTodo();
     }
   },
 
@@ -1397,19 +1404,20 @@ const DB = {
   },
 
   async actualizarProducto(p, skuAnterior=''){
+    const producto = { ...p, vendedor: String(p.vendedor || vendedorActual || CFG.vendedores[0] || '').trim() };
     if(this.modo==='firebase'){
       const {f,bd}=this.fb;
-      if(skuAnterior && skuAnterior.toUpperCase()!==p.sku.toUpperCase()){
-        await f.setDoc(f.doc(bd,'productos',p.sku), p);
+      if(skuAnterior && skuAnterior.toUpperCase()!==producto.sku.toUpperCase()){
+        await f.setDoc(f.doc(bd,'productos',producto.sku), producto);
         await f.deleteDoc(f.doc(bd,'productos',skuAnterior.toUpperCase()));
-      }else await f.updateDoc(f.doc(bd,'productos',p.sku), p);
-      const claveAnterior=String(skuAnterior||p.sku).trim().toUpperCase();
-      this.productos=this.productos.map(item=>item.sku.toUpperCase()===claveAnterior?{...item,...p}:item);
+      }else await f.updateDoc(f.doc(bd,'productos',producto.sku), producto);
+      const claveAnterior=String(skuAnterior||producto.sku).trim().toUpperCase();
+      this.productos=this.productos.map(item=>item.sku.toUpperCase()===claveAnterior?{...item,...producto}:item);
       pintarTodo();
     }else{
-      const claveAnterior = String(skuAnterior || p.sku).trim().toUpperCase();
+      const claveAnterior = String(skuAnterior || producto.sku).trim().toUpperCase();
       const idx = this.productos.findIndex(item => item.sku.toUpperCase() === claveAnterior);
-      if(idx >= 0){ this.productos[idx] = { ...this.productos[idx], ...p }; }
+      if(idx >= 0){ this.productos[idx] = { ...this.productos[idx], ...producto }; }
       caja.guardar('gp_productos',this.productos); pintarTodo();
     }
   },
@@ -1484,14 +1492,18 @@ const DB = {
     }
   },
 
-  buscar(codigo){
+  buscar(codigo, vendedor = vendedorActual){
     const claves = variantesCodigo(codigo);
     if(!claves.length) return undefined;
-    const exacto = this.productos.find(p=>
+    const productos = (this.productos||[]).filter(p => {
+      const pv = String(p.vendedor || '').trim();
+      return !vendedor || !pv || pv === String(vendedor).trim();
+    });
+    const exacto = productos.find(p=>
       claves.includes(normalizarCodigo(p.sku)) || claves.includes(normalizarCodigo(p.codigoBarras)));
     if(exacto) return exacto;
     // El producto guardado puede estar en otra variante del mismo código (UPC-A / EAN-13 / GTIN-14)
-    return this.productos.find(p=>
+    return productos.find(p=>
       variantesCodigo(p.sku).some(v=>claves.includes(v)) ||
       variantesCodigo(p.codigoBarras).some(v=>claves.includes(v)));
   }
@@ -1616,6 +1628,10 @@ async function cerrarEntregasVencidas(){
 
 function vendedoresActuales(){
   return DB.modo==='firebase' ? (DB.vendedores||[]) : caja.leer('gp_vendedores', CFG.vendedores.slice());
+}
+function productosActuales(){
+  const target = String(vendedorActual || '').trim();
+  return (DB.productos||[]).filter(p => !target || String(p.vendedor || '').trim() === target);
 }
 // Lista completa {nombre, dia} — usar esta para gestión y para filtrar por día.
 function zonasDetalle(){
@@ -4219,7 +4235,8 @@ async function guardarProducto(skuOriginal = ''){
     marca:$('#pMarca').value.trim().toUpperCase(),
     categoria:$('#pCat').value || categoriaSegunNombre(nombre) || 'Otros',
     contado:+$('#pContado').value||0, credito:+$('#pCredito').value||0, stock:+$('#pStock').value||0,
-    piezas:Math.max(1, Math.round(+$('#pPiezas').value||1))
+    piezas:Math.max(1, Math.round(+$('#pPiezas').value||1)),
+    vendedor: String(vendedorActual || '').trim()
   };
 
   const existe = DB.buscar(sku);
@@ -4339,13 +4356,14 @@ function bindSwipeVenta(card){
 function pintarProductos(){
   const q = $('#filtroProd').value.toLowerCase().trim();
   let lista, exacta = false;
+  const catalogo = productosActuales();
   if(skuBuscado){
     // Búsqueda por cámara: solo el producto escaneado, exacto
-    const p = DB.buscar(skuBuscado);
+    const p = DB.buscar(skuBuscado, vendedorActual);
     lista = p ? [p] : [];
     exacta = true;
   }else{
-    lista = DB.productos.filter(p=>!q ||
+    lista = catalogo.filter(p=>!q ||
       (p.nombre+p.marca+p.sku+(p.codigoBarras||'')+(p.categoria||'')).toLowerCase().includes(q));
   }
   const btnLimpiar = $('#btnLimpiarProd');
@@ -4497,10 +4515,11 @@ function detalleVenta(id){
 }
 
 function coincidePeriodo(fechaVenta, tipo, valor){
-  if(!fechaVenta || !valor) return false;
-  if(tipo==='dia') return fechaVenta===valor;
-  if(tipo==='año') return fechaVenta.slice(0,4)===valor;
-  return fechaVenta.slice(0,7)===valor;
+  const fecha = String(fechaVenta || '').slice(0,10);
+  if(!fecha || !valor) return false;
+  if(tipo==='dia') return fecha===valor;
+  if(tipo==='año') return fecha.slice(0,4)===valor;
+  return fecha.slice(0,7)===valor;
 }
 
 function pintarCartera(){
@@ -4943,11 +4962,24 @@ function configurarFiltroFecha(tipoId, fechaId, pintar){
 }
 $('#filtroEntregasTipo').addEventListener('change',()=>configurarFiltroFecha('filtroEntregasTipo','filtroEntregasFecha',pintarEntregas));
 $('#filtroEntregasFecha').addEventListener('input',pintarEntregas);
+
+function inicializarFiltroEntregas(){
+  const selector = $('#filtroEntregasTipo');
+  const campo = $('#filtroEntregasFecha');
+  if(!selector || !campo) return;
+  selector.value = 'dia';
+  campo.type = 'date';
+  campo.value = hoy();
+  configurarFiltroFecha('filtroEntregasTipo','filtroEntregasFecha',pintarEntregas);
+}
+
 $('#btnGestionVendedores').addEventListener('click',gestionarVendedores);
 $('#btnGestionZonas').addEventListener('click',gestionarZonas);
 $('#btnZonasHoy').addEventListener('click',mostrarZonasHoy);
 $('#filtroCarteraTipo').addEventListener('change',()=>configurarFiltroFecha('filtroCarteraTipo','filtroCarteraFecha',pintarCartera));
 $('#filtroCarteraFecha').addEventListener('input',pintarCartera);
+
+inicializarFiltroEntregas();
 
 /* Cartera vive dentro de "Ventas": se abre con el icono de la esquina y
    la barra inferior sigue marcando Ventas. */
@@ -5420,9 +5452,9 @@ $('#btnPdfVentas').addEventListener('click',()=>{
 $('#btnPdfEntregas').addEventListener('click',()=>{
   const tipo=$('#filtroEntregasTipo').value, valor=$('#filtroEntregasFecha').value;
   const entregas=(DB.entregas||[]).filter(e=>
-    coincidePeriodo(e.fecha,tipo,valor) &&
-    (diaEntregasFiltro==='todos' || diaEntregaDeFecha(e.fecha)===diaEntregasFiltro)
-  ).slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
+    coincidePeriodo(e.fecha || e.entregaCreado || e.creado, tipo, valor) &&
+    (diaEntregasFiltro==='todos' || diaEntregaDeFecha(e.fecha || e.entregaCreado || e.creado)===diaEntregasFiltro)
+  ).slice().sort((a,b)=>String(a.fecha || a.entregaCreado || a.creado || '').localeCompare(String(b.fecha || b.entregaCreado || b.creado || '')));
   const valor_=arr=>(arr||[]).reduce((s,i)=>s+(Number(i.precio)||0)*(i.cantidad||1),0);
   const cantidad=arr=>(arr||[]).reduce((s,i)=>s+(Number(i.cantidad)||1),0);
   const neto=e=>{
@@ -5497,8 +5529,8 @@ function pintarEntregas(){
   const tipoFiltro = $('#filtroEntregasTipo')?.value || 'mes';
   const fechaFiltro = $('#filtroEntregasFecha')?.value || hoy().slice(0,7);
   const entregas = (DB.entregas || []).filter(e=>!e.ventaGenerada &&
-    coincidePeriodo(e.fecha,tipoFiltro,fechaFiltro) &&
-    (diaEntregasFiltro==='todos' || diaEntregaDeFecha(e.fecha)===diaEntregasFiltro)
+    coincidePeriodo(e.fecha || e.entregaCreado || e.creado, tipoFiltro, fechaFiltro) &&
+    (diaEntregasFiltro==='todos' || diaEntregaDeFecha(e.fecha || e.entregaCreado || e.creado)===diaEntregasFiltro)
   );
   const contar = arr => (arr||[]).reduce((t,i)=>t+(i.cantidad||1),0);
   const totalEntregados = entregas.reduce((s,e)=>s + contar(productosEntregadosIniciales(e)),0);
